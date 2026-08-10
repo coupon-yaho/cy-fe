@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as EventsIndexRouteImport } from './routes/events.index'
+import { Route as EventsCouponIdRouteImport } from './routes/events.$couponId'
+import { Route as MyCouponsRouteImport } from './routes/my.coupons'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +31,76 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsCouponIdRoute = EventsCouponIdRouteImport.update({
+  id: '/events/$couponId',
+  path: '/events/$couponId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyCouponsRoute = MyCouponsRouteImport.update({
+  id: '/my/coupons',
+  path: '/my/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/events/$couponId': typeof EventsCouponIdRoute
+  '/my/coupons': typeof MyCouponsRoute
+  '/events/': typeof EventsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/events/$couponId': typeof EventsCouponIdRoute
+  '/my/coupons': typeof MyCouponsRoute
+  '/events': typeof EventsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/events/$couponId': typeof EventsCouponIdRoute
+  '/my/coupons': typeof MyCouponsRoute
+  '/events/': typeof EventsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/events/$couponId'
+    | '/my/coupons'
+    | '/events/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/signup'
-  id: '__root__' | '/' | '/login' | '/signup'
+  to:
+    '/' | '/login' | '/signup' | '/events/$couponId' | '/my/coupons' | '/events'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/events/$couponId'
+    | '/my/coupons'
+    | '/events/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  EventsCouponIdRoute: typeof EventsCouponIdRoute
+  MyCouponsRoute: typeof MyCouponsRoute
+  EventsIndexRoute: typeof EventsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +126,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$couponId': {
+      id: '/events/$couponId'
+      path: '/events/$couponId'
+      fullPath: '/events/$couponId'
+      preLoaderRoute: typeof EventsCouponIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my/coupons': {
+      id: '/my/coupons'
+      path: '/my/coupons'
+      fullPath: '/my/coupons'
+      preLoaderRoute: typeof MyCouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +154,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  EventsCouponIdRoute: EventsCouponIdRoute,
+  MyCouponsRoute: MyCouponsRoute,
+  EventsIndexRoute: EventsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
