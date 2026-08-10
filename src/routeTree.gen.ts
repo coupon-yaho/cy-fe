@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
 import { Route as AdminSystemRouteImport } from './routes/admin.system'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsCouponIdRouteImport } from './routes/events.$couponId'
@@ -50,6 +51,11 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCouponsRoute = AdminCouponsRouteImport.update({
+  id: '/coupons',
+  path: '/coupons',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSystemRoute = AdminSystemRouteImport.update({
   id: '/system',
   path: '/system',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/coupons': typeof AdminCouponsRoute
   '/admin/system': typeof AdminSystemRoute
   '/events/$couponId': typeof EventsCouponIdRoute
   '/my/coupons': typeof MyCouponsRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/coupons': typeof AdminCouponsRoute
   '/admin/system': typeof AdminSystemRoute
   '/events/$couponId': typeof EventsCouponIdRoute
   '/my/coupons': typeof MyCouponsRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/coupons': typeof AdminCouponsRoute
   '/admin/system': typeof AdminSystemRoute
   '/events/$couponId': typeof EventsCouponIdRoute
   '/my/coupons': typeof MyCouponsRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/admin/analytics'
+    | '/admin/coupons'
     | '/admin/system'
     | '/events/$couponId'
     | '/my/coupons'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/admin/analytics'
+    | '/admin/coupons'
     | '/admin/system'
     | '/events/$couponId'
     | '/my/coupons'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/admin/analytics'
+    | '/admin/coupons'
     | '/admin/system'
     | '/events/$couponId'
     | '/my/coupons'
@@ -199,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/coupons': {
+      id: '/admin/coupons'
+      path: '/coupons'
+      fullPath: '/admin/coupons'
+      preLoaderRoute: typeof AdminCouponsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/system': {
       id: '/admin/system'
       path: '/system'
@@ -232,12 +251,14 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminCouponsRoute: typeof AdminCouponsRoute
   AdminSystemRoute: typeof AdminSystemRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminCouponsRoute: AdminCouponsRoute,
   AdminSystemRoute: AdminSystemRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
