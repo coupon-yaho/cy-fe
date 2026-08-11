@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
