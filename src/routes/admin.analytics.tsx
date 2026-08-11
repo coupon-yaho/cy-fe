@@ -57,12 +57,28 @@ function AdminAnalytics() {
   const [period, setPeriod] = useState<StatPeriod>("30d");
   const [nonce, setNonce] = useState(0);
 
-  void nonce;
-  const brands = brandStats(period);
-  const grades = gradeStats(period);
-  const cells = heatmap(period);
+  // 기간/리셋이 바뀌면 즉시 재계산
+  const { brands, grades, cells, totalIssued, totalUsed, conversion, peak } = useMemo(() => {
+    const brands = brandStats(period);
+    const grades = gradeStats(period);
+    const cells = heatmap(period);
+    const totalIssued = brands.reduce((a, b) => a + b.issued, 0);
+    const totalUsed = brands.reduce((a, b) => a + b.used, 0);
+    const peak = cells.reduce((a, c) => (c.value > a.value ? c : a), cells[0]!);
+    return {
+      brands,
+      grades,
+      cells,
+      totalIssued,
+      totalUsed,
+      conversion: totalIssued ? (totalUsed / totalIssued) * 100 : 0,
+      peak,
+    };
+  }, [period, nonce]);
+
   const max = Math.max(...cells.map((c) => c.value), 1);
   const periodLabel = STAT_PERIODS.find((p) => p.value === period)?.label ?? "";
+
 
   function handleReset() {
     resetStats();
