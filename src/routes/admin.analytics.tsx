@@ -35,9 +35,13 @@ import {
   brandStats,
   gradeStats,
   heatmap,
+  heatmapDays,
+  heatmapHours,
+  issuanceTrend,
   resetStats,
   type StatPeriod,
 } from "@/lib/metrics";
+
 
 export const Route = createFileRoute("/admin/analytics")({
   head: () => ({
