@@ -167,7 +167,7 @@ export function heatmap(period: StatPeriod = "30d"): { day: number; hour: number
         const dist = Math.abs(day - pd!) * 3 + Math.abs(hour - ph!);
         if (dist < 6) v += Math.round(9000 / (1 + dist * dist));
       }
-      cells.push({ day, hour, value: v });
+      cells.push({ day, hour, value: Math.round(v * k) });
     }
   }
   return cells;
