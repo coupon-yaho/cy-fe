@@ -189,18 +189,43 @@ function AdminAnalytics() {
       </div>
 
       <Card className="shadow-card">
-        <CardHeader><CardTitle className="text-base">요일 × 시간대 발급 히트맵</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">
+            발급 · 사용 추이 ({periodLabel} · {period === "today" ? "시간별" : "일별"})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={trend}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Legend />
+              <Area type="monotone" dataKey="issued" name="발급" stroke="#3b6fa0" fill="#3b6fa0" fillOpacity={0.25} />
+              <Area type="monotone" dataKey="used" name="사용" stroke="#0f1b3d" fill="#0f1b3d" fillOpacity={0.25} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base">
+            요일 × 시간대 발급 히트맵 ({periodLabel})
+          </CardTitle>
+        </CardHeader>
         <CardContent className="overflow-x-auto">
           <div className="min-w-[640px] space-y-1">
-            {DAYS.map((d, day) => (
-              <div key={d} className="flex items-center gap-1">
-                <span className="w-6 text-xs text-muted-foreground">{d}</span>
-                {Array.from({ length: 24 }).map((_, hour) => {
+            {days.map((day) => (
+              <div key={day} className="flex items-center gap-1">
+                <span className="w-6 text-xs text-muted-foreground">{DAYS[day]}</span>
+                {hours.map((hour) => {
                   const v = cells.find((c) => c.day === day && c.hour === hour)?.value ?? 0;
                   return (
                     <div
                       key={hour}
-                      title={`${d} ${hour}시 · ${v.toLocaleString("ko-KR")}건`}
+                      title={`${DAYS[day]} ${hour}시 · ${v.toLocaleString("ko-KR")}건`}
                       className="h-6 flex-1 rounded-sm"
                       style={{ backgroundColor: `rgba(15,27,61,${0.08 + (v / max) * 0.92})` }}
                     />
@@ -209,8 +234,14 @@ function AdminAnalytics() {
               </div>
             ))}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {period === "today"
+              ? "오늘 요일의 현재 시각까지 발급분만 표시합니다."
+              : `${periodLabel} 누적 발급 기준입니다.`}
+          </p>
         </CardContent>
       </Card>
+
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="shadow-card">
