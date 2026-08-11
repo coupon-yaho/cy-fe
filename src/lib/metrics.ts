@@ -90,6 +90,33 @@ export function queueMode(p: MetricPoint | undefined): QueueMode {
 
 /* ---------- 사전 집계 통계 (300만 건 규모 대표값) ---------- */
 
+export type StatPeriod = "today" | "7d" | "30d";
+
+export const STAT_PERIODS: { value: StatPeriod; label: string; scale: number }[] = [
+  { value: "today", label: "오늘", scale: 0.045 },
+  { value: "7d", label: "7일", scale: 0.28 },
+  { value: "30d", label: "30일", scale: 1 },
+];
+
+function scaleOf(period: StatPeriod) {
+  return STAT_PERIODS.find((p) => p.value === period)?.scale ?? 1;
+}
+
+/** 리셋할 때마다 증가하는 시드 — 집계 지표를 초기 상태로 다시 계산 */
+let statSeed = 0;
+
+/** 관리자 통계 지표 리셋 (누적 집계를 다시 산출) */
+export function resetStats() {
+  statSeed += 1;
+  series = [];
+  lastTick = 0;
+  return statSeed;
+}
+
+export function statSeedValue() {
+  return statSeed;
+}
+
 export interface BrandStat {
   brand: string;
   issued: number;
@@ -97,32 +124,37 @@ export interface BrandStat {
   conversion: number;
 }
 
-export function brandStats(): BrandStat[] {
+export function brandStats(period: StatPeriod = "30d"): BrandStat[] {
   const s = getStore();
+  const k = scaleOf(period);
   return s.brands.map((b, i) => {
-    const issued = 180000 + ((i * 37711) % 140000);
-    const used = Math.round(issued * (0.42 + ((i * 13) % 30) / 100));
+    const j = i + statSeed;
+    const issued = Math.round((180000 + ((j * 37711) % 140000)) * k);
+    const used = Math.round(issued * (0.42 + ((j * 13) % 30) / 100));
     return {
       brand: b.name,
       issued,
       used,
-      conversion: Number(((used / issued) * 100).toFixed(1)),
+      conversion: Number((issued ? (used / issued) * 100 : 0).toFixed(1)),
     };
   });
 }
 
-export function gradeStats(): { grade: Grade; issued: number; users: number }[] {
+export function gradeStats(period: StatPeriod = "30d"): { grade: Grade; issued: number; users: number }[] {
   const base = { WELCOME: 500000, SILVER: 300000, GOLD: 150000, VIP: 50000 } as Record<Grade, number>;
   const weight = { WELCOME: 1.6, SILVER: 3.1, GOLD: 5.4, VIP: 9.2 } as Record<Grade, number>;
+  const k = scaleOf(period);
   return GRADES.map((g) => ({
     grade: g,
     users: base[g],
-    issued: Math.round(base[g] * weight[g]),
+    issued: Math.round(base[g] * weight[g] * k),
   }));
 }
 
 /** 요일(0=월) × 시간(0~23) 발급 히트맵 */
-export function heatmap(): { day: number; hour: number; value: number }[] {
+export function heatmap(period: StatPeriod = "30d"): { day: number; hour: number; value: number }[] {
+  const k = scaleOf(period);
+
   const cells: { day: number; hour: number; value: number }[] = [];
   const peaks = [
     [1, 14], [3, 18], [4, 11], [1, 10], [2, 15],
