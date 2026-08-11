@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -57,12 +57,28 @@ function AdminAnalytics() {
   const [period, setPeriod] = useState<StatPeriod>("30d");
   const [nonce, setNonce] = useState(0);
 
-  void nonce;
-  const brands = brandStats(period);
-  const grades = gradeStats(period);
-  const cells = heatmap(period);
+  // 기간/리셋이 바뀌면 즉시 재계산
+  const { brands, grades, cells, totalIssued, totalUsed, conversion, peak } = useMemo(() => {
+    const brands = brandStats(period);
+    const grades = gradeStats(period);
+    const cells = heatmap(period);
+    const totalIssued = brands.reduce((a, b) => a + b.issued, 0);
+    const totalUsed = brands.reduce((a, b) => a + b.used, 0);
+    const peak = cells.reduce((a, c) => (c.value > a.value ? c : a), cells[0]!);
+    return {
+      brands,
+      grades,
+      cells,
+      totalIssued,
+      totalUsed,
+      conversion: totalIssued ? (totalUsed / totalIssued) * 100 : 0,
+      peak,
+    };
+  }, [period, nonce]);
+
   const max = Math.max(...cells.map((c) => c.value), 1);
   const periodLabel = STAT_PERIODS.find((p) => p.value === period)?.label ?? "";
+
 
   function handleReset() {
     resetStats();
@@ -100,6 +116,22 @@ function AdminAnalytics() {
             <RotateCcw className="mr-2 size-4" /> 지표 리셋
           </Button>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "총 발급", value: totalIssued.toLocaleString("ko-KR") + "건" },
+          { label: "총 사용", value: totalUsed.toLocaleString("ko-KR") + "건" },
+          { label: "전환율", value: conversion.toFixed(1) + "%" },
+          { label: "피크 시간대", value: `${DAYS[peak.day]} ${peak.hour}시` },
+        ].map((kpi) => (
+          <Card key={kpi.label} className="shadow-card">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">{kpi.label}</p>
+              <p className="num mt-1 text-2xl font-bold">{kpi.value}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
 
