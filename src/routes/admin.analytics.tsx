@@ -118,6 +118,22 @@ function AdminAnalytics() {
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "총 발급", value: totalIssued.toLocaleString("ko-KR") + "건" },
+          { label: "총 사용", value: totalUsed.toLocaleString("ko-KR") + "건" },
+          { label: "전환율", value: conversion.toFixed(1) + "%" },
+          { label: "피크 시간대", value: `${DAYS[peak.day]} ${peak.hour}시` },
+        ].map((kpi) => (
+          <Card key={kpi.label} className="shadow-card">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">{kpi.label}</p>
+              <p className="num mt-1 text-2xl font-bold">{kpi.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="shadow-card">
