@@ -151,18 +151,33 @@ export function gradeStats(period: StatPeriod = "30d"): { grade: Grade; issued: 
   }));
 }
 
-/** 요일(0=월) × 시간(0~23) 발급 히트맵 */
+/** 선택 기간에 포함되는 요일(0=월) 목록 — 오늘은 오늘 요일만 */
+export function heatmapDays(period: StatPeriod = "30d"): number[] {
+  if (period !== "today") return [0, 1, 2, 3, 4, 5, 6];
+  const js = new Date().getDay(); // 0=일
+  return [(js + 6) % 7];
+}
+
+/** 선택 기간에 포함되는 시간대 — 오늘은 현재 시각까지만 */
+export function heatmapHours(period: StatPeriod = "30d"): number[] {
+  const last = period === "today" ? new Date().getHours() : 23;
+  return Array.from({ length: last + 1 }, (_, h) => h);
+}
+
+/** 요일(0=월) × 시간(0~23) 발급 히트맵 (기간에 해당하는 셀만 반환) */
 export function heatmap(period: StatPeriod = "30d"): { day: number; hour: number; value: number }[] {
   const k = scaleOf(period);
+  const days = heatmapDays(period);
+  const hours = heatmapHours(period);
 
   const cells: { day: number; hour: number; value: number }[] = [];
   const peaks = [
     [1, 14], [3, 18], [4, 11], [1, 10], [2, 15],
     [4, 19], [0, 12], [2, 16], [4, 17], [1, 13], [3, 20], [4, 7],
   ];
-  for (let day = 0; day < 7; day++) {
-    for (let hour = 0; hour < 24; hour++) {
-      let v = 200 + ((day * 31 + hour * 17) % 400);
+  for (const day of days) {
+    for (const hour of hours) {
+      let v = 200 + ((day * 31 + hour * 17 + statSeed * 7) % 400);
       for (const [pd, ph] of peaks) {
         const dist = Math.abs(day - pd!) * 3 + Math.abs(hour - ph!);
         if (dist < 6) v += Math.round(9000 / (1 + dist * dist));
@@ -172,6 +187,40 @@ export function heatmap(period: StatPeriod = "30d"): { day: number; hour: number
   }
   return cells;
 }
+
+export interface TrendPoint {
+  label: string;
+  issued: number;
+  used: number;
+}
+
+/** 기간별 발급 추이 — 오늘은 시간 단위, 7일/30일은 일 단위 */
+export function issuanceTrend(period: StatPeriod = "30d"): TrendPoint[] {
+  const now = new Date();
+  const buckets = period === "today" ? now.getHours() + 1 : period === "7d" ? 7 : 30;
+  const points: TrendPoint[] = [];
+  for (let i = buckets - 1; i >= 0; i--) {
+    let label: string;
+    let base: number;
+    if (period === "today") {
+      const hour = now.getHours() - i;
+      label = `${String(hour).padStart(2, "0")}시`;
+      base = 4200 + ((hour * 977 + statSeed * 131) % 3600) + (hour >= 10 && hour <= 20 ? 5200 : 0);
+    } else {
+      const d = new Date(now.getTime() - i * 86400000);
+      label = `${d.getMonth() + 1}/${d.getDate()}`;
+      const key = d.getDate() + d.getMonth() * 31 + statSeed * 17;
+      base = 68000 + ((key * 5171) % 42000) + ([0, 6].includes(d.getDay()) ? 18000 : 0);
+    }
+    points.push({
+      label,
+      issued: base,
+      used: Math.round(base * (0.44 + ((Math.abs(base) / 7) % 22) / 100)),
+    });
+  }
+  return points;
+}
+
 
 export interface Benchmark {
   version: "v1" | "v2" | "v3";
