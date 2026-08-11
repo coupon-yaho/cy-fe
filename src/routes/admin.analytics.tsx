@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -12,6 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -22,7 +26,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { GRADE_LABEL } from "@/lib/domain";
-import { BENCHMARKS, VERIFY_REPORT, brandStats, gradeStats, heatmap } from "@/lib/metrics";
+import {
+  BENCHMARKS,
+  STAT_PERIODS,
+  VERIFY_REPORT,
+  brandStats,
+  gradeStats,
+  heatmap,
+  resetStats,
+  type StatPeriod,
+} from "@/lib/metrics";
 
 export const Route = createFileRoute("/admin/analytics")({
   head: () => ({
@@ -41,17 +54,54 @@ const PIE_COLORS = ["#8ab0d6", "#3b6fa0", "#1e3a5f", "#0f1b3d"];
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 function AdminAnalytics() {
-  const brands = brandStats();
-  const grades = gradeStats();
-  const cells = heatmap();
-  const max = Math.max(...cells.map((c) => c.value));
+  const [period, setPeriod] = useState<StatPeriod>("30d");
+  const [nonce, setNonce] = useState(0);
+
+  void nonce;
+  const brands = brandStats(period);
+  const grades = gradeStats(period);
+  const cells = heatmap(period);
+  const max = Math.max(...cells.map((c) => c.value), 1);
+  const periodLabel = STAT_PERIODS.find((p) => p.value === period)?.label ?? "";
+
+  function handleReset() {
+    resetStats();
+    setNonce((n) => n + 1);
+    toast.success("지표를 리셋했습니다", { description: "집계 데이터가 다시 산출되었습니다." });
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl font-bold">통계 · 분석</h1>
-        <p className="text-sm text-muted-foreground">누적 발급 300만 건 규모 사전 집계 데이터</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">통계 · 분석</h1>
+          <p className="text-sm text-muted-foreground">
+            {periodLabel} 기준 집계 데이터 (누적 300만 건 규모)
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md border border-border bg-background p-0.5">
+            {STAT_PERIODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setPeriod(p.value)}
+                className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                  period === p.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-secondary"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleReset}>
+            <RotateCcw className="mr-2 size-4" /> 지표 리셋
+          </Button>
+        </div>
       </div>
+
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="shadow-card">
