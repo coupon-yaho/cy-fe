@@ -253,3 +253,152 @@ export const VERIFY_REPORT: VerifyRow[] = [
   { rule: "멱등키 응답 동일성", checked: 51204, violations: 0, planted: 2, detected: 2 },
   { rule: "만료 배치 정합성", checked: 812340, violations: 0, planted: 1, detected: 1 },
 ];
+
+/* ---------- 시스템 관제 파생 지표 ---------- */
+
+export type Health = "OK" | "WARN" | "CRIT";
+
+export interface SloRow {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  target: number;
+  /** true면 값이 target 이하일 때 정상 */
+  lowerIsBetter: boolean;
+  health: Health;
+  hint: string;
+}
+
+function health(value: number, target: number, lowerIsBetter: boolean, slack = 1.25): Health {
+  if (lowerIsBetter) {
+    if (value <= target) return "OK";
+    return value <= target * slack ? "WARN" : "CRIT";
+  }
+  if (value >= target) return "OK";
+  return value >= target / slack ? "WARN" : "CRIT";
+}
+
+export function sloRows(points: MetricPoint[]): SloRow[] {
+  const last = points[points.length - 1];
+  const win = points.slice(-60);
+  const total = win.reduce((a, p) => a + p.c201 + p.c202 + p.c409 + p.c403 + p.c5xx, 0) || 1;
+  const errors = win.reduce((a, p) => a + p.c5xx, 0);
+  const errorRate = Number(((errors / total) * 100).toFixed(3));
+  const p99 = last?.p99 ?? 0;
+  const availability = Number((100 - errorRate).toFixed(3));
+  const drift = win.reduce((a, p) => a + p.drift, 0);
+
+  const rows: Omit<SloRow, "health">[] = [
+    { key: "p99", label: "발급 p99 지연", value: p99, unit: "ms", target: 500, lowerIsBetter: true, hint: "목표 500ms 이하" },
+    { key: "err", label: "5xx 오류율", value: errorRate, unit: "%", target: 0.1, lowerIsBetter: true, hint: "목표 0.1% 이하" },
+    { key: "avail", label: "가용성", value: availability, unit: "%", target: 99.9, lowerIsBetter: false, hint: "목표 99.9% 이상" },
+    { key: "over", label: "초과 발급", value: 0, unit: "건", target: 0, lowerIsBetter: true, hint: "재고 불변식 위반 0건" },
+    { key: "drift", label: "Redis↔DB 격차", value: drift, unit: "건", target: 0, lowerIsBetter: true, hint: "최근 60초 누적" },
+  ];
+  return rows.map((r) => ({ ...r, health: health(r.value, r.target, r.lowerIsBetter) }));
+}
+
+export interface BreakerRow {
+  name: string;
+  state: "CLOSED" | "HALF_OPEN" | "OPEN";
+  failureRate: number;
+  calls: number;
+}
+
+export function breakers(last: MetricPoint | undefined): BreakerRow[] {
+  const base = last?.issuePerSec ?? 0;
+  const defs: { name: string; f: number; c: number }[] = [
+    { name: "coupon-issue", f: (last?.c5xx ?? 0) * 1.4, c: base },
+    { name: "redis-stock", f: (last?.redisLatency ?? 0) * 1.2, c: Math.round(base * 1.6) },
+    { name: "kafka-producer", f: (last?.kafkaLag ?? 0) / 900, c: Math.round(base * 0.8) },
+  ];
+  return defs.map((d) => {
+    const failureRate = Number(Math.min(100, d.f).toFixed(2));
+    return {
+      name: d.name,
+      state: failureRate > 8 ? "OPEN" : failureRate > 3 ? "HALF_OPEN" : "CLOSED",
+      failureRate,
+      calls: d.c,
+    };
+  });
+}
+
+export interface ResourceRow {
+  label: string;
+  value: number;
+  detail: string;
+}
+
+export function resources(last: MetricPoint | undefined): ResourceRow[] {
+  const inflight = last?.inflight ?? 0;
+  return [
+    { label: "API CPU", value: Math.min(99, Math.round(24 + inflight / 9)), detail: "8 vCPU × 3 노드" },
+    { label: "API 메모리", value: Math.min(99, Math.round(38 + inflight / 22)), detail: "4 GiB / 노드" },
+    { label: "DB 커넥션 풀", value: last?.dbPool ?? 0, detail: "HikariCP max 200" },
+    { label: "Redis 메모리", value: Math.min(99, Math.round(41 + (last?.kafkaLag ?? 0) / 220)), detail: "12 GiB 클러스터" },
+  ];
+}
+
+export interface AlertRow {
+  id: string;
+  at: number;
+  level: Health;
+  title: string;
+  detail: string;
+}
+
+/** 최근 구간 임계치 위반을 알림 피드로 변환 */
+export function alertFeed(points: MetricPoint[]): AlertRow[] {
+  const out: AlertRow[] = [];
+  for (const p of points.slice(-120)) {
+    if (p.c5xx > 2) out.push({ id: `5xx-${p.t}`, at: p.t, level: "CRIT", title: "5xx 급증", detail: `${p.c5xx}건 / 초 · 발급 API` });
+    else if (p.p99 > 500) out.push({ id: `p99-${p.t}`, at: p.t, level: "WARN", title: "p99 지연 초과", detail: `${p.p99}ms (목표 500ms)` });
+    else if (p.drift > 0) out.push({ id: `drift-${p.t}`, at: p.t, level: "WARN", title: "재고 격차 감지", detail: `Redis↔DB ${p.drift}건 · 보정 배치 대기` });
+    else if (p.queueDepth > 2500) out.push({ id: `q-${p.t}`, at: p.t, level: "WARN", title: "대기열 급증", detail: `${p.queueDepth.toLocaleString("ko-KR")}명 대기` });
+  }
+  return out.slice(-12).reverse();
+}
+
+/* ---------- 분석 파생 지표 ---------- */
+
+export interface FunnelStage {
+  stage: string;
+  value: number;
+  rate: number;
+}
+
+/** 조회 → 입장 → 발급 → 사용 퍼널 */
+export function funnel(period: StatPeriod = "30d"): FunnelStage[] {
+  const brands = brandStats(period);
+  const issued = brands.reduce((a, b) => a + b.issued, 0);
+  const used = brands.reduce((a, b) => a + b.used, 0);
+  const view = Math.round(issued * 4.6);
+  const entry = Math.round(issued * 2.1);
+  const raw = [
+    { stage: "이벤트 조회", value: view },
+    { stage: "대기열 입장", value: entry },
+    { stage: "발급 성공", value: issued },
+    { stage: "쿠폰 사용", value: used },
+  ];
+  return raw.map((r) => ({ ...r, rate: Number(((r.value / (view || 1)) * 100).toFixed(1)) }));
+}
+
+export interface PolicySlice {
+  policy: string;
+  issued: number;
+  used: number;
+}
+
+export function policyMix(period: StatPeriod = "30d"): PolicySlice[] {
+  const brands = brandStats(period);
+  const split = [0.46, 0.33, 0.21];
+  const labels = ["정률 + 상한", "정액", "데이터"];
+  const issued = brands.reduce((a, b) => a + b.issued, 0);
+  const used = brands.reduce((a, b) => a + b.used, 0);
+  return labels.map((policy, i) => ({
+    policy,
+    issued: Math.round(issued * split[i]!),
+    used: Math.round(used * split[i]! * (0.9 + i * 0.08)),
+  }));
+}
