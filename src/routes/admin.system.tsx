@@ -2,8 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
-  AlertTriangle,
-  CheckCircle2,
   CircleDashed,
   Cpu,
   Pause,
@@ -35,7 +33,6 @@ import { Separator } from "@/components/ui/separator";
 import { getEngine, setEngineVersion } from "@/lib/api";
 import type { EngineVersion } from "@/lib/domain";
 import {
-  alertFeed,
   breakers,
   metricSeries,
   queueMode,
@@ -122,7 +119,6 @@ function AdminSystem() {
   const slo = useMemo(() => sloRows(points), [points]);
   const cbs = useMemo(() => breakers(last), [last]);
   const res = useMemo(() => resources(last), [last]);
-  const alerts = useMemo(() => alertFeed(points), [points]);
   const mode = queueMode(last);
   const worst: Health = slo.some((s) => s.health === "CRIT")
     ? "CRIT"
@@ -408,33 +404,6 @@ function AdminSystem() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="size-4 text-accent" /> 알림 피드
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="max-h-56 space-y-2 overflow-y-auto">
-            {alerts.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm text-muted-foreground">
-                <CheckCircle2 className="size-4 text-chart-2" /> 임계치 위반이 없습니다.
-              </div>
-            ) : (
-              alerts.map((a) => (
-                <div key={a.id} className="rounded-lg border border-border p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <HealthDot health={a.level} />
-                      <p className="truncate text-sm font-medium">{a.title}</p>
-                    </div>
-                    <span className="num shrink-0 text-[11px] text-muted-foreground">{timeLabel(a.at)}</span>
-                  </div>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{a.detail}</p>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* 긴급 제어 */}

@@ -8,11 +8,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   Line,
-  Pie,
-  PieChart,
+  LineChart,
   ComposedChart,
   ResponsiveContainer,
   Tooltip,
@@ -32,20 +30,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GRADE_LABEL } from "@/lib/domain";
 import {
   BENCHMARKS,
   STAT_PERIODS,
   VERIFY_REPORT,
   brandStats,
   funnel,
-  gradeStats,
   heatmap,
   heatmapDays,
   heatmapHours,
   issuanceTrend,
-  policyMix,
   resetStats,
+  versionDbPoolCurve,
+  versionLatencyCurve,
+  versionStockCurve,
   type StatPeriod,
 } from "@/lib/metrics";
 
@@ -65,7 +63,6 @@ export const Route = createFileRoute("/admin/analytics")({
   component: AdminAnalytics,
 });
 
-const PIE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 type SortKey = "issued" | "used" | "conversion";
@@ -83,7 +80,6 @@ function AdminAnalytics() {
 
   const data = useMemo(() => {
     const brands = brandStats(period);
-    const grades = gradeStats(period);
     const cells = heatmap(period);
     const totalIssued = brands.reduce((a, b) => a + b.issued, 0);
     const totalUsed = brands.reduce((a, b) => a + b.used, 0);
@@ -92,12 +88,10 @@ function AdminAnalytics() {
     const best = [...brands].sort((a, b) => b.conversion - a.conversion)[0]!;
     return {
       brands,
-      grades,
       cells,
       days: heatmapDays(period),
       hours: heatmapHours(period),
       trend: issuanceTrend(period),
-      policies: policyMix(period),
       stages,
       totalIssued,
       totalUsed,
@@ -107,6 +101,15 @@ function AdminAnalytics() {
       avgPerDay: Math.round(totalIssued / (period === "today" ? 1 : period === "7d" ? 7 : 30)),
     };
   }, [period, nonce]);
+
+  const VERSION_CHARTS = useMemo(
+    () => [
+      { key: "stock", title: "버전별 재고 소진", hint: "재고 10만장 소진까지 남은 수량", unit: "장", data: versionStockCurve() },
+      { key: "p99", title: "버전별 p99 추이", hint: "부하 구간 응답 지연 p99", unit: "ms", data: versionLatencyCurve() },
+      { key: "pool", title: "버전별 DB 풀 사용률", hint: "HikariCP 커넥션 점유율", unit: "%", data: versionDbPoolCurve() },
+    ],
+    [nonce],
+  );
 
   const sortedBrands = useMemo(
     () => [...data.brands].sort((a, b) => b[sortKey] - a[sortKey]),
@@ -191,9 +194,9 @@ function AdminAnalytics() {
         ))}
       </div>
 
-      {/* 퍼널 + 정책 믹스 */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="shadow-card lg:col-span-2">
+      {/* 퍼널 */}
+      <div className="grid gap-4">
+        <Card className="shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <TrendingUp className="size-4 text-accent" /> 발급 퍼널 ({periodLabel})
@@ -219,31 +222,6 @@ function AdminAnalytics() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">할인 정책별 비중</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data.policies}
-                  dataKey="issued"
-                  nameKey="policy"
-                  innerRadius={48}
-                  outerRadius={86}
-                  paddingAngle={2}
-                >
-                  {data.policies.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => v.toLocaleString("ko-KR") + "건"} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
       </div>
 
       {/* 추이 */}
@@ -346,47 +324,9 @@ function AdminAnalytics() {
         </CardContent>
       </Card>
 
-      {/* 등급 분포 + 히트맵 */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* 히트맵 */}
+      <div className="grid gap-4">
         <Card className="shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">등급별 발급 분포</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.grades.map((g) => ({ name: GRADE_LABEL[g.grade], value: g.issued }))}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={44}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {data.grades.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => v.toLocaleString("ko-KR") + "건"} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-1.5">
-              {data.grades.map((g) => (
-                <div key={g.grade} className="num flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="text-foreground">{GRADE_LABEL[g.grade]}</span>
-                  <span>
-                    회원 {kfmt(g.users)}명 · 1인당 {(g.issued / g.users).toFixed(1)}건
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">요일 × 시간대 발급 히트맵 ({periodLabel})</CardTitle>
           </CardHeader>
@@ -434,6 +374,35 @@ function AdminAnalytics() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 버전별 비교 */}
+      <Card className="shadow-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">엔진 버전별 비교 (v1 DB 락 · v2 Redis · v3 Kafka)</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-6 lg:grid-cols-3">
+          {VERSION_CHARTS.map((chart) => (
+            <div key={chart.key}>
+              <p className="mb-1 text-sm font-medium">{chart.title}</p>
+              <p className="mb-2 text-xs text-muted-foreground">{chart.hint}</p>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chart.data}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                    <XAxis dataKey="sec" tick={{ fontSize: 10 }} unit="s" />
+                    <YAxis tick={{ fontSize: 10 }} width={44} />
+                    <Tooltip formatter={(v: number) => v.toLocaleString("ko-KR") + chart.unit} labelFormatter={(l) => `${l}초`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="v1" name="v1 DB 락" stroke="var(--chart-5)" dot={false} connectNulls />
+                    <Line type="monotone" dataKey="v2" name="v2 Redis" stroke="var(--chart-1)" dot={false} connectNulls />
+                    <Line type="monotone" dataKey="v3" name="v3 Kafka" stroke="var(--chart-2)" dot={false} connectNulls />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* 벤치마크 */}
       <div className="grid gap-4 lg:grid-cols-2">

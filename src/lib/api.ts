@@ -449,15 +449,23 @@ export async function adminDeleteTemplate(templateId: string): Promise<void> {
   s.templates = s.templates.filter((t) => t.templateId !== templateId);
 }
 
+/** 최신 이벤트 스트림 (발급/상태전이 공통) */
+export async function adminRecentEvents(limit = 40): Promise<AppEvent[]> {
+  const s = getStore();
+  return s.events.slice().sort((a, b) => b.at - a.at).slice(0, limit);
+}
+
 export async function adminEvents(sinceId: number): Promise<AppEvent[]> {
   const s = getStore();
   return s.events.filter((e) => e.id > sinceId).slice(-50);
 }
 
-export async function adminRecentIssuances(limit = 12): Promise<IssuanceView[]> {
+export async function adminRecentIssuances(limit = 12, query = ""): Promise<IssuanceView[]> {
   const s = getStore();
+  const q = query.trim().toLowerCase();
   return s.issuances
     .slice()
+    .filter((i) => !q || i.userId.toLowerCase().includes(q) || i.maskedUserId.toLowerCase().includes(q))
     .sort((a, b) => b.issuedAt - a.issuedAt)
     .slice(0, limit)
     .map((i) => {
