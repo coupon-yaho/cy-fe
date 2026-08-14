@@ -402,3 +402,70 @@ export function policyMix(period: StatPeriod = "30d"): PolicySlice[] {
     used: Math.round(used * split[i]! * (0.9 + i * 0.08)),
   }));
 }
+
+/* ---------- 엔진 버전(v1/v2/v3) 비교 시계열 ---------- */
+
+export interface VersionSeriesPoint {
+  sec: number;
+  v1: number | null;
+  v2: number | null;
+  v3: number | null;
+}
+
+const TOTAL_STOCK = 100000;
+
+function seeded(n: number) {
+  const x = Math.sin(n * 12.9898 + statSeed * 4.1414) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/** 버전별 재고 소진 곡선 (남은 재고, 초 단위) */
+export function versionStockCurve(): VersionSeriesPoint[] {
+  const maxSec = Math.max(...BENCHMARKS.map((b) => b.duration));
+  const out: VersionSeriesPoint[] = [];
+  for (let sec = 0; sec <= maxSec; sec++) {
+    const point: VersionSeriesPoint = { sec, v1: null, v2: null, v3: null };
+    for (const b of BENCHMARKS) {
+      if (sec > b.duration) continue;
+      const consumed = Math.min(TOTAL_STOCK, Math.round(b.tps * sec * (0.9 + seeded(sec + b.tps) * 0.2)));
+      point[b.version] = Math.max(0, TOTAL_STOCK - consumed);
+    }
+    out.push(point);
+  }
+  return out;
+}
+
+/** 버전별 p99 지연 추이 (부하 구간, 초 단위) */
+export function versionLatencyCurve(): VersionSeriesPoint[] {
+  const maxSec = Math.max(...BENCHMARKS.map((b) => b.duration));
+  const out: VersionSeriesPoint[] = [];
+  for (let sec = 0; sec <= maxSec; sec++) {
+    const point: VersionSeriesPoint = { sec, v1: null, v2: null, v3: null };
+    for (const b of BENCHMARKS) {
+      if (sec > b.duration) continue;
+      const ramp = Math.min(1, sec / Math.max(1, b.duration * 0.35));
+      point[b.version] = Math.round(b.p99 * (0.35 + ramp * 0.75) * (0.9 + seeded(sec * 3 + b.p99) * 0.2));
+    }
+    out.push(point);
+  }
+  return out;
+}
+
+/** 버전별 DB 커넥션 풀 사용률 (%) */
+export function versionDbPoolCurve(): VersionSeriesPoint[] {
+  const maxSec = Math.max(...BENCHMARKS.map((b) => b.duration));
+  const peaks: Record<Benchmark["version"], number> = { v1: 99, v2: 62, v3: 38 };
+  const out: VersionSeriesPoint[] = [];
+  for (let sec = 0; sec <= maxSec; sec++) {
+    const point: VersionSeriesPoint = { sec, v1: null, v2: null, v3: null };
+    for (const b of BENCHMARKS) {
+      if (sec > b.duration) continue;
+      const ramp = Math.min(1, sec / Math.max(1, b.duration * 0.25));
+      point[b.version] = Math.round(
+        Math.min(100, peaks[b.version] * (0.3 + ramp * 0.72) * (0.95 + seeded(sec * 7 + peaks[b.version]) * 0.1)),
+      );
+    }
+    out.push(point);
+  }
+  return out;
+}
