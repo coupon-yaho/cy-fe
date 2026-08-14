@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
-  CheckCircle2,
   CircleDashed,
   Cpu,
   Pause,
