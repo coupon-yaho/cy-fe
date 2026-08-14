@@ -8,11 +8,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   Line,
-  Pie,
-  PieChart,
+  LineChart,
   ComposedChart,
   ResponsiveContainer,
   Tooltip,
@@ -65,7 +63,6 @@ export const Route = createFileRoute("/admin/analytics")({
   component: AdminAnalytics,
 });
 
-const PIE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 type SortKey = "issued" | "used" | "conversion";
