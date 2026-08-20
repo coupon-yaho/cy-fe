@@ -3,28 +3,30 @@ import { BrandLogo } from "@/components/brand-logo";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border/70 bg-secondary/40">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <BrandLogo className="h-7" />
-          <p className="text-xs text-muted-foreground">
-            통신사 브랜드 데이 · 대규모 트래픽 선착순 쿠폰 발급 시스템 데모
+    <footer className="mt-24 border-t border-hairline bg-hig-canvas">
+      <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-12 sm:grid-cols-[1fr_auto]">
+        <div>
+          <BrandLogo className="h-14" variant="full" />
+          <p className="t-body-sm mt-4 max-w-[44ch] text-hig-secondary">
+            매월 열리는 12개 브랜드 데이. 정해진 수량을 선착순으로 나눠 드립니다.
           </p>
         </div>
-        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-          <Link to="/events" className="hover:text-foreground">
+        <nav className="t-body-sm flex flex-wrap gap-x-7 gap-y-2 sm:justify-end">
+          <Link to="/events" className="text-hig-link hover:underline">
             브랜드 데이
           </Link>
-          <Link to="/my/coupons" className="hover:text-foreground">
+          <Link to="/my/coupons" className="text-hig-link hover:underline">
             내 쿠폰함
           </Link>
-          <Link to="/admin" className="hover:text-foreground">
-            관리자 콘솔
+          <Link to="/admin" className="text-hig-link hover:underline">
+            관리자
           </Link>
-        </div>
+        </nav>
       </div>
-      <div className="border-t border-border/70 px-4 py-4 text-center text-xs text-muted-foreground">
-        로그인 · 알림은 모두 Mock 처리된 데모 화면입니다.
+      <div className="border-t border-hairline">
+        <p className="t-caption mx-auto w-full max-w-6xl px-5 py-5 text-hig-muted">
+          로그인과 알림은 데모용입니다.
+        </p>
       </div>
     </footer>
   );

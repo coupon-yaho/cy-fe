@@ -1,0 +1,283 @@
+/**
+ * CY-1 (cy-be · origin/feature/CY-1) 실계약.
+ *
+ * 필드명 · 열거값 · 타입은 백엔드 DTO 와 1:1 입니다. 임의로 바꾸지 마세요.
+ *   api/src/main/java/com/kafkick/api/coupon/dto/*.java
+ *   core/src/main/java/com/kafkick/core/coupon/domain/*.java
+ *
+ * Instant 는 Jackson 기본 직렬화(ISO-8601 문자열)를 그대로 받습니다.
+ * LocalTime 은 "HH:mm:ss" 문자열입니다.
+ */
+
+/* ── 열거형 ─────────────────────────────────────────── */
+
+export type MembershipGrade = "WELCOME" | "SILVER" | "GOLD" | "VIP";
+export type CouponPolicyType = "PERCENT_CAPPED" | "FIXED_AMOUNT";
+export type IssuanceStatus = "ISSUED" | "USED" | "CANCELLED" | "EXPIRED";
+export type IssuanceEventType = "ISSUE" | "USE" | "CANCEL_USE" | "CANCEL" | "EXPIRE";
+export type CouponRoundStatus = "SCHEDULED" | "OPEN" | "CLOSED";
+export type CouponDayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+
+export const GRADES: MembershipGrade[] = ["WELCOME", "SILVER", "GOLD", "VIP"];
+export const DAYS_OF_WEEK: CouponDayOfWeek[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+/* ── 공통 응답 봉투 ────────────────────────────────── */
+
+export interface ErrorBody {
+  status: number;
+  code: string;
+  message: string;
+  requestId: string | null;
+  timestamp: string;
+}
+
+export interface ResponseEnvelope<T> {
+  success: boolean;
+  data: T | null;
+  error: ErrorBody | null;
+}
+
+export interface Page<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/* ── 쿠폰 템플릿 · 관리자 ──────────────────────────────
+   POST/GET/PUT/PATCH /api/v1/admin/coupon-templates       */
+
+export interface CouponTemplateDetail {
+  id: number;
+  brandId: number;
+  name: string;
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+  validDays: number;
+  nthWeek: number;
+  dayOfWeek: CouponDayOfWeek;
+  /** "HH:mm:ss" */
+  startTime: string;
+  durationHours: number;
+  stockPerOccurrence: number;
+  eligibleGrades: MembershipGrade[];
+  active: boolean;
+}
+
+export interface CouponTemplateWriteRequest {
+  brandId: number;
+  name: string;
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+  validDays: number;
+  nthWeek: number;
+  dayOfWeek: CouponDayOfWeek;
+  startTime: string;
+  durationHours: number;
+  stockPerOccurrence: number;
+  eligibleGrades: MembershipGrade[];
+}
+
+/* ── 쿠폰 발급 · 사용 ──────────────────────────────── */
+
+/** POST /api/v1/coupons/{couponRoundId}/issue → 201 */
+export interface CouponIssueResponse {
+  issuanceId: number;
+  couponRoundId: number;
+  code: string;
+  status: IssuanceStatus;
+  issuedAt: string;
+  expiresAt: string;
+}
+
+/** POST /api/v1/coupons/{issuanceId}/use */
+export interface CouponUseResponse {
+  issuanceId: number;
+  status: IssuanceStatus;
+  orderId: number;
+  discountAmount: number;
+  usedAt: string;
+}
+
+/** POST /api/v1/coupons/{issuanceId}/cancel-use */
+export interface CouponCancelUseResponse {
+  issuanceId: number;
+  status: IssuanceStatus;
+  orderId: number;
+  discountAmount: number;
+  canceledAt: string;
+}
+
+/** POST /api/v1/coupons/{issuanceId}/cancel */
+export interface CouponCancelResponse {
+  issuanceId: number;
+  status: IssuanceStatus;
+  canceledAt: string;
+}
+
+/** GET /api/v1/coupons — 보유 쿠폰 한 건 */
+export interface MemberCoupon {
+  issuanceId: number;
+  couponRoundId: number;
+  code: string;
+  status: IssuanceStatus;
+  name: string;
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+  issuedAt: string;
+  expiresAt: string;
+  /** 활성 사용 시각. 쓰지 않았으면 null */
+  usedAt: string | null;
+  /** 활성 사용에서 실제로 깎인 금액. 명세의 최상위 discountAmount 입니다. */
+  usedDiscountAmount: number | null;
+  /** 사용을 붙인 주문 번호 */
+  orderId: number | null;
+}
+
+/* ── 쿠폰 회차 조회 ────────────────────────────────────
+   백엔드 미구현. CouponRound 도메인 레코드 필드 그대로 잡아 두었으므로
+   컨트롤러가 붙으면 이 타입 그대로 씁니다. PRD 대기열 규약(§입장과 발급의 분리)도 같습니다. */
+
+export interface CouponRoundView {
+  id: number;
+  templateId: number;
+  brandId: number;
+  name: string;
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+  validDays: number;
+  eligibleGrades: MembershipGrade[];
+  openAt: string;
+  closeAt: string;
+  status: CouponRoundStatus;
+  /** coupon_stocks.total_quantity */
+  totalQuantity: number;
+  /** coupon_stocks.active_count — 점유된 재고 */
+  activeCount: number;
+  /** 대기열이 켜져 있는 회차입니다. 꺼져 있으면 바로 발급됩니다. */
+  queueActive: boolean;
+}
+
+/** 대기열에서 보여 줄 값 한 벌 */
+export interface QueuePlace {
+  /** 내 순번. 앞에 남은 사람 수와 같습니다. */
+  position: number;
+  /** 내 뒤에서 기다리는 사람 수 */
+  behind: number;
+  /** 이 회차에서 대기 중인 전체 인원 */
+  totalWaiting: number;
+  /** 입장까지 남은 시간(초). 입장 처리가 멈추면 null 입니다. */
+  etaSeconds: number | null;
+}
+
+/** POST /api/v1/coupons/{couponRoundId}/entry — 200 입장 / 202 대기 */
+export interface EntryResponse {
+  admitted: boolean;
+  entryToken: string | null;
+  expiresIn: number | null;
+  queueToken: string | null;
+  place: QueuePlace | null;
+}
+
+/** GET /api/v1/coupons/{couponRoundId}/queue */
+export interface QueueResponse {
+  status: "WAITING" | "ADMITTED";
+  place: QueuePlace | null;
+  entryToken: string | null;
+}
+
+/* ── 표시용 라벨 · 파생 계산 ─────────────────────────── */
+
+export const GRADE_LABEL: Record<MembershipGrade, string> = {
+  WELCOME: "웰컴",
+  SILVER: "실버",
+  GOLD: "골드",
+  VIP: "VIP",
+};
+
+export const ISSUANCE_STATUS_LABEL: Record<IssuanceStatus, string> = {
+  ISSUED: "사용 가능",
+  USED: "사용 완료",
+  CANCELLED: "취소됨",
+  EXPIRED: "기간 만료",
+};
+
+export const ROUND_STATUS_LABEL: Record<CouponRoundStatus, string> = {
+  SCHEDULED: "오픈 예정",
+  OPEN: "발급 중",
+  CLOSED: "마감",
+};
+
+export const DAY_LABEL: Record<CouponDayOfWeek, string> = {
+  MON: "월",
+  TUE: "화",
+  WED: "수",
+  THU: "목",
+  FRI: "금",
+  SAT: "토",
+  SUN: "일",
+};
+
+export const NTH_WEEK_LABEL = ["", "첫째", "둘째", "셋째", "넷째"];
+
+interface DiscountLike {
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+}
+
+/** "40%" / "5,000원" — 자막에 크게 박히는 숫자 */
+export function discountHeadline(c: DiscountLike): string {
+  if (c.policyType === "PERCENT_CAPPED") return `${c.discountRate ?? 0}%`;
+  return `${(c.discountAmount ?? 0).toLocaleString("ko-KR")}원`;
+}
+
+/** "최대 8,000원 할인" / "즉시 할인" — 헤드라인 아래 보조 설명 */
+export function discountDetail(c: DiscountLike): string {
+  if (c.policyType === "PERCENT_CAPPED") {
+    return `최대 ${(c.maxDiscountAmount ?? 0).toLocaleString("ko-KR")}원 할인`;
+  }
+  return "결제 금액에서 바로 할인";
+}
+
+/** 실제 할인액 — PERCENT_CAPPED 는 상한을 넘지 않습니다 */
+export function calcDiscount(c: DiscountLike, orderAmount: number): number {
+  if (c.policyType === "FIXED_AMOUNT") {
+    return Math.min(c.discountAmount ?? 0, orderAmount);
+  }
+  const raw = Math.floor((orderAmount * (c.discountRate ?? 0)) / 100);
+  return Math.min(raw, c.maxDiscountAmount ?? raw, orderAmount);
+}
+
+export function gradesLabel(grades: MembershipGrade[]): string {
+  if (grades.length === GRADES.length) return "전체 등급";
+  const sorted = GRADES.filter((g) => grades.includes(g));
+  const lowest = sorted[0];
+  if (!lowest) return "참여 등급 없음";
+  if (sorted.length > 1 && GRADES.indexOf(lowest) + sorted.length === GRADES.length) {
+    return `${GRADE_LABEL[lowest]} 이상`;
+  }
+  return sorted.map((g) => GRADE_LABEL[g]).join(" · ");
+}
+
+/** 남은 재고 — CouponStock.remainingQuantity() */
+export function remainingStock(
+  round: Pick<CouponRoundView, "totalQuantity" | "activeCount">,
+): number {
+  return Math.max(0, round.totalQuantity - round.activeCount);
+}
+
+/** "14:00:00" → "14:00" */
+export function trimSeconds(localTime: string): string {
+  return localTime.slice(0, 5);
+}

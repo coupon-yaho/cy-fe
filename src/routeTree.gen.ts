@@ -14,12 +14,13 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
-import { Route as AdminCouponsRouteImport } from './routes/admin.coupons'
+import { Route as AdminAnalysisRouteImport } from './routes/admin.analysis'
 import { Route as AdminSystemRouteImport } from './routes/admin.system'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
-import { Route as EventsCouponIdRouteImport } from './routes/events.$couponId'
+import { Route as EventsCouponRoundIdRouteImport } from './routes/events.$couponRoundId'
 import { Route as MyCouponsRouteImport } from './routes/my.coupons'
+import { Route as AdminCampaignsIndexRouteImport } from './routes/admin.campaigns.index'
+import { Route as AdminCampaignsCouponRoundIdRouteImport } from './routes/admin.campaigns.$couponRoundId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,14 +47,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminCouponsRoute = AdminCouponsRouteImport.update({
-  id: '/coupons',
-  path: '/coupons',
+const AdminAnalysisRoute = AdminAnalysisRouteImport.update({
+  id: '/analysis',
+  path: '/analysis',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSystemRoute = AdminSystemRouteImport.update({
@@ -66,9 +62,9 @@ const EventsIndexRoute = EventsIndexRouteImport.update({
   path: '/events/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsCouponIdRoute = EventsCouponIdRouteImport.update({
-  id: '/events/$couponId',
-  path: '/events/$couponId',
+const EventsCouponRoundIdRoute = EventsCouponRoundIdRouteImport.update({
+  id: '/events/$couponRoundId',
+  path: '/events/$couponRoundId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyCouponsRoute = MyCouponsRouteImport.update({
@@ -76,31 +72,44 @@ const MyCouponsRoute = MyCouponsRouteImport.update({
   path: '/my/coupons',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCampaignsIndexRoute = AdminCampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCampaignsCouponRoundIdRoute =
+  AdminCampaignsCouponRoundIdRouteImport.update({
+    id: '/campaigns/$couponRoundId',
+    path: '/campaigns/$couponRoundId',
+    getParentRoute: () => AdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/admin/analytics': typeof AdminAnalyticsRoute
-  '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/analysis': typeof AdminAnalysisRoute
   '/admin/system': typeof AdminSystemRoute
-  '/events/$couponId': typeof EventsCouponIdRoute
+  '/events/$couponRoundId': typeof EventsCouponRoundIdRoute
   '/my/coupons': typeof MyCouponsRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/admin/campaigns/$couponRoundId': typeof AdminCampaignsCouponRoundIdRoute
+  '/admin/campaigns/': typeof AdminCampaignsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/admin/analytics': typeof AdminAnalyticsRoute
-  '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/analysis': typeof AdminAnalysisRoute
   '/admin/system': typeof AdminSystemRoute
-  '/events/$couponId': typeof EventsCouponIdRoute
+  '/events/$couponRoundId': typeof EventsCouponRoundIdRoute
   '/my/coupons': typeof MyCouponsRoute
   '/admin': typeof AdminIndexRoute
   '/events': typeof EventsIndexRoute
+  '/admin/campaigns/$couponRoundId': typeof AdminCampaignsCouponRoundIdRoute
+  '/admin/campaigns': typeof AdminCampaignsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -108,13 +117,14 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/admin/analytics': typeof AdminAnalyticsRoute
-  '/admin/coupons': typeof AdminCouponsRoute
+  '/admin/analysis': typeof AdminAnalysisRoute
   '/admin/system': typeof AdminSystemRoute
-  '/events/$couponId': typeof EventsCouponIdRoute
+  '/events/$couponRoundId': typeof EventsCouponRoundIdRoute
   '/my/coupons': typeof MyCouponsRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/admin/campaigns/$couponRoundId': typeof AdminCampaignsCouponRoundIdRoute
+  '/admin/campaigns/': typeof AdminCampaignsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -123,38 +133,41 @@ export interface FileRouteTypes {
     | '/admin'
     | '/login'
     | '/signup'
-    | '/admin/analytics'
-    | '/admin/coupons'
+    | '/admin/analysis'
     | '/admin/system'
-    | '/events/$couponId'
+    | '/events/$couponRoundId'
     | '/my/coupons'
     | '/admin/'
     | '/events/'
+    | '/admin/campaigns/$couponRoundId'
+    | '/admin/campaigns/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/signup'
-    | '/admin/analytics'
-    | '/admin/coupons'
+    | '/admin/analysis'
     | '/admin/system'
-    | '/events/$couponId'
+    | '/events/$couponRoundId'
     | '/my/coupons'
     | '/admin'
     | '/events'
+    | '/admin/campaigns/$couponRoundId'
+    | '/admin/campaigns'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/login'
     | '/signup'
-    | '/admin/analytics'
-    | '/admin/coupons'
+    | '/admin/analysis'
     | '/admin/system'
-    | '/events/$couponId'
+    | '/events/$couponRoundId'
     | '/my/coupons'
     | '/admin/'
     | '/events/'
+    | '/admin/campaigns/$couponRoundId'
+    | '/admin/campaigns/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,7 +175,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
-  EventsCouponIdRoute: typeof EventsCouponIdRoute
+  EventsCouponRoundIdRoute: typeof EventsCouponRoundIdRoute
   MyCouponsRoute: typeof MyCouponsRoute
   EventsIndexRoute: typeof EventsIndexRoute
 }
@@ -204,18 +217,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/analytics': {
-      id: '/admin/analytics'
-      path: '/analytics'
-      fullPath: '/admin/analytics'
-      preLoaderRoute: typeof AdminAnalyticsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/coupons': {
-      id: '/admin/coupons'
-      path: '/coupons'
-      fullPath: '/admin/coupons'
-      preLoaderRoute: typeof AdminCouponsRouteImport
+    '/admin/analysis': {
+      id: '/admin/analysis'
+      path: '/analysis'
+      fullPath: '/admin/analysis'
+      preLoaderRoute: typeof AdminAnalysisRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/system': {
@@ -232,11 +238,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events/$couponId': {
-      id: '/events/$couponId'
-      path: '/events/$couponId'
-      fullPath: '/events/$couponId'
-      preLoaderRoute: typeof EventsCouponIdRouteImport
+    '/events/$couponRoundId': {
+      id: '/events/$couponRoundId'
+      path: '/events/$couponRoundId'
+      fullPath: '/events/$couponRoundId'
+      preLoaderRoute: typeof EventsCouponRoundIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my/coupons': {
@@ -246,21 +252,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MyCouponsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/campaigns/': {
+      id: '/admin/campaigns/'
+      path: '/campaigns'
+      fullPath: '/admin/campaigns/'
+      preLoaderRoute: typeof AdminCampaignsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/campaigns/$couponRoundId': {
+      id: '/admin/campaigns/$couponRoundId'
+      path: '/campaigns/$couponRoundId'
+      fullPath: '/admin/campaigns/$couponRoundId'
+      preLoaderRoute: typeof AdminCampaignsCouponRoundIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
-  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
-  AdminCouponsRoute: typeof AdminCouponsRoute
+  AdminAnalysisRoute: typeof AdminAnalysisRoute
   AdminSystemRoute: typeof AdminSystemRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminCampaignsCouponRoundIdRoute: typeof AdminCampaignsCouponRoundIdRoute
+  AdminCampaignsIndexRoute: typeof AdminCampaignsIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminAnalyticsRoute: AdminAnalyticsRoute,
-  AdminCouponsRoute: AdminCouponsRoute,
+  AdminAnalysisRoute: AdminAnalysisRoute,
   AdminSystemRoute: AdminSystemRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminCampaignsCouponRoundIdRoute: AdminCampaignsCouponRoundIdRoute,
+  AdminCampaignsIndexRoute: AdminCampaignsIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -270,7 +292,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
-  EventsCouponIdRoute: EventsCouponIdRoute,
+  EventsCouponRoundIdRoute: EventsCouponRoundIdRoute,
   MyCouponsRoute: MyCouponsRoute,
   EventsIndexRoute: EventsIndexRoute,
 }

@@ -23,7 +23,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const notify = useCallback((title: string, body: string) => {
     setItems((prev) => [
-      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, title, body, at: Date.now() },
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        title,
+        body,
+        at: Date.now(),
+      },
       ...prev,
     ]);
   }, []);

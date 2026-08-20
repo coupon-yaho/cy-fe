@@ -18,22 +18,21 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
 import { NotificationProvider } from "@/hooks/use-notifications";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+      <div className="w-full max-w-md">
+        <p className="eyebrow">404</p>
+        <h1 className="t-section mt-2">이 주소에는 아무것도 없습니다</h1>
+        <p className="t-body mt-3 text-hig-secondary">
+          주소가 바뀌었거나 지워진 회차일 수 있습니다.
         </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link to="/events" className="btn-primary">
+            브랜드 데이 보기
+          </Link>
+          <Link to="/" className="btn-outline">
+            홈으로
           </Link>
         </div>
       </div>
@@ -50,28 +49,23 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+      <div className="w-full max-w-md">
+        <h1 className="t-section">화면을 불러오지 못했습니다</h1>
+        <p className="t-body mt-3 text-hig-secondary">
+          다시 시도해 주세요. 계속 같은 화면이 뜨면 홈으로 돌아가세요.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-8 flex flex-wrap gap-3">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="btn-primary"
           >
-            Try again
+            다시 시도
           </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
+          <a href="/" className="btn-outline">
+            홈으로
           </a>
         </div>
       </div>
@@ -87,7 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "쿠폰 야~호 — 브랜드 데이 선착순 쿠폰" },
       {
         name: "description",
-        content: "12개 제휴 브랜드의 브랜드 데이 선착순 쿠폰을 초과 발급 없이 정확하게.",
+        content: "매월 열리는 12개 브랜드 데이. 한정 수량 쿠폰을 선착순으로 발급받으세요.",
       },
       { name: "author", content: "쿠폰 야~호" },
       { property: "og:site_name", content: "쿠폰 야~호" },
@@ -99,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap",
       },
       {
         rel: "stylesheet",
@@ -155,4 +149,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

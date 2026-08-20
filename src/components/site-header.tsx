@@ -1,9 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, LogOut, ShieldCheck, Ticket, Menu } from "lucide-react";
 import { useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
-import { GradeBadge } from "@/components/status-badges";
-import { Button } from "@/components/ui/button";
+import { GradeChip } from "@/components/coupon/grade-chip";
+import { LiveStrip } from "@/components/coupon/live-strip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotifications } from "@/hooks/use-notifications";
 
@@ -22,162 +21,188 @@ const NAV = [
   { to: "/my/coupons", label: "내 쿠폰함" },
 ] as const;
 
+function timeAgo(at: number) {
+  const sec = Math.floor((Date.now() - at) / 1000);
+  if (sec < 60) return "방금";
+  if (sec < 3600) return `${Math.floor(sec / 60)}분 전`;
+  return `${Math.floor(sec / 3600)}시간 전`;
+}
+
 export function SiteHeader() {
   const { session, logout } = useAuth();
   const { items, unread, markAllRead } = useNotifications();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const isActive = (to: string) => (to === "/" ? pathname === "/" : pathname.startsWith(to));
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4">
-        <Link to="/" className="shrink-0">
-          <BrandLogo className="h-8" />
-        </Link>
+    <header className="sticky top-0 z-50">
+      <div className="border-b border-hairline bg-hig-surface/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-5">
+          <Link to="/" className="shrink-0" aria-label="쿠폰 야~호 홈">
+            <BrandLogo className="h-6" />
+          </Link>
 
-        <nav className="ml-4 hidden items-center gap-1 md:flex">
-          {NAV.map((n) => (
-            <Link
-              key={n.to}
-              to={n.to}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                pathname === n.to
-                  ? "bg-secondary text-secondary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {n.label}
-            </Link>
-          ))}
-          {session?.role === "ADMIN" && (
-            <Link
-              to="/admin"
-              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              관리자
-            </Link>
-          )}
-        </nav>
+          <nav className="hidden items-center gap-7 md:flex">
+            {NAV.map((n) => (
+              <Link
+                key={n.to}
+                to={n.to}
+                className={`t-body-sm transition-opacity hover:opacity-60 ${
+                  isActive(n.to) ? "font-semibold text-hig-fg" : "text-hig-secondary"
+                }`}
+              >
+                {n.label}
+              </Link>
+            ))}
+            {session?.role === "ADMIN" && (
+              <Link
+                to="/admin"
+                className="t-body-sm text-hig-secondary transition-opacity hover:opacity-60"
+              >
+                관리자
+              </Link>
+            )}
+          </nav>
 
-        <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu onOpenChange={(o) => o && markAllRead()}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative" aria-label="알림">
-                <Bell className="size-5" />
+          <div className="ml-auto flex items-center gap-2">
+            <DropdownMenu onOpenChange={(o) => o && markAllRead()}>
+              <DropdownMenuTrigger
+                className="relative grid size-8 place-items-center rounded-full text-hig-secondary transition-opacity hover:opacity-60"
+                aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
+              >
+                <BellGlyph />
                 {unread > 0 && (
-                  <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive" />
+                  <span
+                    className="absolute top-0.5 right-0.5 size-2 rounded-full bg-live"
+                    aria-hidden
+                  />
                 )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel>알림 (Mock)</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {items.length === 0 && (
-                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  받은 알림이 없습니다
-                </div>
-              )}
-              {items.slice(0, 6).map((n) => (
-                <div key={n.id} className="px-2 py-2">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <p className="text-xs text-muted-foreground">{n.body}</p>
-                </div>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {session ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <span className="max-w-24 truncate">{session.nickname}</span>
-                  <GradeBadge grade={session.grade} />
-                </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="num text-xs text-muted-foreground">
-                  {session.userId}
-                </DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-80 rounded-2xl">
+                <DropdownMenuLabel className="eyebrow">알림</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/my/coupons">
-                    <Ticket className="mr-2 size-4" /> 내 쿠폰함
-                  </Link>
-                </DropdownMenuItem>
-                {session.role === "ADMIN" && (
-                  <DropdownMenuItem asChild>
-                    <Link to="/admin">
-                      <ShieldCheck className="mr-2 size-4" /> 관리자 콘솔
-                    </Link>
-                  </DropdownMenuItem>
+                {items.length === 0 ? (
+                  <p className="t-body-sm px-3 py-8 text-center text-hig-muted">
+                    쿠폰을 발급받으면 여기에 알림이 쌓입니다.
+                  </p>
+                ) : (
+                  items.slice(0, 6).map((n) => (
+                    <div key={n.id} className="hairline-row px-3 py-3 last:border-0">
+                      <p className="t-body-sm font-semibold">{n.title}</p>
+                      <p className="t-body-sm mt-0.5 text-hig-secondary">{n.body}</p>
+                      <p className="num t-caption mt-1 text-hig-muted">{timeAgo(n.at)}</p>
+                    </div>
+                  ))
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
-                  <LogOut className="mr-2 size-4" /> 로그아웃
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : (
-            <div className="hidden items-center gap-2 sm:flex">
-              <Button variant="ghost" asChild>
-                <Link to="/login">로그인</Link>
-              </Button>
-              <Button asChild>
-                <Link to="/signup">회원가입</Link>
-              </Button>
-            </div>
-          )}
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="메뉴">
-                <Menu className="size-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-64">
-              <nav className="mt-8 flex flex-col gap-1">
-                {NAV.map((n) => (
-                  <Link
-                    key={n.to}
-                    to={n.to}
-                    onClick={() => setOpen(false)}
-                    className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary"
-                  >
-                    {n.label}
-                  </Link>
-                ))}
-                {session?.role === "ADMIN" && (
-                  <Link
-                    to="/admin"
-                    onClick={() => setOpen(false)}
-                    className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary"
-                  >
-                    관리자 콘솔
-                  </Link>
-                )}
-                {!session && (
-                  <>
+            {session ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="t-body-sm flex items-center gap-2 rounded-full px-2 py-1.5 transition-opacity hover:opacity-60">
+                  <GradeChip grade={session.grade} size="sm" />
+                  <span className="hidden text-hig-fg sm:inline">{session.nickname}</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 rounded-2xl">
+                  <div className="px-3 pt-1 pb-2">
+                    <p className="t-body-sm font-semibold">{session.nickname}</p>
+                    <p className="t-caption mt-0.5 text-hig-muted">
+                      회원 번호 <span className="num">{session.memberId}</span>
+                    </p>
+                    <p className="t-caption mt-1.5 text-hig-muted">
+                      문의하실 때 이 번호를 알려 주세요.
+                    </p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/my/coupons">내 쿠폰함</Link>
+                  </DropdownMenuItem>
+                  {session.role === "ADMIN" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin">관리자</Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={logout}>로그아웃</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link to="/login" className="btn-compact">
+                로그인
+              </Link>
+            )}
+
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger
+                className="grid size-8 place-items-center text-hig-secondary md:hidden"
+                aria-label="메뉴"
+              >
+                <MenuGlyph />
+              </SheetTrigger>
+              <SheetContent side="right" className="w-64">
+                <SheetTitle className="sr-only">메뉴</SheetTitle>
+                <nav className="mt-12 flex flex-col px-4">
+                  {NAV.map((n) => (
                     <Link
-                      to="/login"
-                      onClick={() => setOpen(false)}
-                      className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary"
+                      key={n.to}
+                      to={n.to}
+                      onClick={() => setMenuOpen(false)}
+                      className="hairline-row t-body py-4"
                     >
-                      로그인
+                      {n.label}
                     </Link>
+                  ))}
+                  {session?.role === "ADMIN" && (
                     <Link
-                      to="/signup"
-                      onClick={() => setOpen(false)}
-                      className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary"
+                      to="/admin"
+                      onClick={() => setMenuOpen(false)}
+                      className="hairline-row t-body py-4"
                     >
-                      회원가입
+                      관리자
                     </Link>
-                  </>
-                )}
-              </nav>
-            </SheetContent>
-          </Sheet>
+                  )}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
+
+      <LiveStrip />
     </header>
+  );
+}
+
+function BellGlyph() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="size-[18px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 8a5 5 0 0 1 10 0c0 3 .8 4.4 1.5 5.2H3.5C4.2 12.4 5 11 5 8Z" />
+      <path d="M8 16a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+function MenuGlyph() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden
+    >
+      <path d="M3 7h14M3 13h14" />
+    </svg>
   );
 }

@@ -5,27 +5,25 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
+ * 디자인 시스템 — DESIGN.md (Apple Human Interface Guidelines 레퍼런스, verified 2026-07-11)
  *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
+ * 색·타이포·컴포넌트 기하는 DESIGN.md 의 tokens 블록 값을 그대로 씁니다.
+ * hex 를 그대로 두는 이유는 레퍼런스가 hex 로 검증됐기 때문입니다 — 변환하면 값이 증거와 달라집니다.
  *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * 로컬 확장(레퍼런스에 없는 값)은 --x- 접두어로 표시했습니다.
+ * DESIGN.md §6 대로 그림자 토큰은 두지 않습니다. 깊이는 대비와 콘텐츠가 만듭니다.
  */
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* DESIGN.md tokens.rounded */
+  --radius-sm: 6px;
+  --radius-md: 8px;
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-xl: 12px;
+  --radius-2xl: 18px;
+  --radius-3xl: 18px;
+  --radius-4xl: 24px;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -62,157 +60,163 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.98 0.005 250);
-  --foreground: oklch(0.22 0.055 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.055 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.055 265);
-  --primary: oklch(0.26 0.075 264);
-  --primary-foreground: oklch(0.97 0.008 250);
-  --secondary: oklch(0.94 0.012 250);
-  --secondary-foreground: oklch(0.26 0.075 264);
-  --muted: oklch(0.945 0.01 250);
-  --muted-foreground: oklch(0.52 0.03 255);
-  --accent: oklch(0.56 0.095 250);
-  --accent-foreground: oklch(0.98 0.005 250);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.98 0.005 250);
-  --success: oklch(0.6 0.14 155);
-  --success-foreground: oklch(0.98 0.005 250);
-  --warning: oklch(0.72 0.16 70);
-  --warning-foreground: oklch(0.22 0.055 265);
-  --ticket: oklch(1 0 0);
-  --ticket-edge: oklch(0.89 0.02 250);
-  --grade-vip: oklch(0.62 0.16 300);
-  --grade-gold: oklch(0.75 0.14 85);
-  --grade-silver: oklch(0.68 0.02 250);
-  --grade-welcome: oklch(0.62 0.09 220);
-  --border: oklch(0.9 0.015 250);
-  --input: oklch(0.9 0.015 250);
-  --ring: oklch(0.56 0.095 250);
-  --chart-1: oklch(0.56 0.095 250);
-  --chart-2: oklch(0.6 0.14 155);
-  --chart-3: oklch(0.72 0.16 70);
-  --chart-4: oklch(0.62 0.16 300);
-  --chart-5: oklch(0.6 0.2 25);
-  --gradient-hero: linear-gradient(140deg, oklch(0.26 0.075 264), oklch(0.4 0.09 250) 55%, oklch(0.56 0.095 250));
-  --shadow-card: 0 1px 2px oklch(0.26 0.075 264 / 0.06), 0 12px 28px -18px oklch(0.26 0.075 264 / 0.35);
-  --shadow-lift: 0 20px 48px -24px oklch(0.26 0.075 264 / 0.45);
-  --sidebar: oklch(0.24 0.065 264);
-  --sidebar-foreground: oklch(0.93 0.01 250);
-  --sidebar-primary: oklch(0.56 0.095 250);
-  --sidebar-primary-foreground: oklch(0.98 0.005 250);
-  --sidebar-accent: oklch(0.31 0.065 262);
-  --sidebar-accent-foreground: oklch(0.97 0.008 250);
-  --sidebar-border: oklch(0.34 0.05 262);
-  --sidebar-ring: oklch(0.56 0.095 250);
-}
+  /* tokens.rounded.control */
+  --radius: 8px;
 
+  /* ── DESIGN.md tokens.colors ───────────────────────── */
+  --hig-primary: #0071e3; /* 채워진 액션 */
+  --hig-brand: #000000; /* 아이덴티티 · 몰입형 다크 섹션 */
+  --hig-canvas: #f5f5f7; /* 라이트 섹션 · 푸터 */
+  --hig-canvas-dark: #000000;
+  --hig-surface: #ffffff;
+  --hig-foreground: #1d1d1f;
+  --hig-on-primary: #ffffff;
+  --hig-muted: #6e6e73;
+  --hig-secondary: #515154;
+  --hig-link: #0066cc;
+  --hig-link-on-dark: #2997ff;
 
-.dark {
-  --background: oklch(0.17 0.045 264);
-  --foreground: oklch(0.95 0.008 250);
-  --card: oklch(0.22 0.05 264);
-  --card-foreground: oklch(0.95 0.008 250);
-  --popover: oklch(0.22 0.05 264);
-  --popover-foreground: oklch(0.95 0.008 250);
-  --primary: oklch(0.66 0.11 250);
-  --primary-foreground: oklch(0.15 0.04 264);
-  --secondary: oklch(0.27 0.05 262);
-  --secondary-foreground: oklch(0.95 0.008 250);
-  --muted: oklch(0.27 0.05 262);
-  --muted-foreground: oklch(0.72 0.03 252);
-  --accent: oklch(0.6 0.1 250);
-  --accent-foreground: oklch(0.15 0.04 264);
-  --destructive: oklch(0.66 0.2 25);
-  --destructive-foreground: oklch(0.97 0.008 250);
-  --success: oklch(0.68 0.15 155);
-  --success-foreground: oklch(0.15 0.04 264);
-  --warning: oklch(0.78 0.15 75);
-  --warning-foreground: oklch(0.15 0.04 264);
-  --ticket: oklch(0.24 0.05 264);
-  --ticket-edge: oklch(0.34 0.05 262);
-  --grade-vip: oklch(0.7 0.16 300);
-  --grade-gold: oklch(0.8 0.14 85);
-  --grade-silver: oklch(0.75 0.02 250);
-  --grade-welcome: oklch(0.7 0.1 220);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.66 0.11 250);
-  --chart-1: oklch(0.66 0.11 250);
-  --chart-2: oklch(0.7 0.15 155);
-  --chart-3: oklch(0.8 0.15 75);
-  --chart-4: oklch(0.7 0.16 300);
-  --chart-5: oklch(0.68 0.19 25);
-  --gradient-hero: linear-gradient(140deg, oklch(0.17 0.045 264), oklch(0.24 0.06 258) 55%, oklch(0.36 0.08 250));
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.4), 0 12px 28px -18px oklch(0 0 0 / 0.6);
-  --shadow-lift: 0 20px 48px -24px oklch(0 0 0 / 0.7);
-  --sidebar: oklch(0.2 0.05 264);
-  --sidebar-foreground: oklch(0.93 0.01 250);
-  --sidebar-primary: oklch(0.66 0.11 250);
-  --sidebar-primary-foreground: oklch(0.15 0.04 264);
-  --sidebar-accent: oklch(0.27 0.05 262);
-  --sidebar-accent-foreground: oklch(0.95 0.008 250);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.66 0.11 250);
+  /* ── 로컬 확장 ────────────────────────────────────────
+     레퍼런스에 없는 값입니다. 상태 전달에만 쓰고 장식에는 쓰지 않습니다. */
+  --x-live: #d70015; /* 발급 중 표시 한 곳 */
+  --x-attention: #b25000; /* 소진 임박 */
+  /* 검은 면 위에서는 같은 색이 4.5:1 에 못 미쳐서 밝은 단계를 따로 둡니다 */
+  --x-live-on-dark: #ff453a;
+  --x-attention-on-dark: #ff9f0a;
+  --x-positive: #1d7a45; /* 사용 완료 */
+  --x-hairline: #d2d2d7; /* Apple 웹 구분선 */
+  --x-fill: #e8e8ed; /* 미충전 게이지 · 트랙 */
+
+  --grade-welcome: #0066cc;
+  --grade-silver: #6e6e73;
+  --grade-gold: #a05a00;
+  --grade-vip: #7b3fb5;
+
+  /* ── 차트 팔레트 (로컬 확장) ────────────────────────
+     DESIGN.md 는 계열색 램프를 주지 않습니다. 액션색(#0071e3)을 계열색으로 쓰면
+     차트가 버튼과 같은 색이 되어 "누를 수 있는 것"과 "데이터"가 섞입니다.
+     그래서 계열색은 별도 램프를 쓰고, 검증기(dataviz)로 라이트·다크 양쪽을 통과시켰습니다.
+       adjacent CVD ΔE 9.1(light) / 8.4(dark) · normal-vision 19.6 / 19.3
+     라이트에서 3:1 미만인 세 슬롯(3·4·5)은 직접 라벨과 수치 표기로 보완합니다. */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #4a3aa7;
+  --viz-8: #e34948;
+
+  /* 순차 램프 — 크기(히트맵·퍼널). 한 색상, 밝음→어두움 */
+  --viz-seq-100: #cde2fb;
+  --viz-seq-250: #86b6ef;
+  --viz-seq-350: #5598e7;
+  --viz-seq-450: #2a78d6;
+  --viz-seq-550: #1c5cab;
+  --viz-seq-650: #104281;
+
+  /* 상태색 — 계열색으로 재사용 금지. 항상 라벨과 함께 씁니다 */
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-serious: #ec835a;
+  --viz-critical: #d03b3b;
+
+  --viz-grid: #e6e6ea;
+  --viz-axis: #86868b;
+
+  --background: var(--hig-canvas);
+  --foreground: var(--hig-foreground);
+  --card: var(--hig-surface);
+  --card-foreground: var(--hig-foreground);
+  --popover: var(--hig-surface);
+  --popover-foreground: var(--hig-foreground);
+  --primary: var(--hig-primary);
+  --primary-foreground: var(--hig-on-primary);
+  --secondary: #ebebf0;
+  --secondary-foreground: var(--hig-foreground);
+  --muted: #ebebf0;
+  --muted-foreground: var(--hig-muted);
+  --accent: #e8f1fd;
+  --accent-foreground: var(--hig-link);
+  --destructive: var(--x-live);
+  --destructive-foreground: #ffffff;
+  --success: var(--x-positive);
+  --success-foreground: #ffffff;
+  --warning: var(--x-attention);
+  --warning-foreground: #ffffff;
+  --border: var(--x-hairline);
+  --input: var(--x-hairline);
+  --ring: var(--hig-primary);
+
+  --chart-1: var(--hig-primary);
+  --chart-2: var(--x-positive);
+  --chart-3: var(--x-attention);
+  --chart-4: var(--grade-vip);
+  --chart-5: var(--x-live);
+
+  --sidebar: var(--hig-brand);
+  --sidebar-foreground: var(--hig-canvas);
+  --sidebar-primary: var(--hig-primary);
+  --sidebar-primary-foreground: var(--hig-on-primary);
+  --sidebar-accent: #1c1c1e;
+  --sidebar-accent-foreground: var(--hig-canvas);
+  --sidebar-border: #2c2c2e;
+  --sidebar-ring: var(--hig-primary);
 }
 
 @theme inline {
+  --color-hig-primary: var(--hig-primary);
+  --color-hig-brand: var(--hig-brand);
+  --color-hig-canvas: var(--hig-canvas);
+  --color-hig-surface: var(--hig-surface);
+  --color-hig-fg: var(--hig-foreground);
+  --color-hig-muted: var(--hig-muted);
+  --color-hig-secondary: var(--hig-secondary);
+  --color-hig-link: var(--hig-link);
+  --color-hig-link-on-dark: var(--hig-link-on-dark);
+  --color-live: var(--x-live);
+  --color-live-on-dark: var(--x-live-on-dark);
+  --color-attention: var(--x-attention);
+  --color-attention-on-dark: var(--x-attention-on-dark);
+  --color-positive: var(--x-positive);
+  --color-hairline: var(--x-hairline);
+  --color-fill: var(--x-fill);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
-  --color-ticket: var(--ticket);
-  --color-ticket-edge: var(--ticket-edge);
   --color-grade-vip: var(--grade-vip);
   --color-grade-gold: var(--grade-gold);
   --color-grade-silver: var(--grade-silver);
   --color-grade-welcome: var(--grade-welcome);
-  --font-display: "Black Han Sans", "Noto Sans KR", sans-serif;
-  --font-sans: "Noto Sans KR", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-}
 
-@utility hero-gradient {
-  background-image: var(--gradient-hero);
-}
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-3: var(--viz-3);
+  --color-viz-4: var(--viz-4);
+  --color-viz-5: var(--viz-5);
+  --color-viz-6: var(--viz-6);
+  --color-viz-7: var(--viz-7);
+  --color-viz-8: var(--viz-8);
+  --color-viz-good: var(--viz-good);
+  --color-viz-warning: var(--viz-warning);
+  --color-viz-serious: var(--viz-serious);
+  --color-viz-critical: var(--viz-critical);
+  --color-viz-grid: var(--viz-grid);
+  --color-viz-axis: var(--viz-axis);
 
-@utility shadow-card {
-  box-shadow: var(--shadow-card);
-}
 
-@utility shadow-lift {
-  box-shadow: var(--shadow-lift);
-}
-
-/* 쿠폰 티켓 절취선 */
-@utility ticket-notch {
-  position: relative;
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 9999px;
-    background-color: var(--background);
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  &::before {
-    left: -0.625rem;
-  }
-  &::after {
-    right: -0.625rem;
-  }
-}
-
-@utility num {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  /* DESIGN.md tokens.typography.family
+     SF Pro 는 Apple 기기에서 system-ui 로 잡힙니다. 그 밖의 환경에서는
+     한글 본문을 감당할 폴백이 필요해 Noto Sans KR 을 함께 싣습니다.
+     SF Mono 는 레퍼런스에서 declared-only 라 승격하지 않습니다 — 숫자는 tabular-nums 로만 정렬합니다. */
+  --font-display:
+    "SF Pro Display", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+    system-ui, sans-serif;
+  --font-sans:
+    "SF Pro Text", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+    system-ui, sans-serif;
+  --font-mono: var(--font-sans);
 }
 
 @layer base {
@@ -224,12 +228,308 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    /* 한글은 어절 중간에서 끊기면 읽기가 무너집니다 */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    /* tokens.typography.body */
+    font-size: 17px;
+    line-height: 25px;
+    letter-spacing: -0.374px;
+    -webkit-font-smoothing: antialiased;
   }
 
   h1,
   h2,
-  h3 {
-    letter-spacing: -0.02em;
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    word-break: keep-all;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+    border-radius: 4px;
   }
 }
 
+/* ── 타이포 역할 (DESIGN.md §3 표) ─────────────────────
+   promote 된 값은 데스크톱 기준입니다. 좁은 화면에서는 비율만 줄이고
+   굵기·자간은 유지합니다 — 기하를 기계적으로 스케일하지 않습니다. */
+
+@utility t-hero {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 6vw, 56px);
+  font-weight: 600;
+  line-height: 1.07;
+  letter-spacing: -0.28px;
+}
+
+@utility t-section {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: normal;
+}
+
+@utility t-tile {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: 0.196px;
+}
+
+@utility t-body {
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 25px;
+  letter-spacing: -0.374px;
+}
+
+@utility t-body-sm {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: -0.224px;
+}
+
+@utility t-caption {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: -0.12px;
+}
+
+/** 수치 정렬 — SF Mono 를 승격하지 않으므로 본문 서체 + tabular-nums 로만 맞춥니다. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ── 컨트롤 (DESIGN.md §4) ─────────────────────────── */
+
+@utility btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 11px 21px;
+  border-radius: 980px;
+  background: var(--hig-primary);
+  color: var(--hig-on-primary);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1;
+  transition: opacity 0.2s ease;
+  &:hover {
+    opacity: 0.86;
+  }
+  &:disabled {
+    opacity: 0.4;
+  }
+}
+
+@utility btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 11px 21px;
+  border-radius: 980px;
+  background: transparent;
+  color: var(--hig-link);
+  border: 1px solid var(--hig-link);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+  &:hover {
+    background: var(--hig-link);
+    color: var(--hig-on-primary);
+  }
+  &:disabled {
+    opacity: 0.4;
+  }
+}
+
+@utility btn-compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 8px 15px;
+  border-radius: 980px;
+  background: var(--hig-primary);
+  color: var(--hig-on-primary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  transition: opacity 0.2s ease;
+  &:hover {
+    opacity: 0.86;
+  }
+  &:disabled {
+    opacity: 0.4;
+  }
+}
+
+/** 어두운 섹션 위의 보조 액션 */
+@utility btn-outline-on-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 11px 21px;
+  border-radius: 980px;
+  background: transparent;
+  color: var(--hig-link-on-dark);
+  border: 1px solid var(--hig-link-on-dark);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+  &:hover {
+    background: var(--hig-link-on-dark);
+    color: #000;
+  }
+}
+
+/* ── 면 ────────────────────────────────────────────
+   DESIGN.md §6 — 그림자 없음. 면은 배경 대비로만 떠 있습니다. */
+
+@utility surface-card {
+  background: var(--card);
+  border-radius: 18px;
+}
+
+/* ── 눈썹 라벨 ─────────────────────────────────────
+   구조 표시는 라벨 하나로 끝냅니다. 배지·괄호·번호를 덧붙이지 않습니다. */
+@utility eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: -0.12px;
+  color: var(--hig-muted);
+}
+
+/* ── 발급 중 표시 ──────────────────────────────────
+   컬러 액센트는 국소 구성마다 하나만. 여기서는 이 점 하나가 그 역할입니다. */
+@utility live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* 로컬 확장 — 레퍼런스가 모션 토큰을 승격하지 않아 페이지 진입 연출은 최소로 둡니다. */
+@utility rise-in {
+  animation: rise-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility hairline-row {
+  border-bottom: 1px solid var(--x-hairline);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── 원천 칩 (AB 설계도) ────────────────────────────
+   패널이 어느 원천에서 값을 가져오는지 표시합니다. 칩만 훑어도 데이터 토폴로지가 보입니다.
+   계열색을 쓰지 않는 이유는 칩이 차트 옆에 붙기 때문입니다 — 같은 색이면 계열로 오독됩니다. */
+@utility src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--x-hairline);
+  background: var(--hig-canvas);
+  color: var(--hig-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* ── 관제 표 ───────────────────────────────────────
+   운영 표는 숫자를 세로로 훑습니다. 헤어라인만 남기고 배경 줄무늬는 쓰지 않습니다. */
+@utility ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* 정렬은 표 전체에서 상속받습니다 — th 에 직접 걸면 셀의 text-right 를 이깁니다 */
+  text-align: left;
+  & th {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.12px;
+    color: var(--hig-muted);
+    padding: 0 12px 8px 0;
+    border-bottom: 1px solid var(--x-hairline);
+    white-space: nowrap;
+  }
+  & td {
+    font-size: 14px;
+    line-height: 18px;
+    letter-spacing: -0.224px;
+    padding: 11px 12px 11px 0;
+    border-bottom: 1px solid var(--x-hairline);
+    vertical-align: top;
+  }
+  & tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+/* ── 폼 입력 ───────────────────────────────────── */
+@utility input-line {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--input);
+  background: var(--hig-surface);
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: -0.224px;
+  &:focus {
+    border-color: var(--hig-primary);
+    outline: none;
+  }
+}
