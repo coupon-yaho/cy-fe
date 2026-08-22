@@ -32,6 +32,21 @@ export interface SeriesSpec {
   note?: string;
 }
 
+/**
+ * 한 차트가 그리는 점 수 상한 (S-3).
+ *
+ * 시계열은 클라이언트가 누적하지 않고 폴링마다 서버가 구간 전체를 내려주므로,
+ * 지금 구조에서 점이 무한히 쌓이는 경로는 없습니다. 그래도 상한을 두는 이유는
+ * 구간(window)이 넓어지거나 서버가 촘촘한 구간을 내려줄 때 1초 갱신에서
+ * 렌더 비용이 먼저 무너지기 때문입니다 — 최근 300점만 그립니다.
+ */
+const MAX_POINTS = 300;
+
+/** 뒤에서 300점만 남깁니다. 상한 아래면 원본 배열을 그대로 넘겨 재렌더를 늘리지 않습니다. */
+function capPoints(data: Point[]) {
+  return data.length > MAX_POINTS ? data.slice(-MAX_POINTS) : data;
+}
+
 const AXIS = "var(--viz-axis)";
 const GRID = "var(--viz-grid)";
 
@@ -161,6 +176,7 @@ export function SeriesChart({
 }) {
   const gradientId = useId();
   const Chart = area ? AreaChart : LineChart;
+  const rows = capPoints(data);
 
   // 관제 지표는 음수가 없습니다. recharts 의 자동 도메인은 0 아래로 여백을 만들어
   // 그래프가 위쪽 절반에만 그려지므로, 위 끝만 데이터에서 뽑아 직접 고정합니다.
@@ -169,7 +185,7 @@ export function SeriesChart({
   const yScale: { domain: [number, number]; ticks: number[] } | undefined = (() => {
     if (yDomain || logY) return undefined;
     let max = 0;
-    for (const row of data) {
+    for (const row of rows) {
       for (const s of series) {
         const v = Number(row[s.key] ?? 0);
         if (Number.isFinite(v) && v > max) max = v;
@@ -191,7 +207,7 @@ export function SeriesChart({
     <div className="w-full min-w-0">
       <div className="w-full min-w-0" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <Chart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+          <Chart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
             <defs>
               {area &&
                 series.map((s) => (
@@ -321,10 +337,11 @@ export function MiniSeries({
   height?: number;
   seriesKey?: string;
 }) {
+  const rows = capPoints(data);
   return (
     <div style={{ height }} aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 2, bottom: 2, left: 2 }}>
+        <LineChart data={rows} margin={{ top: 4, right: 2, bottom: 2, left: 2 }}>
           <Line
             type="monotone"
             dataKey={seriesKey}
