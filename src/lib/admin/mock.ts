@@ -33,7 +33,10 @@ import type {
   CampaignOpsState,
   CouponMetricsResponse,
   EventSlice,
+  GapState,
   GapType,
+  GapValue,
+  LatencyGroupStat,
   HistorySlice,
   IssuanceAttemptEvent,
   IssuanceHistoryRow,
@@ -47,6 +50,7 @@ import type {
   SourceState,
   SourceValue,
   TrafficKey,
+  UriGroup,
 } from "./types";
 
 /** 템플릿의 요일 문자열을 히트맵 행 번호(월=0)로 바꿉니다. */
@@ -101,8 +105,32 @@ function sv<T>(value: T, state: SourceState, observedAt: number, note?: string):
   };
 }
 
-/** 값이 없는 상태 — PENDING · NO_TRAFFIC · N_A · WARMING_UP 은 0 이 아니라 빈 값입니다. */
+/**
+ * 값이 없는 상태 — PENDING · NO_TRAFFIC · N_A · WARMING_UP · UNAVAILABLE 은
+ * 0 이 아니라 빈 값입니다. UNAVAILABLE 은 원천 접근 자체가 안 되는 경우라
+ * 마지막 값이 남아 있어도 현재값으로 내려보내지 않습니다.
+ */
 function absent<T>(state: SourceState, observedAt: number, note?: string): SourceValue<T> {
+  return {
+    value: null,
+    state,
+    observedAt: new Date(observedAt).toISOString(),
+    ...(note ? { note } : {}),
+  };
+}
+
+/** gap 전용 — 허용 상태가 5종으로 좁습니다. */
+function gv(value: number, state: GapState, observedAt: number, note?: string): GapValue {
+  return {
+    value,
+    state,
+    observedAt: new Date(observedAt).toISOString(),
+    ...(note ? { note } : {}),
+  };
+}
+
+/** 아직 계산되지 않은 gap — 0 으로 채우지 않습니다. */
+function gapAbsent(state: GapState, observedAt: number, note?: string): GapValue {
   return {
     value: null,
     state,
@@ -822,6 +850,35 @@ function buildHistories(now: number, couponRoundId: number | null, limit: number
   };
 }
 
+/**
+ * uri 그룹별 응답 시간 배율.
+ *
+ * 자릿수로 다르게 둡니다 — 순번 폴링은 Redis 한 번이고 발급은 Lua + DB + Kafka 입니다.
+ * 한 선에 합치면 폴링이 전체를 끌어내려 발급 지연이 보이지 않습니다.
+ */
+const URI_GROUPS: UriGroup[] = ["ISSUE", "ENTRY", "QUEUE_POLL", "LOOKUP", "TRANSITION"];
+
+const SUCCESS_GROUP_FACTOR: Record<UriGroup, number> = {
+  ISSUE: 1,
+  ENTRY: 0.42,
+  TRANSITION: 0.3,
+  LOOKUP: 0.085,
+  QUEUE_POLL: 0.016,
+};
+
+const FAILURE_GROUP_FACTOR: Record<UriGroup, number> = {
+  ISSUE: 1,
+  ENTRY: 0.6,
+  TRANSITION: 0.45,
+  LOOKUP: 0.2,
+  QUEUE_POLL: 0.05,
+};
+
+/** 소수 자리는 ms 단위가 한 자리로 내려갈 때만 남깁니다. */
+function ms(v: number) {
+  return v >= 10 ? Math.round(v) : Number(v.toFixed(2));
+}
+
 /** 측정 대상 회차. 지금 트래픽이 가장 많은 회차를 대상으로 잡습니다. */
 function measuredCampaign(now: number) {
   const target = listRoundStates(now)
@@ -838,6 +895,9 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
   const loadRunning = t < LOAD_END_T;
   const draining = lag > 0;
   const runState = loadRunning ? "RUNNING" : draining ? "DRAINING" : "DONE";
+  // 유휴 구간 끝자락에 원천 접근 실패를 한 번 재현합니다.
+  // UNAVAILABLE 이 실제로 관측돼야 후속 티켓이 렌더를 검증할 수 있습니다.
+  const idle = !loadRunning && !draining && t >= 78;
   const p99 = successP99(t);
   const attempts = issueAttemptRps(t);
   const failures = systemFailureRps(t);
@@ -846,13 +906,33 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
   const consumeRps = lag > 0 ? CONSUME_RPS : Math.min(CONSUME_RPS, arrivalRps);
 
   // persist lag 이 0에 닿기 전에는 최종 gap 두 개를 판정할 수 없습니다.
-  const finalState: SourceState = draining ? "PENDING" : "VALID";
-  const gapValue = (type: GapType): SourceValue<number> =>
-    type === "LUA_GAP" || type === "ACTIVE_DB_GAP"
-      ? sv(0, "VALID", now)
-      : draining
-        ? absent<number>(finalState, now)
-        : sv(0, finalState, now);
+  const gapValue = (type: GapType): GapValue => {
+    // DB 카운터는 Redis 를 거쳐 읽습니다 — 유휴 구간에서 원천이 끊긴 상황을 재현합니다.
+    if (type === "DB_COUNTER_GAP" && idle) {
+      return gapAbsent("UNAVAILABLE", now, "Redis 조회 실패");
+    }
+    if (type === "LUA_GAP" || type === "ACTIVE_DB_GAP") return gv(0, "VALID", now);
+    return draining ? gapAbsent("PENDING", now) : gv(0, "VALID", now);
+  };
+
+  const latencyGroups = (
+    factors: Record<UriGroup, number>,
+    base: (x: number) => number,
+  ): LatencyGroupStat[] =>
+    URI_GROUPS.map((group) => {
+      const f = factors[group];
+      return {
+        group,
+        p50: sv(ms(base(t) * f * 0.137), "VALID", now),
+        p95: sv(ms(base(t) * f * 0.394), "VALID", now),
+        p99: sv(ms(base(t) * f), "VALID", now),
+        series: windowSeries(now, window, (x) => ({
+          p50: ms(base(x) * f * 0.137),
+          p95: ms(base(x) * f * 0.394),
+          p99: ms(base(x) * f),
+        })),
+      };
+    });
 
   const trafficCounter = (key: TrafficKey, label: string, value: number) => ({
     key,
@@ -879,7 +959,7 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
       runState,
     },
     kpi: {
-      overIssued: sv(0, draining ? "PENDING" : "VALID", now),
+      overIssued: draining ? gapAbsent("PENDING", now) : gv(0, "VALID", now),
       overIssuedZeroSeconds: Math.min(60, Math.round(t - 4)),
       gapsValid: 2,
       gapsPending: draining ? 2 : 0,
@@ -916,7 +996,9 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
       phase: draining ? "LIVE" : "FINAL",
       // LIVE 국면에서는 PASS 를 낼 수 없습니다. 판정은 lag=0 이후에만.
       verdict: draining ? null : "PASS",
-      overIssued: sv(0, draining ? "PENDING" : "VALID", now),
+      // LIVE 국면에서는 평가 가능한 gap 이 없습니다 — null 이고 NONE 으로 치환하지 않습니다.
+      severity: draining ? null : "NONE",
+      overIssued: draining ? gapAbsent("PENDING", now) : gv(0, "VALID", now),
       issuedPlusUsed: issuedByTime(t),
       totalQuantity: RUN_STOCK,
       gaps: (["LUA_GAP", "ACTIVE_DB_GAP", "PERSIST_GAP", "DB_COUNTER_GAP"] as GapType[]).map(
@@ -938,6 +1020,7 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
           p95: Math.round(successP99(x) * 0.394),
           p99: successP99(x),
         })),
+        groups: latencyGroups(SUCCESS_GROUP_FACTOR, successP99),
       },
       failure: {
         p50: sv(0.8, "VALID", now),
@@ -949,6 +1032,7 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
           p95: Number((2 + wobble(x, 52, 0.4)).toFixed(2)),
           p99: Number((4 + wobble(x, 53, 0.6)).toFixed(2)),
         })),
+        groups: latencyGroups(FAILURE_GROUP_FACTOR, (x) => 4 + wobble(x, 53, 0.6)),
       },
       dependency: {
         redisP99Ms: sv(1.2, "VALID", now),

@@ -15,38 +15,45 @@
  * 컨트롤러가 붙으면 http 어댑터만 켜면 됩니다.
  */
 
-/* ── 값 상태 계약 6종 (AB-G0 · Source Status) ─────────
-   빈칸과 0을 구분하지 못하면 관제가 아닙니다. 모든 패널이 같은 상태를 씁니다. */
+/* ── 값 상태 계약 7종 (AB-G0 · G0-05 SourceStatus) ─────────
+   빈칸과 0을 구분하지 못하면 관제가 아닙니다. 모든 패널이 같은 상태를 씁니다.
+
+   WARMING_UP(표본 미달) 과 UNAVAILABLE(원천 접근 불가) 은 다른 사건입니다.
+   하나로 합치면 둘 중 하나를 표현할 수단이 사라집니다. */
 
 export type SourceState =
   /** 현재 실행 기준 유효 */
   | "VALID"
   /** 최종 집계 전 · 판정 금지 */
   | "PENDING"
+  /** 백분위 계산에 필요한 표본이 아직 모자람 — 곧 값이 나옵니다 */
+  | "WARMING_UP"
   /** observedAt 이 허용 지연 초과 */
   | "STALE"
   /** 요청 없음 — 장애가 아닙니다 */
   | "NO_TRAFFIC"
-  /** 백분위 계산에 필요한 표본이 아직 모자람 */
-  | "WARMING_UP"
+  /** 원천에 접근할 수 없음 — 값이 있어도 현재값이 아닙니다 */
+  | "UNAVAILABLE"
   /** 이 버전에 없는 기능 */
   | "N_A";
 
 export const SOURCE_STATE_LABEL: Record<SourceState, string> = {
   VALID: "유효",
   PENDING: "집계 전",
+  WARMING_UP: "표본 부족",
   STALE: "갱신 지연",
   NO_TRAFFIC: "요청 없음",
-  WARMING_UP: "표본 부족",
+  UNAVAILABLE: "원천 불가",
   N_A: "해당 없음",
 };
 
 export const SOURCE_STATE_NOTE: Record<SourceState, string> = {
   VALID: "현재 실행 기준 유효한 값입니다.",
   PENDING: "최종 집계 전이라 이 값으로 판정하면 안 됩니다.",
-  STALE: "관측 시각이 허용 지연을 넘었습니다. 값이 현재 상태가 아닐 수 있습니다.",
-  NO_TRAFFIC: "해당 구간에 요청이 없었습니다. 장애가 아닙니다.",
   WARMING_UP: "p99 같은 값을 낼 표본이 아직 모자랍니다.",
+  STALE: "관측 시각이 허용 지연을 넘었습니다. 마지막 값은 참고값입니다.",
+  NO_TRAFFIC: "해당 구간에 요청이 없었습니다. 장애가 아닙니다.",
+  UNAVAILABLE: "원천에 접근할 수 없습니다. 남은 값을 현재값으로 읽으면 안 됩니다.",
   N_A: "이 버전에는 없는 기능입니다.",
 };
 
@@ -59,6 +66,25 @@ export interface SourceValue<T> {
   state: SourceState;
   observedAt: string | null;
   /** 화면에 그대로 노출할 짧은 단서 */
+  note?: string;
+}
+
+/**
+ * gap 전용 값 (AB-G0 · G0-05).
+ *
+ * SourceValue<number> 와 구조는 같지만 허용 상태가 5종으로 좁습니다 —
+ * gap 은 표본 개수로 계산하는 값이 아니고(WARMING_UP 없음),
+ * 요청이 없다고 격차가 사라지지도 않습니다(NO_TRAFFIC 없음).
+ * 별칭으로 두면 이 두 상태가 타입으로 막히지 않으므로 별도 타입으로 둡니다.
+ *
+ * observedAt = min(사용된 원천 시각) 이되 VALID 일 때만 새로 계산합니다.
+ */
+export type GapState = Extract<SourceState, "VALID" | "PENDING" | "STALE" | "UNAVAILABLE" | "N_A">;
+
+export interface GapValue {
+  value: number | null;
+  state: GapState;
+  observedAt: string | null;
   note?: string;
 }
 
@@ -342,6 +368,31 @@ export const GAP_LABEL: Record<GapType, string> = {
 export type ConsistencyPhase = "LIVE" | "FINAL";
 export type Verdict = "PASS" | "FAIL" | null;
 
+/**
+ * 운영 대응 우선순위 (AB-G0 · G0-13).
+ *
+ * 합성은 CRITICAL > WARN > NONE. 평가 가능한 gap 이 없으면 null 이고,
+ * null 을 NONE 으로 바꾸지 않습니다 — "문제 없음" 과 "판단 불가" 는 다릅니다.
+ * 값은 A-05 가 계산해 내려줍니다. 화면이 gap 을 보고 다시 판정하면 규칙이 두 곳으로 갈립니다.
+ */
+export type Severity = "NONE" | "WARN" | "CRITICAL";
+
+/**
+ * 응답시간 uri 그룹 (B 단독 결정 · AB-G0 근거 없음).
+ *
+ * 발급·입장·순번 폴링·조회·상태 전이는 응답 시간대가 자릿수로 다릅니다.
+ * 한 선에 합치면 /queue 폴링이 전체를 끌어내려 발급 지연이 안 보입니다.
+ */
+export type UriGroup = "ISSUE" | "ENTRY" | "QUEUE_POLL" | "LOOKUP" | "TRANSITION";
+
+export const URI_GROUP_LABEL: Record<UriGroup, string> = {
+  ISSUE: "발급",
+  ENTRY: "입장",
+  QUEUE_POLL: "순번 폴링",
+  LOOKUP: "조회",
+  TRANSITION: "상태 전이",
+};
+
 export interface BreakerRow {
   name: "dbCB" | "redisCB" | "kafkaCB";
   failureRate: SourceValue<number>;
@@ -359,8 +410,8 @@ export interface RunScope {
 }
 
 export interface AdminMetricsKpi {
-  /** 과제 합격 판정 — 스크롤 없이 가장 먼저 보여야 하는 숫자 */
-  overIssued: SourceValue<number>;
+  /** 과제 합격 판정 — 스크롤 없이 가장 먼저 보여야 하는 숫자. 미계산을 0 으로 만들지 않습니다 */
+  overIssued: GapValue;
   overIssuedZeroSeconds: number;
   gapsValid: number;
   gapsPending: number;
@@ -381,11 +432,31 @@ export interface AdminMetricsKpi {
 
 export interface ConsistencyPanel {
   phase: ConsistencyPhase;
+  /** 정합성 판정 — LIVE 에서는 null */
   verdict: Verdict;
-  overIssued: SourceValue<number>;
+  /**
+   * 운영 대응 우선순위 — verdict 와는 다른 축입니다.
+   * 어느 한쪽에서 파생시키지 않습니다. 평가 가능한 gap 이 없으면 null.
+   */
+  severity: Severity | null;
+  /** gap 배열 밖 독립 필드입니다 (G0-04). 배열에 넣으면 렌더 루프가 다섯 칸을 그립니다 */
+  overIssued: GapValue;
   issuedPlusUsed: number;
   totalQuantity: number;
-  gaps: { type: GapType; value: SourceValue<number> }[];
+  /** 정확히 4종 */
+  gaps: { type: GapType; value: GapValue }[];
+}
+
+/**
+ * uri 그룹별 백분위 — 전체 집계 옆에 붙는 분해 축입니다.
+ * 전체 집계 필드를 대체하지 않습니다 (KPI 카드가 전체 집계를 씁니다).
+ */
+export interface LatencyGroupStat {
+  group: UriGroup;
+  p50: SourceValue<number>;
+  p95: SourceValue<number>;
+  p99: SourceValue<number>;
+  series: Point[];
 }
 
 export interface LatencyPanel {
@@ -397,6 +468,8 @@ export interface LatencyPanel {
     targetMs: number;
     percentileMode: "instance-max" | "merged";
     series: Point[];
+    /** 그룹별 분해 */
+    groups: LatencyGroupStat[];
   };
   /** 14 실패 응답시간 — 정책 거절과 시스템 실패는 축이 다릅니다 */
   failure: {
@@ -405,6 +478,8 @@ export interface LatencyPanel {
     p99: SourceValue<number>;
     systemFailureP99Ms: SourceValue<number>;
     series: Point[];
+    /** 그룹별 분해 */
+    groups: LatencyGroupStat[];
   };
   /** 15 의존성 지연 — 통계 종류가 달라 한 축에 두지 않고 계열별로 정규화합니다 */
   dependency: {
