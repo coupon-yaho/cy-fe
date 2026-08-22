@@ -3,7 +3,7 @@ import { useState } from "react";
 import { SeriesChart, SeriesLegend, type SeriesSpec } from "@/components/admin/charts";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
 import { MetaChips, PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
-import { StatedValue, Value } from "@/components/admin/state";
+import { StateBadge, StatedValue, Value } from "@/components/admin/state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
 import {
@@ -39,21 +39,23 @@ function CampaignDetail() {
 
   const metrics = useAdminPolling({
     pollKey: ["admin", "coupon-metrics", roundId, window],
-    queryFn: () => adminApi.getCouponMetrics(roundId, window),
+    queryFn: (signal) => adminApi.getCouponMetrics(roundId, window, signal),
     intervalMs: interval,
   });
   const events = useAdminPolling({
     pollKey: ["admin", "events", roundId],
-    queryFn: () => adminApi.getEvents({ couponRoundId: roundId, limit: 14 }),
+    queryFn: (signal) => adminApi.getEvents({ couponRoundId: roundId, limit: 14 }, signal),
     intervalMs: interval,
   });
   const histories = useAdminPolling({
     pollKey: ["admin", "histories", roundId],
-    queryFn: () => adminApi.getHistories({ couponRoundId: roundId, limit: 12 }),
+    queryFn: (signal) => adminApi.getHistories({ couponRoundId: roundId, limit: 12 }, signal),
     intervalMs: interval,
   });
 
   const d = metrics.data;
+  // 셋 중 하나만 멈춰도 이 화면의 숫자는 서로 다른 시각의 값이 섞입니다.
+  const stale = metrics.isStale || events.isStale || histories.isStale;
 
   return (
     <>
@@ -81,6 +83,7 @@ function CampaignDetail() {
         controls={
           <>
             <Segmented label="범위" value={window} options={WINDOWS} onChange={setWindow} />
+            {stale && <StateBadge state="STALE" />}
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}

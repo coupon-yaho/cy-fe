@@ -24,7 +24,9 @@ export function createHttpAdminApi(baseUrl: string): AdminApi {
           ...(init.body ? { "Content-Type": "application/json" } : {}),
         },
       });
-    } catch {
+    } catch (e) {
+      // abort 는 오류가 아닙니다 — 화면이 떠난 것뿐이라 그대로 던져 훅이 버리게 합니다.
+      if (init.signal?.aborted || (e instanceof DOMException && e.name === "AbortError")) throw e;
       throw new CouponApiError({
         status: 0,
         code: "NETWORK",
@@ -61,33 +63,39 @@ export function createHttpAdminApi(baseUrl: string): AdminApi {
   };
 
   return {
-    getOverview: (query = {}) =>
+    getOverview: (query = {}, signal) =>
       call(
         `/api/v1/admin/overview${qs({ couponId: query.brandId ?? null, filter: query.filter })}`,
+        { signal: signal ?? null },
       ),
 
-    getCouponMetrics: (couponRoundId: number, window: MetricsWindow) =>
-      call(`/api/v1/admin/coupon-metrics${qs({ couponId: couponRoundId, window })}`),
+    getCouponMetrics: (couponRoundId: number, window: MetricsWindow, signal) =>
+      call(`/api/v1/admin/coupon-metrics${qs({ couponId: couponRoundId, window })}`, {
+        signal: signal ?? null,
+      }),
 
-    getEvents: (params) =>
+    getEvents: (params, signal) =>
       call(
         `/api/v1/admin/events${qs({
           couponId: params.couponRoundId ?? null,
           since: params.cursor ?? null,
           limit: params.limit ?? 50,
         })}`,
+        { signal: signal ?? null },
       ),
 
-    getHistories: (params) =>
+    getHistories: (params, signal) =>
       call(
         `/api/v1/admin/issuance-histories${qs({
           couponId: params.couponRoundId ?? null,
           cursor: params.cursor ?? null,
           limit: params.limit ?? 50,
         })}`,
+        { signal: signal ?? null },
       ),
 
-    getMetrics: (window) => call(`/api/v1/admin/metrics${qs({ window })}`),
+    getMetrics: (window, signal) =>
+      call(`/api/v1/admin/metrics${qs({ window })}`, { signal: signal ?? null }),
 
     getBenchmarks: () => call("/api/v1/admin/benchmarks"),
 

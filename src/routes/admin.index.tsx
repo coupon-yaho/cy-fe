@@ -42,7 +42,7 @@ function OperationsOverview() {
 
   const query = useAdminPolling({
     pollKey: ["admin", "overview", filter, brandId],
-    queryFn: () => adminApi.getOverview({ filter, brandId }),
+    queryFn: (signal) => adminApi.getOverview({ filter, brandId }, signal),
     intervalMs: interval,
   });
 
@@ -68,6 +68,7 @@ function OperationsOverview() {
               ))}
             </select>
             <Segmented value={filter} options={FILTERS} onChange={setFilter} />
+            {query.isStale && <StateBadge state="STALE" />}
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}

@@ -191,7 +191,26 @@ function meta(
   };
 }
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * 목 지연. signal 을 주면 실서버 어댑터와 같은 자리에서 끊깁니다(S-3) —
+ * 목으로 개발할 때도 취소 경로가 실제로 도는지 볼 수 있어야 합니다.
+ */
+const wait = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 
 /* ══ 부하 곡선 ═════════════════════════════════════
    t<10 램프업 · 10~48 정상 · 48 재고 소진 · 64 부하 종료 · 이후 수렴 */
@@ -1651,24 +1670,24 @@ function buildInquiry(now: number, memberId: number): MemberInquiryResponse {
 
 export function createMockAdminApi(): AdminApi {
   return {
-    async getOverview(query = {}) {
-      await wait(90);
+    async getOverview(query = {}, signal) {
+      await wait(90, signal);
       return buildOverview(Date.now(), query);
     },
-    async getCouponMetrics(couponRoundId, window) {
-      await wait(80);
+    async getCouponMetrics(couponRoundId, window, signal) {
+      await wait(80, signal);
       return buildCouponMetrics(Date.now(), couponRoundId, window);
     },
-    async getEvents(params) {
-      await wait(70);
+    async getEvents(params, signal) {
+      await wait(70, signal);
       return buildEvents(Date.now(), params.couponRoundId ?? null, params.limit ?? 24);
     },
-    async getHistories(params) {
-      await wait(70);
+    async getHistories(params, signal) {
+      await wait(70, signal);
       return buildHistories(Date.now(), params.couponRoundId ?? null, params.limit ?? 20);
     },
-    async getMetrics(window) {
-      await wait(85);
+    async getMetrics(window, signal) {
+      await wait(85, signal);
       return buildMetrics(Date.now(), window);
     },
     async getBenchmarks() {

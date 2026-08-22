@@ -42,7 +42,7 @@ function SystemConsole() {
 
   const query = useAdminPolling({
     pollKey: ["admin", "metrics", window],
-    queryFn: () => adminApi.getMetrics(window),
+    queryFn: (signal) => adminApi.getMetrics(window, signal),
     intervalMs: interval,
   });
 
@@ -68,6 +68,7 @@ function SystemConsole() {
         controls={
           <>
             <Segmented label="범위" value={window} options={WINDOWS} onChange={setWindow} />
+            {query.isStale && <StateBadge state="STALE" />}
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}
