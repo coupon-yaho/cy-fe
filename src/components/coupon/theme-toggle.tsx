@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Sun } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,19 +40,25 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
         align="end"
         className="yh w-44 rounded-xl border-yh-rule bg-yh-surface p-1"
       >
-        {OPTIONS.map(({ key, label, Icon: OptIcon }) => (
-          <DropdownMenuItem
-            key={key}
-            onSelect={() => choose(key)}
-            className={`yh-body flex items-center gap-2.5 rounded-lg font-medium ${
-              pref === key ? "text-yh-navy" : "text-yh-ink-2"
-            }`}
-          >
-            <OptIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden />
-            {label}
-            {pref === key && <span className="ml-auto text-yh-accent">●</span>}
-          </DropdownMenuItem>
-        ))}
+        {OPTIONS.map(({ key, label, Icon: OptIcon }) => {
+          const on = pref === key;
+          return (
+            <DropdownMenuItem
+              key={key}
+              onSelect={() => choose(key)}
+              className={`yh-body flex items-center gap-2.5 rounded-lg font-medium ${
+                on ? "bg-yh-paper-2 font-bold text-yh-navy" : "text-yh-ink-2"
+              }`}
+            >
+              <OptIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden />
+              {label}
+              {/* 고른 값을 빨간 점으로 찍고 있었습니다. 이 화면에서 빨강은 "지금 발급 중"
+                  을 뜻하는 색이라 밝기 메뉴에 쓰면 알림 배지처럼 읽힙니다.
+                  게다가 색만으로 알리는 표시라 색을 못 보면 무엇을 골랐는지 모릅니다. */}
+              {on && <Check className="ml-auto size-4 shrink-0" strokeWidth={2.4} aria-hidden />}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
