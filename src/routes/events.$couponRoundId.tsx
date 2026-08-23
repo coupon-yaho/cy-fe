@@ -35,9 +35,57 @@ type Phase =
   | { kind: "idle" }
   | { kind: "entering" }
   | { kind: "queued"; queueToken: string; place: QueuePlace; startPosition: number }
+  /* 순서가 왔지만 **아직 발급하지 않은** 상태입니다.
+     PRD 는 입장과 발급을 나눠 두었습니다 — "1번으로 입장했어도 170초 뒤에 누르면,
+     500번으로 입장해 즉시 누른 사람이 먼저 받습니다." 자동으로 발급해 버리면
+     입장 순서가 곧 발급 순서가 되어 그 정의가 무력해집니다. 버튼을 남깁니다. */
+  | { kind: "admitted"; entryToken: string; expiresAt: number }
+  /** entryToken 이 만료돼 슬롯을 반납한 상태 */
+  | { kind: "expired" }
   | { kind: "issuing"; fromQueue: boolean }
   | { kind: "done"; issuance: CouponIssueResponse }
   | { kind: "error"; error: unknown };
+
+/** PRD — entryToken TTL 180초. 서버가 expiresIn 을 주면 그 값이 우선입니다. */
+const ENTRY_TTL_SECONDS = 180;
+
+/* 대기 중 새로고침해도 순번이 유지되게 토큰을 남깁니다.
+   PRD 설계 규칙 5 — "/entry 중복 호출은 기존 queueToken 반환(멱등).
+   새로고침으로 순번이 밀리지 않도록." 순번은 서버에 살아 있는데 프론트가 토큰을
+   메모리에만 들고 있어서 잃어버리고 있었습니다. */
+const QUEUE_KEY = "coupon-yaho.queue.v1";
+
+/* 토큰을 들고 있을 필요가 없습니다. 어느 회차에서 줄을 섰는지만 남기고,
+   돌아오면 /entry 를 다시 부릅니다 — 서버가 기존 순번을 그대로 돌려줍니다. */
+interface SavedQueue {
+  roundId: number;
+  memberId: number;
+}
+
+function saveQueue(v: SavedQueue) {
+  try {
+    window.localStorage.setItem(QUEUE_KEY, JSON.stringify(v));
+  } catch {
+    /* 저장 실패는 무시합니다 — 이번 세션에서만 순번을 잃습니다 */
+  }
+}
+
+function loadQueue(): SavedQueue | null {
+  try {
+    const raw = window.localStorage.getItem(QUEUE_KEY);
+    return raw ? (JSON.parse(raw) as SavedQueue) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearQueue() {
+  try {
+    window.localStorage.removeItem(QUEUE_KEY);
+  } catch {
+    /* 무시 */
+  }
+}
 
 function RoundDetail() {
   const { couponRoundId } = useParams({ from: "/events/$couponRoundId" });
@@ -68,6 +116,7 @@ function RoundDetail() {
       setPhase({ kind: "issuing", fromQueue });
       try {
         const issuance = await couponApi.issue(roundId, member, entryToken);
+        clearQueue();
         setPhase({ kind: "done", issuance });
         notify(
           "쿠폰이 발급됐습니다",
@@ -77,11 +126,88 @@ function RoundDetail() {
         queryClient.invalidateQueries({ queryKey: ["rounds"] });
         queryClient.invalidateQueries({ queryKey: ["my-coupons"] });
       } catch (error) {
+        clearQueue();
         setPhase({ kind: "error", error });
       }
     },
     [notify, queryClient, round?.name, roundId],
   );
+
+  /* 순번을 1초마다 봅니다. PRD 가 SSE 를 쓰지 않기로 했습니다 —
+     20,000 VU 부하 테스트에서 클라이언트가 먼저 죽기 때문입니다. */
+  const watchQueue = useCallback(
+    (member: MemberContext, queueToken: string) => {
+      stopPolling();
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await couponApi.pollQueue(roundId, member, queueToken);
+          if (status.status === "ADMITTED" && status.entryToken) {
+            stopPolling();
+            clearQueue();
+            /* 여기서 바로 발급하지 않습니다. 입장은 발급을 보장하지 않고,
+               누르는 시점이 곧 선착순이라는 것이 PRD 의 정의입니다. */
+            setPhase({
+              kind: "admitted",
+              entryToken: status.entryToken,
+              expiresAt: Date.now() + ENTRY_TTL_SECONDS * 1000,
+            });
+            return;
+          }
+          if (status.place) {
+            setPhase((prev) => (prev.kind === "queued" ? { ...prev, place: status.place! } : prev));
+          }
+        } catch (error) {
+          stopPolling();
+          clearQueue();
+          setPhase({ kind: "error", error });
+        }
+      }, 1000);
+    },
+    [roundId, stopPolling],
+  );
+
+  /* 새로고침 복귀. 이 회차에서 줄을 섰던 기록이 있으면 /entry 를 다시 부릅니다.
+     PRD 설계 규칙 5 — 중복 호출은 기존 queueToken 과 순번을 그대로 돌려줍니다.
+     토큰을 프론트가 보관했다가 그대로 쓰는 것보다 낫습니다: 서버가 토큰을 갈아도
+     따라가고, 그 사이 순서가 왔으면 admitted 로 바로 들어갑니다. */
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current || !session) return;
+    const saved = loadQueue();
+    if (!saved || saved.roundId !== roundId || saved.memberId !== session.memberId) return;
+    resumedRef.current = true;
+
+    const member: MemberContext = { memberId: session.memberId, grade: session.grade };
+    void (async () => {
+      try {
+        const entry = await couponApi.enterRound(roundId, member);
+        if (entry.admitted && entry.entryToken) {
+          clearQueue();
+          setPhase({
+            kind: "admitted",
+            entryToken: entry.entryToken,
+            expiresAt: Date.now() + (entry.expiresIn ?? ENTRY_TTL_SECONDS) * 1000,
+          });
+          return;
+        }
+        const place = entry.place;
+        if (!entry.queueToken || !place) {
+          clearQueue();
+          return;
+        }
+        setPhase({
+          kind: "queued",
+          queueToken: entry.queueToken,
+          place,
+          startPosition: place.position,
+        });
+        watchQueue(member, entry.queueToken);
+      } catch {
+        // 줄이 이미 사라졌거나 발급이 끝난 경우입니다. 조용히 기록만 지웁니다.
+        clearQueue();
+      }
+    })();
+  }, [roundId, session, watchQueue]);
 
   const start = useCallback(async () => {
     if (!session) return;
@@ -98,32 +224,37 @@ function RoundDetail() {
 
       const queueToken = entry.queueToken!;
       const place = entry.place!;
+      saveQueue({ roundId, memberId: member.memberId });
       setPhase({ kind: "queued", queueToken, place, startPosition: place.position });
-
-      stopPolling();
-      pollRef.current = setInterval(async () => {
-        try {
-          const status = await couponApi.pollQueue(roundId, member, queueToken);
-          if (status.status === "ADMITTED") {
-            stopPolling();
-            await runIssue(member, status.entryToken, true);
-            return;
-          }
-          if (status.place) {
-            setPhase((prev) => (prev.kind === "queued" ? { ...prev, place: status.place! } : prev));
-          }
-        } catch (error) {
-          stopPolling();
-          setPhase({ kind: "error", error });
-        }
-      }, 1000);
+      watchQueue(member, queueToken);
     } catch (error) {
       setPhase({ kind: "error", error });
     }
   }, [roundId, runIssue, session, stopPolling]);
 
+  /* 입장 토큰의 남은 시간. 1초마다 셉니다 — 서버가 이 시간을 넘기면 슬롯을 반납하므로
+     화면도 같은 시점에 손을 떼야 사용자가 헛되이 누르지 않습니다. */
+  const [entrySecondsLeft, setEntrySecondsLeft] = useState(0);
+  useEffect(() => {
+    if (phase.kind !== "admitted") return;
+    const tick = () => {
+      const left = Math.ceil((phase.expiresAt - Date.now()) / 1000);
+      setEntrySecondsLeft(Math.max(0, left));
+      if (left <= 0) setPhase({ kind: "expired" });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  const issueFromQueue = useCallback(() => {
+    if (phase.kind !== "admitted" || !session) return;
+    void runIssue({ memberId: session.memberId, grade: session.grade }, phase.entryToken, true);
+  }, [phase, runIssue, session]);
+
   const cancelQueue = useCallback(() => {
     stopPolling();
+    clearQueue();
     setPhase({ kind: "idle" });
     if (session) {
       void couponApi.leaveQueue(roundId, {
@@ -196,6 +327,8 @@ function RoundDetail() {
               <Issued issuance={phase.issuance} />
             ) : phase.kind === "error" ? (
               <Failed error={phase.error} onReset={() => setPhase({ kind: "idle" })} />
+            ) : phase.kind === "expired" ? (
+              <Expired onReset={() => setPhase({ kind: "idle" })} />
             ) : (
               <Ready round={round} remaining={remaining} phase={phase} onStart={start} />
             )}
@@ -206,11 +339,19 @@ function RoundDetail() {
       </div>
 
       <QueueDialog
-        open={phase.kind === "queued" || (phase.kind === "issuing" && phase.fromQueue)}
+        open={
+          phase.kind === "queued" ||
+          phase.kind === "admitted" ||
+          (phase.kind === "issuing" && phase.fromQueue)
+        }
         campaign={round.name}
         place={phase.kind === "queued" ? phase.place : null}
         startPosition={phase.kind === "queued" ? phase.startPosition : 0}
-        admitted={phase.kind === "issuing"}
+        admitted={phase.kind === "admitted" ? { secondsLeft: entrySecondsLeft } : null}
+        issuing={phase.kind === "issuing"}
+        remaining={remaining}
+        closeAt={round.closeAt}
+        onIssue={issueFromQueue}
         onCancel={cancelQueue}
       />
     </div>
@@ -392,6 +533,24 @@ function Ready({
             : round.queueActive
               ? "대기열 입장"
               : "발급받기"}
+      </button>
+    </div>
+  );
+}
+
+/* 입장 토큰이 180초를 넘긴 상태. 실패가 아니라 "자리를 반납했다" 입니다 —
+   PRD 규칙 3: 이탈한 사용자가 슬롯을 붙들고 있지 않도록 만료시킵니다.
+   그래서 사과하지 않고 다시 줄 설 수 있다고만 말합니다. */
+function Expired({ onReset }: { onReset: () => void }) {
+  return (
+    <div>
+      <h2 className="yh-sub">입장 시간이 지났습니다</h2>
+      <p className="yh-body mt-2.5 text-yh-ink-2">
+        3분 안에 누르지 않아 자리가 다음 사람에게 넘어갔습니다. 아직 수량이 남아 있으면 다시 줄을 설
+        수 있습니다.
+      </p>
+      <button type="button" onClick={onReset} className="yh-btn mt-6 w-full">
+        다시 대기하기
       </button>
     </div>
   );

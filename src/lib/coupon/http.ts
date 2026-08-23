@@ -85,6 +85,8 @@ export function createHttpApi(baseUrl: string): CouponApi {
     }
 
     if (!res.ok || !envelope?.success) {
+      // Retry-After 는 헤더로만 옵니다. 초 단위 형식만 읽습니다(HTTP-date 는 안 씁니다).
+      const retryAfter = Number(res.headers.get("Retry-After"));
       throw new CouponApiError(
         envelope?.error ?? {
           status: res.status,
@@ -93,6 +95,7 @@ export function createHttpApi(baseUrl: string): CouponApi {
           requestId: res.headers.get("X-Request-Id"),
           timestamp: new Date().toISOString(),
         },
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
       );
     }
 

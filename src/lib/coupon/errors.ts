@@ -19,15 +19,27 @@ export class CouponApiError extends Error {
   readonly code: string;
   readonly requestId: string | null;
   readonly serverMessage: string;
+  /**
+   * 503 일 때 서버가 헤더로 알려 주는 재시도 간격(초).
+   * 게이트(서킷브레이커)가 닫히면 /entry 가 503 + Retry-After 를 줍니다 — PRD 적응형 대기열.
+   * 응답 **본문**에는 없는 값이라 어댑터가 헤더에서 읽어 넣습니다.
+   */
+  readonly retryAfterSeconds: number | null;
 
-  constructor(body: ErrorBody) {
+  constructor(body: ErrorBody, retryAfterSeconds: number | null = null) {
     super(body.message);
     this.name = "CouponApiError";
     this.status = body.status;
     this.code = body.code;
     this.requestId = body.requestId;
     this.serverMessage = body.message;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/** 게이트가 닫혀 지금은 줄조차 설 수 없는 상태 */
+export function isGateClosed(e: unknown): e is CouponApiError {
+  return isCouponApiError(e) && e.status === 503;
 }
 
 export function isCouponApiError(e: unknown): e is CouponApiError {
@@ -100,6 +112,12 @@ const COPY: Record<string, Copy> = {
   "COMMON-002": { title: "찾을 수 없습니다" },
   "COMMON-005": { title: "접근 권한이 없습니다", next: "관리자 계정으로 로그인하세요." },
   "COMMON-004": { title: "지금은 처리가 지연되고 있습니다", next: "잠시 후 다시 시도해 주세요." },
+  /* 게이트가 닫힌 상태. 줄을 세우는 것조차 의미가 없어서 입장 자체를 막습니다 —
+     "붐빈다" 가 아니라 "지금은 발급이 안 된다" 입니다. */
+  GATE_CLOSED: {
+    title: "지금은 입장할 수 없습니다",
+    next: "발급 처리가 잠시 멈췄습니다. 곧 다시 열립니다.",
+  },
 };
 
 const NETWORK: Copy = {
@@ -117,6 +135,14 @@ export function errorCopy(e: unknown): Copy {
   if (!isCouponApiError(e)) return NETWORK;
   const hit = COPY[e.code];
   if (hit) return hit;
+  /* 503 은 "서버가 아픔" 이 아니라 게이트가 닫힌 것입니다. 코드보다 상태로 먼저
+     가릅니다 — 백엔드가 어떤 코드를 실어 보내든 사용자에게 할 말은 같습니다. */
+  if (e.status === 503) {
+    const copy = COPY["GATE_CLOSED"]!;
+    return e.retryAfterSeconds
+      ? { title: copy.title, next: `약 ${e.retryAfterSeconds}초 뒤에 다시 시도해 주세요.` }
+      : copy;
+  }
   if (e.status >= 500) return UNAVAILABLE;
   return { title: e.serverMessage };
 }

@@ -685,10 +685,15 @@ interface Persisted {
      실서버라면 DB 에 남는 것이라 목도 남겨야 같은 것을 보여 줍니다. */
   reservedRounds: ReservedRound[];
   nextReservedRoundId: number;
+  /* 대기열 티켓과 입장 토큰. 실서버에서는 Redis 에 있고 새로고침해도 순번이
+     유지됩니다(PRD 설계 규칙 5 — /entry 는 멱등). 목이 메모리에만 들고 있으면
+     새로고침한 사람이 줄 맨 뒤로 밀려서 PRD 가 막으려던 일이 그대로 일어납니다. */
+  queueTickets: Record<string, unknown>;
+  entryTokens: Record<string, unknown>;
 }
 
 // 저장 형식이 바뀌었으므로 키를 올립니다. 옛 키는 그대로 두고 무시합니다.
-const STORE_KEY = "coupon-yaho.mock.v6";
+const STORE_KEY = "coupon-yaho.mock.v7";
 
 function emptyState(): Persisted {
   return {
@@ -697,6 +702,8 @@ function emptyState(): Persisted {
     seededMembers: [],
     reservedRounds: [],
     nextReservedRoundId: 9001,
+    queueTickets: {},
+    entryTokens: {},
   };
 }
 

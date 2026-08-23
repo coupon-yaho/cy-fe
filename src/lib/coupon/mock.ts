@@ -96,11 +96,39 @@ interface QueueTicket {
   entryToken: string;
 }
 
-const queues = new Map<string, QueueTicket>();
-const entryTokens = new Map<
-  string,
-  { couponRoundId: number; memberId: number; expiresAt: number }
->();
+interface EntryTokenRecord {
+  couponRoundId: number;
+  memberId: number;
+  expiresAt: number;
+}
+
+/* 대기열 티켓과 입장 토큰은 저장본에 둡니다.
+   모듈 Map 에 두었더니 새로고침 한 번에 줄이 통째로 사라져서, 다시 들어온 사람이
+   맨 뒤로 밀렸습니다 — PRD 설계 규칙 5 가 정확히 막으려던 일입니다.
+   실서버에서는 Redis 에 있으니 목도 남는 곳에 둡니다. */
+const queues = {
+  get: (k: string) => loadStore().queueTickets[k] as QueueTicket | undefined,
+  set: (k: string, v: QueueTicket) => {
+    loadStore().queueTickets[k] = v;
+    saveStore();
+  },
+  delete: (k: string) => {
+    delete loadStore().queueTickets[k];
+    saveStore();
+  },
+};
+
+const entryTokens = {
+  get: (k: string) => loadStore().entryTokens[k] as EntryTokenRecord | undefined,
+  set: (k: string, v: EntryTokenRecord) => {
+    loadStore().entryTokens[k] = v;
+    saveStore();
+  },
+  delete: (k: string) => {
+    delete loadStore().entryTokens[k];
+    saveStore();
+  },
+};
 
 function queueKey(couponRoundId: number, memberId: number) {
   return `${couponRoundId}:${memberId}`;
