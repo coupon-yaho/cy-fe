@@ -258,6 +258,8 @@ const EMPTY: CouponTemplateWriteRequest = {
   discountRate: 20,
   maxDiscountAmount: 10000,
   discountAmount: null,
+  dataGrantMb: null,
+  minOrderAmount: null,
   validDays: 14,
   nthWeek: 1,
   dayOfWeek: "TUE",

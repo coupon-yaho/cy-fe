@@ -20,18 +20,18 @@ import { NotificationProvider } from "@/hooks/use-notifications";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <p className="eyebrow">404</p>
-        <h1 className="t-section mt-2">이 주소에는 아무것도 없습니다</h1>
-        <p className="t-body mt-3 text-hig-secondary">
+    <div className="flex min-h-[70vh] items-center px-5">
+      <div className="mx-auto w-full max-w-2xl">
+        <p className="yh-figure text-yh-rule">404</p>
+        <h1 className="yh-hero mt-4">이 주소에는 아무것도 없습니다</h1>
+        <p className="yh-lede mt-4 max-w-[38ch] text-yh-ink-2">
           주소가 바뀌었거나 지워진 회차일 수 있습니다.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link to="/events" className="btn-primary">
+        <div className="mt-10 flex flex-wrap gap-3">
+          <Link to="/events" className="yh-btn">
             브랜드 데이 보기
           </Link>
-          <Link to="/" className="btn-outline">
+          <Link to="/" className="yh-btn-ghost">
             홈으로
           </Link>
         </div>
@@ -48,23 +48,26 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <h1 className="t-section">화면을 불러오지 못했습니다</h1>
-        <p className="t-body mt-3 text-hig-secondary">
+    /* 루트 에러는 RootComponent 를 통째로 대체합니다 — .ed 래퍼 바깥이라
+       여기서 직접 클래스를 답니다. */
+    <div className="yh flex min-h-screen items-center px-5">
+      <div className="mx-auto w-full max-w-2xl">
+        <p className="yh-label">오류</p>
+        <h1 className="yh-hero mt-3">화면을 불러오지 못했습니다</h1>
+        <p className="yh-lede mt-4 max-w-[42ch] text-yh-ink-2">
           다시 시도해 주세요. 계속 같은 화면이 뜨면 홈으로 돌아가세요.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-10 flex flex-wrap gap-3">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="btn-primary"
+            className="yh-btn"
           >
             다시 시도
           </button>
-          <a href="/" className="btn-outline">
+          <a href="/" className="yh-btn-ghost">
             홈으로
           </a>
         </div>
@@ -91,9 +94,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://cdn.jsdelivr.net", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap",
+      },
+      /* 고객 화면(.ed)의 본문 서체. dynamic-subset 이라 쓰인 글자 조각만 내려받습니다.
+         관리자 화면은 .ed 바깥이라 이 서체를 쓰지 않습니다 — DESIGN.md 스택 그대로입니다. */
+      {
+        rel: "stylesheet",
+        href: "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css",
       },
       {
         rel: "stylesheet",
@@ -134,9 +144,14 @@ function RootComponent() {
           {isAdmin ? (
             <Outlet />
           ) : (
-            <div className="flex min-h-screen flex-col">
+            /* .ed — 고객 셸. 에디토리얼 토큰·서체가 이 안에서만 걸립니다.
+               관리자 화면은 이 래퍼 바깥이라 기존 DESIGN.md 스타일 그대로입니다. */
+            <div className="yh flex min-h-screen flex-col">
+              <a href="#main" className="yh-skip">
+                본문으로 건너뛰기
+              </a>
               <SiteHeader />
-              <main className="flex-1">
+              <main id="main" className="flex-1">
                 {/* Required: nested routes render here. */}
                 <Outlet />
               </main>

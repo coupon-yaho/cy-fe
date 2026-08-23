@@ -16,17 +16,26 @@ function groupCode(code: string) {
 }
 
 const STATUS_TONE: Record<IssuanceStatus, string> = {
-  ISSUED: "text-hig-link",
+  ISSUED: "text-yh-navy",
   USED: "text-positive",
-  CANCELLED: "text-hig-muted",
-  EXPIRED: "text-hig-muted",
+  CANCELLED: "text-yh-ink-3",
+  EXPIRED: "text-yh-ink-3",
 };
 
 /**
  * 보유 쿠폰 카드.
  *
- * DESIGN.md §6 — 그림자 없음. 18px 라운드 흰 면이 캔버스(#f5f5f7) 위에 얹히는 것으로 충분합니다.
- * 상태는 도장 같은 장식 대신 이름 그대로 적습니다.
+ * 왼쪽 레일은 브랜드 고유색입니다 — 쿠폰함에 여러 브랜드가 쌓이면 색으로 먼저 찾습니다.
+ *
+ * 상태 표현은 `cy-be/docs/05-design-handoff.md` §3 표를 따릅니다.
+ * 라벨만으로도 상태는 전달되지만, 쿠폰함은 훑는 화면이라 **글자를 읽기 전에**
+ * 못 쓰는 쿠폰이 걸러져야 합니다. 그래서 색·질감을 함께 씁니다.
+ *
+ *   USED       채도를 낮추고 대각선 스탬프
+ *   CANCELLED  회색조 + 점선 테두리
+ *   EXPIRED    회색조 + 우상단 모서리 접힘
+ *
+ * 색만으로 전달하지 않도록 스탬프·라벨을 항상 같이 둡니다.
  */
 export function CouponTicket({
   coupon,
@@ -40,60 +49,93 @@ export function CouponTicket({
   dimmed?: boolean;
 }) {
   const brand = brandOf(brandId);
+  const used = coupon.status === "USED";
+  const cancelled = coupon.status === "CANCELLED";
+  const expired = coupon.status === "EXPIRED";
+  const spent = cancelled || expired;
 
   return (
     <article
-      className={`overflow-hidden rounded-2xl ${
-        dimmed ? "border border-hairline bg-hig-canvas" : "bg-card"
-      }`}
+      className={`yh-card relative overflow-hidden pl-2 ${
+        spent ? "border border-dashed border-yh-rule bg-yh-paper-2 saturate-[0.15]" : ""
+      } ${used ? "saturate-[0.55]" : ""} ${dimmed && !spent ? "opacity-70" : ""}`}
     >
+      <span
+        className="absolute inset-y-0 left-0 w-2"
+        style={{ backgroundColor: spent ? "var(--yh-rule)" : brand.hue }}
+        aria-hidden
+      />
+
+      {/* 사용 완료 — 실물 쿠폰에 찍는 도장 */}
+      {used && (
+        <span
+          className="pointer-events-none absolute top-1/2 right-8 -translate-y-1/2 -rotate-12 rounded-md border-[3px] border-yh-good/45 px-3 py-1 text-[1.125rem] font-extrabold tracking-[0.18em] text-yh-good/45"
+          aria-hidden
+        >
+          USED
+        </span>
+      )}
+
+      {/* 만료 — 우상단 모서리가 접힌 종이 */}
+      {expired && (
+        <span
+          className="pointer-events-none absolute top-0 right-0 size-8 rounded-bl-md"
+          style={{
+            background: "linear-gradient(225deg, var(--yh-rule) 0 50%, transparent 50%)",
+          }}
+          aria-hidden
+        />
+      )}
+
       <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
             <BrandPlate brandId={brandId} size="md" />
             <div className="min-w-0">
-              <p className="t-body truncate font-semibold">{coupon.name}</p>
-              <p className="t-body-sm text-hig-muted">
+              <p className="yh-sub truncate">{coupon.name}</p>
+              <p className="yh-small text-yh-ink-3">
                 {brand.name} · {brand.category}
               </p>
             </div>
           </div>
 
-          <p className="t-tile mt-6">
+          <p className="yh-figure-sm mt-6 text-[2rem] leading-none">
             {discountHeadline(coupon)}
-            <span className="t-body-sm ml-3 align-middle text-hig-secondary">
+            <span className="yh-small ml-3 align-middle font-normal text-yh-ink-2">
               {discountDetail(coupon)}
             </span>
           </p>
 
-          <p className="num t-body mt-4 tracking-[0.12em] text-hig-secondary">
+          <p className="yh-num yh-body mt-5 font-semibold tracking-[0.16em] text-yh-ink-2">
             {groupCode(coupon.code)}
           </p>
         </div>
 
         <div className="flex shrink-0 flex-col gap-4 sm:items-end sm:text-right">
-          <p className={`t-body-sm font-semibold ${STATUS_TONE[coupon.status]}`}>
+          <p className={`yh-small font-bold ${STATUS_TONE[coupon.status]}`}>
             {ISSUANCE_STATUS_LABEL[coupon.status]}
           </p>
-          <dl className="t-body-sm space-y-0.5 text-hig-muted">
+          <dl className="yh-small space-y-1 text-yh-ink-3">
             <div className="flex gap-2 sm:justify-end">
               <dt>발급</dt>
-              <dd className="num text-hig-secondary">{formatDate(coupon.issuedAt)}</dd>
+              <dd className="yh-num text-yh-ink-2">{formatDate(coupon.issuedAt)}</dd>
             </div>
             {/* 쓴 쿠폰은 남은 기한보다 언제 얼마를 깎았는지가 궁금합니다. */}
             {coupon.status === "USED" && coupon.usedAt ? (
               <>
                 <div className="flex gap-2 sm:justify-end">
                   <dt>사용</dt>
-                  <dd className="num text-hig-fg">{formatDate(coupon.usedAt)}</dd>
+                  <dd className="yh-num text-yh-navy">{formatDate(coupon.usedAt)}</dd>
                 </div>
                 {coupon.usedDiscountAmount !== null && (
                   <div className="flex gap-2 sm:justify-end">
                     <dt>할인</dt>
-                    <dd className="num text-hig-fg">
+                    <dd className="yh-num font-bold text-yh-navy">
                       {coupon.usedDiscountAmount.toLocaleString("ko-KR")}원
                       {coupon.orderId !== null && (
-                        <span className="ml-1.5 text-hig-muted">주문 {coupon.orderId}</span>
+                        <span className="ml-1.5 font-normal text-yh-ink-3">
+                          주문 {coupon.orderId}
+                        </span>
                       )}
                     </dd>
                   </div>
@@ -103,11 +145,11 @@ export function CouponTicket({
               // 취소된 쿠폰에 남은 기한을 적으면 아직 쓸 수 있는 것처럼 읽힙니다.
               <div className="flex gap-2 sm:justify-end">
                 <dt>사용 기한</dt>
-                <dd className="num text-hig-fg">{formatDate(coupon.expiresAt)}</dd>
+                <dd className="yh-num text-yh-navy">{formatDate(coupon.expiresAt)}</dd>
               </div>
             )}
           </dl>
-          {actions && <div className="flex items-center gap-3 sm:justify-end">{actions}</div>}
+          {actions && <div className="flex items-center gap-4 sm:justify-end">{actions}</div>}
         </div>
       </div>
     </article>

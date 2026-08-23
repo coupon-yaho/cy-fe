@@ -8,6 +8,7 @@
  * ⏳ = PRD 확정 · 백엔드 미구현 (목만 응답)
  */
 import type {
+  CalendarEntry,
   CouponCancelResponse,
   CouponCancelUseResponse,
   CouponIssueResponse,
@@ -34,6 +35,12 @@ export interface CouponApi {
   listRounds(): Promise<CouponRoundView[]>;
   /** ⏳ GET /api/v1/coupon-rounds/{couponRoundId} */
   getRound(couponRoundId: number): Promise<CouponRoundView>;
+
+  /**
+   * ⏳ GET /api/v1/calendar?from&to — 기간 내 브랜드 데이 회차
+   * from · to 는 "YYYY-MM-DD" 입니다.
+   */
+  listCalendar(from: string, to: string): Promise<CalendarEntry[]>;
 
   /** ⏳ POST /api/v1/coupons/{couponRoundId}/entry */
   enterRound(couponRoundId: number, member: MemberContext): Promise<EntryResponse>;

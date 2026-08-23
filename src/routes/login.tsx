@@ -34,29 +34,30 @@ function LoginPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 py-16">
-      <h1 className="t-section">로그인</h1>
-      <p className="t-body mt-3 text-hig-secondary">
+    <div className="mx-auto w-full max-w-md px-5 py-20">
+      <p className="yh-label">시작하기</p>
+      <h1 className="yh-hero mt-3">로그인</h1>
+      <p className="yh-lede mt-4 text-yh-ink-2">
         닉네임과 등급만 고르면 바로 시작합니다. 비밀번호는 받지 않습니다.
       </p>
 
-      <form onSubmit={submit} className="surface-card mt-8 p-8">
+      <form onSubmit={submit} className="mt-10 border-t border-yh-rule pt-9">
         <label className="block">
-          <span className="eyebrow">닉네임</span>
+          <span className="yh-label">닉네임</span>
           <input
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="예: 야호"
             autoFocus
-            className="t-body mt-2 w-full rounded-xl border border-input bg-hig-surface px-3.5 py-3 focus:border-hig-primary focus:outline-none"
+            className="yh-input mt-2.5"
           />
-          <span className="t-caption mt-2 block text-hig-muted">
+          <span className="yh-small mt-2.5 block text-yh-ink-3">
             같은 닉네임으로 다시 들어오면 쿠폰함이 그대로 있습니다.
           </span>
         </label>
 
-        <fieldset className="mt-7">
-          <legend className="eyebrow">멤버십 등급</legend>
+        <fieldset className="mt-8">
+          <legend className="yh-label">멤버십 등급</legend>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {GRADES.map((g) => (
               <button
@@ -64,11 +65,7 @@ function LoginPage() {
                 type="button"
                 onClick={() => setGrade(g)}
                 aria-pressed={grade === g}
-                className={`rounded-xl bg-hig-canvas px-2 py-3.5 text-center transition-colors ${
-                  grade === g
-                    ? "outline-2 -outline-offset-2 outline-hig-primary"
-                    : "hover:bg-secondary"
-                }`}
+                className="yh-choice px-2 py-4 text-center"
               >
                 <GradeChip grade={g} size="sm" />
               </button>
@@ -76,8 +73,8 @@ function LoginPage() {
           </div>
         </fieldset>
 
-        <fieldset className="mt-7">
-          <legend className="eyebrow">들어갈 화면</legend>
+        <fieldset className="mt-8">
+          <legend className="yh-label">들어갈 화면</legend>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {DESTINATIONS.map((r) => (
               <button
@@ -85,26 +82,22 @@ function LoginPage() {
                 type="button"
                 onClick={() => setRole(r.key)}
                 aria-pressed={role === r.key}
-                className={`rounded-xl bg-hig-canvas px-4 py-3.5 text-left transition-colors ${
-                  role === r.key
-                    ? "outline-2 -outline-offset-2 outline-hig-primary"
-                    : "hover:bg-secondary"
-                }`}
+                className="yh-choice px-4 py-3.5 text-left"
               >
-                <span className="t-body-sm block font-semibold">{r.label}</span>
-                <span className="t-caption block text-hig-muted">{r.desc}</span>
+                <span className="yh-body block font-bold">{r.label}</span>
+                <span className="yh-small block text-yh-ink-3">{r.desc}</span>
               </button>
             ))}
           </div>
         </fieldset>
 
-        <button type="submit" disabled={!trimmed} className="btn-primary mt-8 w-full">
+        <button type="submit" disabled={!trimmed} className="yh-btn mt-9 w-full">
           로그인
         </button>
 
-        <p className="t-body-sm mt-5 text-center text-hig-muted">
+        <p className="yh-body mt-6 text-center text-yh-ink-3">
           처음이신가요?{" "}
-          <Link to="/signup" className="text-hig-link hover:underline">
+          <Link to="/signup" className="font-bold text-yh-navy underline underline-offset-4">
             회원가입
           </Link>
         </p>

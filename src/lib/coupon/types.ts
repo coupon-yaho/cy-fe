@@ -12,13 +12,43 @@
 /* ── 열거형 ─────────────────────────────────────────── */
 
 export type MembershipGrade = "WELCOME" | "SILVER" | "GOLD" | "VIP";
-export type CouponPolicyType = "PERCENT_CAPPED" | "FIXED_AMOUNT";
+export type CouponPolicyType = "PERCENT_CAPPED" | "FIXED_AMOUNT" | "DATA_GRANT";
 export type IssuanceStatus = "ISSUED" | "USED" | "CANCELLED" | "EXPIRED";
 export type IssuanceEventType = "ISSUE" | "USE" | "CANCEL_USE" | "CANCEL" | "EXPIRE";
 export type CouponRoundStatus = "SCHEDULED" | "OPEN" | "CLOSED";
 export type CouponDayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 export const GRADES: MembershipGrade[] = ["WELCOME", "SILVER", "GOLD", "VIP"];
+
+/**
+ * 등급 비트 — `grades.bit_value` 와 같은 값입니다.
+ *
+ * 회차의 참여 등급은 DB 에 `eligible_grades_mask tinyint` 하나로 들어 있습니다.
+ * 화면은 배열이 편하고 계약은 마스크라, **어댑터(mock · http)에서 한 번만 풉니다.**
+ * 두 표현이 코드 여기저기서 섞이면 어느 쪽이 진짜인지 알 수 없게 됩니다.
+ */
+export const GRADE_BIT: Record<MembershipGrade, number> = {
+  WELCOME: 1,
+  SILVER: 2,
+  GOLD: 4,
+  VIP: 8,
+};
+
+/** 전체 등급 = 15. 실버 이상 = 14, 골드 이상 = 12, VIP 전용 = 8 */
+export const MASK_ALL = 15;
+
+export function maskToGrades(mask: number): MembershipGrade[] {
+  return GRADES.filter((g) => (mask & GRADE_BIT[g]) !== 0);
+}
+
+export function gradesToMask(grades: MembershipGrade[]): number {
+  return grades.reduce((m, g) => m | GRADE_BIT[g], 0);
+}
+
+/** 이 등급이 이 마스크에 포함되는가 */
+export function isGradeEligible(mask: number, grade: MembershipGrade): boolean {
+  return (mask & GRADE_BIT[grade]) !== 0;
+}
 export const DAYS_OF_WEEK: CouponDayOfWeek[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 /* ── 공통 응답 봉투 ────────────────────────────────── */
@@ -56,6 +86,10 @@ export interface CouponTemplateDetail {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
+  /** DATA_GRANT 전용. coupon_templates.data_grant_mb */
+  dataGrantMb: number | null;
+  /** 이 금액 미만 주문에는 쓸 수 없습니다. coupon_templates.min_order_amount */
+  minOrderAmount: number | null;
   validDays: number;
   nthWeek: number;
   dayOfWeek: CouponDayOfWeek;
@@ -63,6 +97,9 @@ export interface CouponTemplateDetail {
   startTime: string;
   durationHours: number;
   stockPerOccurrence: number;
+  /** 계약 필드 — coupon_templates.eligible_grades_mask */
+  eligibleGradesMask: number;
+  /** 위 마스크를 어댑터가 푼 것 */
   eligibleGrades: MembershipGrade[];
   active: boolean;
 }
@@ -74,6 +111,8 @@ export interface CouponTemplateWriteRequest {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
+  dataGrantMb: number | null;
+  minOrderAmount: number | null;
   validDays: number;
   nthWeek: number;
   dayOfWeek: CouponDayOfWeek;
@@ -131,6 +170,8 @@ export interface MemberCoupon {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
+  dataGrantMb: number | null;
+  minOrderAmount: number | null;
   issuedAt: string;
   expiresAt: string;
   /** 활성 사용 시각. 쓰지 않았으면 null */
@@ -154,7 +195,12 @@ export interface CouponRoundView {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
+  dataGrantMb: number | null;
+  minOrderAmount: number | null;
   validDays: number;
+  /** 계약 필드 — coupons.eligible_grades_mask */
+  eligibleGradesMask: number;
+  /** 위 마스크를 어댑터가 푼 것. 화면 전용이고 계약이 아닙니다. */
   eligibleGrades: MembershipGrade[];
   openAt: string;
   closeAt: string;
@@ -193,6 +239,36 @@ export interface QueueResponse {
   status: "WAITING" | "ADMITTED";
   place: QueuePlace | null;
   entryToken: string | null;
+}
+
+/* ── 캘린더 ────────────────────────────────────────────
+   GET /api/v1/calendar?from&to — 사양서 U2 가 새로 요구한 엔드포인트입니다.
+
+   회차 목록(listRounds)과 나누는 이유: 목록은 "지금 근처"만 주고, 달력은 지난달·다음
+   달을 봅니다. 그리고 지난달 칸에는 재고가 없습니다 — 그래서 재고 필드가 nullable 입니다.
+   한 응답에 섞으면 화면이 없는 재고를 0 으로 그립니다. */
+
+export interface CalendarEntry {
+  templateId: number;
+  brandId: number;
+  name: string;
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+  dataGrantMb: number | null;
+  eligibleGradesMask: number;
+  eligibleGrades: MembershipGrade[];
+  /** ISO-8601 */
+  openAt: string;
+  closeAt: string;
+  status: CouponRoundStatus;
+  /** 지금 살아 있는 회차면 그 id. 아니면 null — 상세로 갈 수 없습니다 */
+  couponRoundId: number | null;
+  /** 살아 있는 회차일 때만 채워집니다 */
+  totalQuantity: number | null;
+  activeCount: number | null;
+  queueActive: boolean;
 }
 
 /* ── 표시용 라벨 · 파생 계산 ─────────────────────────── */
@@ -234,11 +310,20 @@ interface DiscountLike {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
+  dataGrantMb?: number | null;
+}
+
+/** 1024MB → "1GB", 500MB → "500MB" — 통신사 표기 관례를 따릅니다 */
+function formatData(mb: number): string {
+  if (mb >= 1024 && mb % 1024 === 0) return `${mb / 1024}GB`;
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)}GB`;
+  return `${mb}MB`;
 }
 
 /** "40%" / "5,000원" — 자막에 크게 박히는 숫자 */
 export function discountHeadline(c: DiscountLike): string {
   if (c.policyType === "PERCENT_CAPPED") return `${c.discountRate ?? 0}%`;
+  if (c.policyType === "DATA_GRANT") return formatData(c.dataGrantMb ?? 0);
   return `${(c.discountAmount ?? 0).toLocaleString("ko-KR")}원`;
 }
 
@@ -247,11 +332,15 @@ export function discountDetail(c: DiscountLike): string {
   if (c.policyType === "PERCENT_CAPPED") {
     return `최대 ${(c.maxDiscountAmount ?? 0).toLocaleString("ko-KR")}원 할인`;
   }
+  // 데이터는 깎는 게 아니라 얹어 주는 것이라 "할인" 이라고 쓰지 않습니다.
+  if (c.policyType === "DATA_GRANT") return "데이터 제공";
   return "결제 금액에서 바로 할인";
 }
 
 /** 실제 할인액 — PERCENT_CAPPED 는 상한을 넘지 않습니다 */
 export function calcDiscount(c: DiscountLike, orderAmount: number): number {
+  // 데이터 제공은 결제 금액을 깎지 않습니다 — 0 원 할인입니다.
+  if (c.policyType === "DATA_GRANT") return 0;
   if (c.policyType === "FIXED_AMOUNT") {
     return Math.min(c.discountAmount ?? 0, orderAmount);
   }

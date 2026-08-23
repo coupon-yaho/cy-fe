@@ -19,6 +19,7 @@ import {
   type CouponTemplateDetail,
   type IssuanceStatus,
   type MembershipGrade,
+  gradesToMask,
 } from "./coupon/types";
 
 export const MINUTE = 60_000;
@@ -90,6 +91,9 @@ interface TemplateSeed {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
+  /** DATA_GRANT 전용 */
+  dataGrantMb?: number | null;
+  minOrderAmount?: number | null;
   validDays: number;
   nthWeek: number;
   dayOfWeek: CouponDayOfWeek;
@@ -272,11 +276,14 @@ const TEMPLATE_SEEDS: TemplateSeed[] = [
   },
   {
     brandId: 12,
-    name: "게임스테이션 주말팩",
-    policyType: "PERCENT_CAPPED",
-    discountRate: 20,
-    maxDiscountAmount: 12000,
+    // 정책 3종 중 DATA_GRANT 를 실제로 관측할 수 있는 유일한 자리입니다.
+    // 열거값만 타입에 넣고 아무 데서도 안 그리면 렌더를 검증할 방법이 없습니다.
+    name: "게임스테이션 주말 데이터팩",
+    policyType: "DATA_GRANT",
+    discountRate: null,
+    maxDiscountAmount: null,
     discountAmount: null,
+    dataGrantMb: 1024,
     validDays: 14,
     nthWeek: 4,
     dayOfWeek: "SAT",
@@ -290,7 +297,12 @@ const TEMPLATE_SEEDS: TemplateSeed[] = [
 let templates: CouponTemplateDetail[] = TEMPLATE_SEEDS.map((seed, i) => ({
   id: i + 1,
   active: true,
+  // 시드는 화면에 편한 배열로 쓰고, 계약 필드(마스크)는 여기서 한 번 만듭니다.
+  // DB 는 eligible_grades_mask tinyint 하나만 들고 있습니다.
   ...seed,
+  eligibleGradesMask: gradesToMask(seed.eligibleGrades),
+  dataGrantMb: seed.dataGrantMb ?? null,
+  minOrderAmount: seed.minOrderAmount ?? null,
 }));
 let nextTemplateId = templates.length + 1;
 
@@ -438,6 +450,9 @@ function buildRoundState(t: CouponTemplateDetail, now: number): RoundState {
       policyType: t.policyType,
       discountRate: t.discountRate,
       maxDiscountAmount: t.maxDiscountAmount,
+      dataGrantMb: t.dataGrantMb,
+      minOrderAmount: t.minOrderAmount,
+      eligibleGradesMask: t.eligibleGradesMask,
       discountAmount: t.discountAmount,
       validDays: t.validDays,
       eligibleGrades: t.eligibleGrades,
@@ -678,4 +693,107 @@ export function appendIssuance(i: Omit<StoredIssuance, "issuanceId">): StoredIss
 
 export function findIssuance(issuanceId: number): StoredIssuance | undefined {
   return loadStore().issuances.find((i) => i.issuanceId === issuanceId);
+}
+
+/* ── 캘린더 ─────────────────────────────────────────
+   달력은 "지금 근처"가 아니라 **임의의 달**을 봅니다. 그래서 listRoundStates 를
+   못 씁니다 — 그쪽은 데모 국면을 지금 옆에 배치하느라 회차마다 오프셋이 걸려 있습니다.
+
+   여기서는 템플릿의 반복 규칙(매월 N번째 X요일 HH:MM)에서 그 달의 발생만 계산합니다.
+   재고는 **그 달의 발생이 지금 살아 있는 회차와 같은 날일 때만** 붙입니다.
+   지난달·다음달 칸에 재고 게이지를 그리면 있지도 않은 수치를 지어내는 것이 됩니다. */
+
+export interface CalendarOccurrence {
+  templateId: number;
+  brandId: number;
+  name: string;
+  policyType: CouponPolicyType;
+  discountRate: number | null;
+  maxDiscountAmount: number | null;
+  discountAmount: number | null;
+  dataGrantMb: number | null;
+  eligibleGradesMask: number;
+  eligibleGrades: MembershipGrade[];
+  /** ms */
+  openAt: number;
+  closeAt: number;
+  /** 이 달의 발생이 지금 살아 있는 회차와 같으면 그 회차. 아니면 null */
+  round: CouponRoundView | null;
+  /** round 가 없을 때 시각만으로 매긴 상태 */
+  status: CouponRoundStatus;
+}
+
+/**
+ * year·monthIndex(0~11) 달에 열리는 회차들.
+ *
+ * ⚠️ 반복 규칙만으로 계산하면 **화면끼리 말이 달라집니다.**
+ *
+ * 이 데모는 방문자가 언제 들어와도 발급 중인 회차를 보도록 DEMO 오프셋으로 일부
+ * 회차를 지금 옆에 끌어다 놓습니다(3·9·5 가 동시에 OPEN). 그런데 템플릿의 반복
+ * 규칙(매월 N번째 X요일)은 12개가 전부 다른 날이라 **같은 날 두 개가 열리는 경우가
+ * 한 번도 없습니다.** 규칙으로만 달력을 그리면 홈이 "3개 발급 중"이라고 말하는 그
+ * 날짜에 달력은 빈 칸을 그립니다.
+ *
+ * 그래서 **살아 있는 회차의 실제 openAt 이 먼저**입니다. 그 회차가 이 달에 떨어지면
+ * 그 날짜에 놓고, 아니면 그 달의 규칙 날짜에 일정만 놓습니다.
+ */
+export function listMonthOccurrences(
+  year: number,
+  monthIndex: number,
+  now: number,
+): CalendarOccurrence[] {
+  const inMonth = (ms: number) => {
+    const d = new Date(ms);
+    return d.getFullYear() === year && d.getMonth() === monthIndex;
+  };
+
+  const live = new Map(listRoundStates(now).map((s) => [s.round.templateId, s.round]));
+
+  return templates
+    .filter((t) => t.active)
+    .map((t) => {
+      const round = live.get(t.id) ?? null;
+      const liveOpenAt = round ? Date.parse(round.openAt) : null;
+
+      // ① 살아 있는 회차가 이 달에 있으면 그 날짜가 진짜입니다
+      if (liveOpenAt !== null && inMonth(liveOpenAt)) {
+        return {
+          ...base(t),
+          openAt: liveOpenAt,
+          closeAt: Date.parse(round!.closeAt),
+          round,
+          status: round!.status,
+        } satisfies CalendarOccurrence;
+      }
+
+      // ② 아니면 이 달의 반복 규칙 날짜에 일정만 놓습니다 (재고 없음)
+      const openAt = nthWeekdayOf(year, monthIndex, t.nthWeek, t.dayOfWeek, t.startTime);
+      if (!inMonth(openAt)) return null; // 5번째 X요일처럼 그 달에 없는 날
+      const closeAt = openAt + t.durationHours * HOUR;
+      return {
+        ...base(t),
+        openAt,
+        closeAt,
+        round: null,
+        status: now < openAt ? "SCHEDULED" : now < closeAt ? "OPEN" : "CLOSED",
+      } satisfies CalendarOccurrence;
+    })
+    .filter((o): o is CalendarOccurrence => o !== null)
+    .sort((a, b) => a.openAt - b.openAt);
+}
+
+/** 회차·일정 양쪽이 공통으로 쓰는 표시 필드 */
+function base(t: CouponTemplateDetail) {
+  return {
+    templateId: t.id,
+    brandId: t.brandId,
+    name: t.name,
+    policyType: t.policyType,
+    discountRate: t.discountRate,
+    maxDiscountAmount: t.maxDiscountAmount,
+    discountAmount: t.discountAmount,
+    dataGrantMb: t.dataGrantMb,
+    eligibleGradesMask: t.eligibleGradesMask,
+    eligibleGrades: t.eligibleGrades,
+  };
 }

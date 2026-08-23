@@ -15,6 +15,7 @@ import {
   findIssuance,
   findRoundState,
   findTemplate,
+  listMonthOccurrences,
   listRoundStates,
   listTemplates,
   loadStore,
@@ -36,6 +37,8 @@ import {
   type MemberCoupon,
   type Page,
   type QueuePlace,
+  gradesToMask,
+  type CalendarEntry,
 } from "./types";
 
 /* ── 에러 카탈로그 (백엔드 enum 과 동일) ────────────── */
@@ -147,6 +150,45 @@ export function createMockApi(): CouponApi {
   }
 
   return {
+    async listCalendar(from: string, to: string) {
+      await wait(120);
+      const now = Date.now();
+      applyExpiry(now);
+
+      const start = new Date(`${from}T00:00:00`);
+      const end = new Date(`${to}T23:59:59`);
+      const out: CalendarEntry[] = [];
+
+      // 기간이 걸친 달을 하나씩 훑습니다. 한 달치씩 계산해야 "N번째 X요일" 규칙이 성립합니다.
+      const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (cur.getTime() <= end.getTime()) {
+        for (const o of listMonthOccurrences(cur.getFullYear(), cur.getMonth(), now)) {
+          if (o.openAt < start.getTime() || o.openAt > end.getTime()) continue;
+          out.push({
+            templateId: o.templateId,
+            brandId: o.brandId,
+            name: o.name,
+            policyType: o.policyType,
+            discountRate: o.discountRate,
+            maxDiscountAmount: o.maxDiscountAmount,
+            discountAmount: o.discountAmount,
+            dataGrantMb: o.dataGrantMb,
+            eligibleGradesMask: o.eligibleGradesMask,
+            eligibleGrades: o.eligibleGrades,
+            openAt: new Date(o.openAt).toISOString(),
+            closeAt: new Date(o.closeAt).toISOString(),
+            status: o.status,
+            couponRoundId: o.round ? o.round.id : null,
+            totalQuantity: o.round ? o.round.totalQuantity : null,
+            activeCount: o.round ? o.round.activeCount : null,
+            queueActive: o.round ? o.round.queueActive : false,
+          });
+        }
+        cur.setMonth(cur.getMonth() + 1);
+      }
+      return out.sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
+    },
+
     async listRounds() {
       await wait(120);
       const now = Date.now();
@@ -319,6 +361,8 @@ export function createMockApi(): CouponApi {
             discountRate: r?.discountRate ?? null,
             maxDiscountAmount: r?.maxDiscountAmount ?? null,
             discountAmount: r?.discountAmount ?? null,
+            dataGrantMb: r?.dataGrantMb ?? null,
+            minOrderAmount: r?.minOrderAmount ?? null,
             issuedAt: i.issuedAt,
             expiresAt: i.expiresAt,
             usedAt: i.usedAt,
@@ -431,14 +475,19 @@ export function createMockApi(): CouponApi {
 
     async createTemplate(request: CouponTemplateWriteRequest) {
       await wait(220);
-      return addTemplate(request);
+      return addTemplate({ ...request, eligibleGradesMask: gradesToMask(request.eligibleGrades) });
     },
 
     async updateTemplate(couponTemplateId, request) {
       await wait(220);
       const current = findTemplate(couponTemplateId);
       if (!current) reject("COUPON-102");
-      return putTemplate({ id: couponTemplateId, active: current.active, ...request });
+      return putTemplate({
+        id: couponTemplateId,
+        active: current.active,
+        ...request,
+        eligibleGradesMask: gradesToMask(request.eligibleGrades),
+      });
     },
 
     async changeTemplateActivation(couponTemplateId, active) {

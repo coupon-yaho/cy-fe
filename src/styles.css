@@ -533,3 +533,565 @@
     outline: none;
   }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   야호 브랜드 레이어 (v2) — 고객 화면 전용
+   ══════════════════════════════════════════════════════════════════
+
+   관제(D2) 화면은 AGENTS.md §3 에서 색 체계 개편이 OBS-16 몫으로 잡혀 있습니다.
+   그래서 이 레이어는 위의 DESIGN.md 토큰(--hig-* · --viz-*)과 유틸리티
+   (t-* · btn-* · surface-card · eyebrow · num · ops-table …)를 **한 글자도
+   바꾸지 않습니다**. 관리자 화면이 물고 있는 값이기 때문입니다.
+
+   대신 --yh-* 토큰과 yh-* 유틸리티를 새로 얹고, 고객 셸(.yh)에만 적용합니다.
+   관리자 화면은 .yh 바깥이라 구조적으로 영향을 받을 수 없습니다.
+
+   ── 값의 출처 ──
+   색은 정하지 않고 **브랜드 아트워크에서 읽었습니다**. logo-yaho.png 픽셀을
+   캔버스로 집계했을 때 최빈색이 #102050 계열(재킷·레터링·리본)이었고,
+   부채꼴 쿠폰의 파스텔 5종과 반짝이가 보조색입니다. 그래서 주색은 검정이
+   아니라 네이비이고, 액센트는 한 개가 아니라 티켓 색 묶음입니다.
+
+   기존 DESIGN.md 는 "그림자 없음"이지만 이 레이어는 씁니다 —
+   아트워크의 레터링 자체가 흰 외곽선과 글로우로 떠 있어서, 평평하게 두면
+   로고만 붕 뜨고 화면이 로고를 배신합니다. 대신 그림자는 검정이 아니라
+   네이비를 섞어 같은 광원 아래 있는 것처럼 보이게 합니다. */
+
+:root {
+  /* 네이비 — 아트워크의 재킷·레터링·리본 */
+  --yh-navy-900: #0d2244;
+  --yh-navy: #16305c;
+  --yh-navy-600: #24497f;
+  --yh-navy-400: #6d8cba;
+
+  --yh-ink-2: #4a6288;
+  --yh-ink-3: #8ba0be;
+  --yh-rule: #dbe5f2;
+
+  --yh-paper: #f6f9fd;
+  --yh-paper-2: #e9f1fa;
+  --yh-surface: #ffffff;
+
+  /* "지금" 을 말하는 색. 순빨강 대신 아트워크의 코랄 쪽으로 당겼습니다. */
+  --yh-accent: #ef4a55;
+  --yh-accent-dark: #d32f3a;
+  --yh-accent-soft: #fde5e7;
+  --yh-accent-on-navy: #ff8a90;
+
+  /* 소진 임박 — 티켓의 버터 옐로 계열을 진하게 */
+  --yh-warn: #c07a10;
+  --yh-warn-on-navy: #ffc95c;
+
+  --yh-good: #1d7a45;
+
+  /* 부채꼴 쿠폰의 파스텔 — 장식이 아니라 브랜드 식별색 */
+  --yh-t-yellow: #fbe9b6;
+  --yh-t-pink: #f9cbd0;
+  --yh-t-peri: #ccd4ef;
+  --yh-t-sky: #d5e6f7;
+  --yh-t-mint: #cde8db;
+
+  /* 그림자는 네이비를 섞습니다 — 검정 그림자는 파란 지면 위에서 때가 탄 것처럼 보입니다 */
+  --yh-shadow-sm: 0 1px 2px rgb(22 48 92 / 0.06), 0 2px 6px rgb(22 48 92 / 0.05);
+  --yh-shadow: 0 2px 4px rgb(22 48 92 / 0.06), 0 8px 22px rgb(22 48 92 / 0.09);
+  --yh-shadow-lg: 0 4px 10px rgb(22 48 92 / 0.08), 0 18px 44px rgb(22 48 92 / 0.14);
+
+  --yh-font:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-yh-navy-900: var(--yh-navy-900);
+  --color-yh-navy: var(--yh-navy);
+  --color-yh-navy-600: var(--yh-navy-600);
+  --color-yh-navy-400: var(--yh-navy-400);
+  --color-yh-ink-2: var(--yh-ink-2);
+  --color-yh-ink-3: var(--yh-ink-3);
+  --color-yh-rule: var(--yh-rule);
+  --color-yh-paper: var(--yh-paper);
+  --color-yh-paper-2: var(--yh-paper-2);
+  --color-yh-surface: var(--yh-surface);
+  --color-yh-accent: var(--yh-accent);
+  --color-yh-accent-soft: var(--yh-accent-soft);
+  --color-yh-accent-on-navy: var(--yh-accent-on-navy);
+  --color-yh-warn: var(--yh-warn);
+  --color-yh-warn-on-navy: var(--yh-warn-on-navy);
+  --color-yh-good: var(--yh-good);
+  --color-yh-t-yellow: var(--yh-t-yellow);
+  --color-yh-t-pink: var(--yh-t-pink);
+  --color-yh-t-peri: var(--yh-t-peri);
+  --color-yh-t-sky: var(--yh-t-sky);
+  --color-yh-t-mint: var(--yh-t-mint);
+}
+
+/* 고객 셸 */
+.yh {
+  font-family: var(--yh-font);
+  background: var(--yh-paper);
+  color: var(--yh-navy);
+  letter-spacing: -0.012em;
+}
+
+.yh h1,
+.yh h2,
+.yh h3,
+.yh h4 {
+  font-family: var(--yh-font);
+}
+
+/* ── 타이포 ────────────────────────────────────────
+   아트워크의 레터링이 두툼하고 둥글어서 본문도 그 무게를 따라갑니다.
+   얇은 획으로 가면 로고만 혼자 굵어 보입니다. */
+
+@utility yh-hero {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+@utility yh-title {
+  font-size: clamp(1.5rem, 2.8vw, 2.125rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
+}
+
+@utility yh-sub {
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.018em;
+}
+
+@utility yh-lede {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.68;
+  letter-spacing: -0.012em;
+}
+
+@utility yh-body {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.62;
+  letter-spacing: -0.008em;
+}
+
+@utility yh-small {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+@utility yh-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: var(--yh-ink-3);
+}
+
+@utility yh-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* 큰 수치 — 할인율·카운트다운. 로고 레터링과 같은 무게로 둡니다. */
+@utility yh-figure {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  /* 상한이 크면 "01:30:42" 가 반칸 안에서 두 줄로 쪼개집니다.
+     8자리 시계가 들어가는 폭을 기준으로 잡았습니다. */
+  font-size: clamp(1.875rem, 3.6vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+@utility yh-figure-sm {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* 로고 레터링의 흰 외곽선을 본문 큰 글자에 옮긴 것.
+   네이비 면 위에서만 씁니다 — 흰 지면에서는 외곽선이 안 보입니다. */
+@utility yh-outline {
+  -webkit-text-stroke: 3px #fff;
+  paint-order: stroke fill;
+}
+
+/* ── 컨트롤 ──────────────────────────────────────── */
+
+@utility yh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding: 0 1.625rem;
+  border-radius: 999px;
+  background: var(--yh-navy);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  box-shadow: var(--yh-shadow-sm);
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+  &:hover {
+    background: var(--yh-navy-600);
+    box-shadow: var(--yh-shadow);
+  }
+  &:active {
+    transform: translateY(1px);
+    box-shadow: var(--yh-shadow-sm);
+  }
+  &:disabled {
+    background: var(--yh-ink-3);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+/* 지금 눌러야 하는 것 — 발급 버튼 하나에만 */
+@utility yh-btn-live {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding: 0 1.625rem;
+  border-radius: 999px;
+  background: var(--yh-accent);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgb(191 40 50 / 0.18), 0 8px 22px rgb(191 40 50 / 0.22);
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+  &:hover {
+    background: var(--yh-accent-dark);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &:disabled {
+    background: var(--yh-ink-3);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+@utility yh-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding: 0 1.5rem;
+  border-radius: 999px;
+  background: var(--yh-surface);
+  color: var(--yh-navy);
+  border: 1.5px solid var(--yh-rule);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.12s ease;
+  &:hover {
+    border-color: var(--yh-navy-400);
+    background: var(--yh-paper-2);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+@utility yh-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--yh-navy);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: var(--yh-shadow-sm);
+  transition:
+    background 0.18s ease,
+    transform 0.12s ease;
+  &:hover {
+    background: var(--yh-navy-600);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &:disabled {
+    background: var(--yh-ink-3);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+@utility yh-btn-on-navy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding: 0 1.5rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+  border: 1.5px solid rgb(255 255 255 / 0.4);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease;
+  &:hover {
+    background: rgb(255 255 255 / 0.2);
+    border-color: #fff;
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+/* ── 면 ────────────────────────────────────────────
+   아트워크의 쿠폰이 둥근 모서리 + 절취선 + 노치입니다. 카드를 그 형태로 둡니다. */
+
+@utility yh-card {
+  position: relative;
+  background: var(--yh-surface);
+  border-radius: 16px;
+  box-shadow: var(--yh-shadow-sm);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+@utility yh-card-hover {
+  &:hover {
+    box-shadow: var(--yh-shadow-lg);
+    transform: translateY(-3px);
+  }
+}
+
+/* 쿠폰 형태 — 좌우에 반원 노치를 파고 그 사이를 점선으로 잇습니다.
+   --yh-notch 로 뒤 배경색을 받습니다(카드가 놓인 면과 같아야 뚫린 것처럼 보입니다). */
+@utility yh-ticket {
+  position: relative;
+  background: var(--yh-surface);
+  border-radius: 16px;
+  box-shadow: var(--yh-shadow);
+  --yh-notch: var(--yh-paper);
+}
+
+@utility yh-ticket-notch {
+  position: relative;
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: -11px;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--yh-notch, var(--yh-paper));
+  }
+  &::before {
+    left: -11px;
+  }
+  &::after {
+    right: -11px;
+  }
+}
+
+/* 절취선 */
+@utility yh-perf {
+  border-top: 2px dashed var(--yh-rule);
+}
+
+/* ── 발급 중 표시 ────────────────────────────────── */
+
+@utility yh-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.25rem 0.625rem 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: var(--yh-accent-soft);
+  color: var(--yh-accent-dark);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+@utility yh-live-on-navy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.25rem 0.625rem 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  color: var(--yh-accent-on-navy);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+/* ── 진입 연출 ───────────────────────────────────── */
+
+@utility yh-rise {
+  animation: yh-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes yh-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 반짝이 — 아트워크의 별. 장식이라 움직임은 아주 느리게. */
+@utility yh-twinkle {
+  animation: yh-twinkle 3.2s ease-in-out infinite;
+}
+
+@keyframes yh-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ── 폼 ──────────────────────────────────────────── */
+
+@utility yh-input {
+  width: 100%;
+  border: 1.5px solid var(--yh-rule);
+  border-radius: 12px;
+  background: var(--yh-surface);
+  padding: 0.75rem 0.9375rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--yh-navy);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+  &::placeholder {
+    color: var(--yh-ink-3);
+    font-weight: 500;
+  }
+  &:focus {
+    border-color: var(--yh-navy);
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(22 48 92 / 0.1);
+  }
+}
+
+@utility yh-choice {
+  border: 1.5px solid var(--yh-rule);
+  border-radius: 12px;
+  background: var(--yh-surface);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+  &:hover {
+    border-color: var(--yh-navy-400);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &[aria-pressed="true"] {
+    border-color: var(--yh-navy);
+    box-shadow: 0 0 0 3px rgb(22 48 92 / 0.1);
+  }
+}
+
+.yh :focus-visible {
+  outline: 2px solid var(--yh-navy);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.yh {
+  scroll-behavior: smooth;
+}
+
+.yh-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+
+.yh-skip:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.625rem 1rem;
+  background: var(--yh-navy);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+/* 섹션 구분선 — 신문 괘선(2px 잉크)은 이 브랜드에 너무 딱딱해서
+   옅은 규칙선으로 두고, 강조는 색과 형태가 맡습니다. */
+@utility yh-rule-head {
+  border-top: 1.5px solid var(--yh-rule);
+}
+
+@utility yh-rule-top {
+  border-top: 1px solid var(--yh-rule);
+}
+
+@utility yh-rule-bottom {
+  border-bottom: 1px solid var(--yh-rule);
+}

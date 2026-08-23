@@ -132,17 +132,17 @@ function MyCoupons() {
         note="사용 기한이 지나면 자동으로 만료됩니다. 주문을 취소하면 쓴 쿠폰도 다시 살아납니다."
       />
 
-      <div className="mt-10 flex flex-wrap gap-2 border-y border-hairline py-3">
+      <div className="mt-12 flex flex-wrap gap-1.5 border-y border-yh-rule py-3">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
             aria-pressed={tab === t.key}
-            className={`t-body-sm rounded-full px-3.5 py-1.5 transition-colors ${
+            className={`yh-body rounded-[3px] px-3.5 py-1.5 font-semibold transition-colors ${
               tab === t.key
-                ? "bg-hig-fg font-semibold text-hig-surface"
-                : "text-hig-secondary hover:bg-secondary"
+                ? "bg-yh-navy text-yh-paper"
+                : "text-yh-ink-2 hover:bg-yh-paper-2 hover:text-yh-navy"
             }`}
           >
             {t.label}
@@ -151,15 +151,15 @@ function MyCoupons() {
       </div>
 
       {coupons.isLoading ? (
-        <div className="mt-10 space-y-4">
+        <div className="mt-12 space-y-5">
           {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-44 rounded-2xl" />
+            <Skeleton key={i} className="h-44 rounded-[6px]" />
           ))}
         </div>
       ) : rows.length === 0 ? (
         <EmptyWallet tab={tab} />
       ) : (
-        <ul className="mt-10 space-y-4">
+        <ul className="mt-12 space-y-5">
           {rows.map((c) => (
             <li key={c.issuanceId}>
               <CouponTicket
@@ -173,7 +173,7 @@ function MyCoupons() {
                         type="button"
                         disabled={busy}
                         onClick={() => cancelIssue.mutate(c)}
-                        className="t-body-sm text-hig-link hover:underline disabled:opacity-40"
+                        className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
                       >
                         발급 취소
                       </button>
@@ -181,7 +181,7 @@ function MyCoupons() {
                         type="button"
                         disabled={busy}
                         onClick={() => setUseTarget(c)}
-                        className="btn-compact"
+                        className="yh-btn-sm"
                       >
                         사용하기
                       </button>
@@ -191,7 +191,7 @@ function MyCoupons() {
                       type="button"
                       disabled={busy}
                       onClick={() => cancelUse.mutate(c)}
-                      className="t-body-sm text-hig-link hover:underline disabled:opacity-40"
+                      className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
                     >
                       사용 취소
                     </button>
@@ -240,52 +240,53 @@ function UseDialog({
 
   return (
     <Dialog open={!!coupon} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
+      {/* 포탈로 body 에 붙으므로 .ed 를 직접 답니다 */}
+      <DialogContent className="yh rounded-[6px] border-yh-navy bg-yh-surface sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="t-tile">쿠폰 사용</DialogTitle>
-          <DialogDescription className="t-body-sm text-hig-secondary">
+          <DialogTitle className="yh-sub">쿠폰 사용</DialogTitle>
+          <DialogDescription className="yh-small text-yh-ink-2">
             {coupon?.name} · 주문 번호와 결제 금액을 넣으면 할인액이 정해집니다.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-5 py-2">
           <label className="block">
-            <span className="eyebrow">주문 번호</span>
+            <span className="yh-label">주문 번호</span>
             <input
               value={orderId}
               onChange={(e) => setOrderId(e.target.value.replace(/\D/g, ""))}
               inputMode="numeric"
-              className="num t-body mt-1.5 w-full rounded-xl border border-input bg-hig-surface px-3.5 py-2.5 focus:border-hig-primary focus:outline-none"
+              className="yh-input yh-num mt-2"
             />
           </label>
 
           <label className="block">
-            <span className="eyebrow">결제 금액</span>
-            <div className="mt-1.5 flex items-center rounded-xl border border-input bg-hig-surface focus-within:border-hig-primary">
+            <span className="yh-label">결제 금액</span>
+            <div className="yh-input mt-2 flex items-center p-0 focus-within:border-yh-navy">
               <input
                 value={orderAmount}
                 onChange={(e) => setOrderAmount(e.target.value.replace(/\D/g, ""))}
                 inputMode="numeric"
-                className="num t-body w-full bg-transparent px-3.5 py-2.5 focus:outline-none"
+                className="yh-num w-full bg-transparent px-3.5 py-3 focus:outline-none"
               />
-              <span className="t-body-sm px-3.5 text-hig-muted">원</span>
+              <span className="yh-small px-3.5 text-yh-ink-3">원</span>
             </div>
           </label>
 
-          <dl className="t-body-sm border-t border-hairline pt-4">
+          <dl className="yh-small border-t border-yh-rule pt-4">
             <div className="flex justify-between py-1.5">
-              <dt className="text-hig-secondary">결제 금액</dt>
-              <dd className="num">{amount.toLocaleString("ko-KR")}원</dd>
+              <dt className="text-yh-ink-2">결제 금액</dt>
+              <dd className="yh-num">{amount.toLocaleString("ko-KR")}원</dd>
             </div>
             <div className="flex justify-between py-1.5">
-              <dt className="text-hig-secondary">쿠폰 할인</dt>
-              <dd className="num font-semibold text-hig-fg">
+              <dt className="text-yh-ink-2">쿠폰 할인</dt>
+              <dd className="yh-num font-bold text-yh-accent">
                 −{discount.toLocaleString("ko-KR")}원
               </dd>
             </div>
-            <div className="mt-2 flex items-baseline justify-between border-t border-hairline pt-3">
-              <dt className="font-semibold">최종 결제</dt>
-              <dd className="num t-tile">{payable.toLocaleString("ko-KR")}원</dd>
+            <div className="mt-2 flex items-baseline justify-between border-t border-yh-rule pt-3">
+              <dt className="font-bold">최종 결제</dt>
+              <dd className="yh-figure-sm text-[1.75rem]">{payable.toLocaleString("ko-KR")}원</dd>
             </div>
           </dl>
         </div>
@@ -294,7 +295,7 @@ function UseDialog({
           <button
             type="button"
             onClick={onClose}
-            className="t-body px-4 text-hig-link hover:underline"
+            className="yh-body px-4 font-semibold text-yh-ink-2 underline-offset-4 hover:underline"
           >
             닫기
           </button>
@@ -302,7 +303,7 @@ function UseDialog({
             type="button"
             disabled={!valid || pending}
             onClick={() => onSubmit(Number(orderId), amount)}
-            className="btn-primary"
+            className="yh-btn"
           >
             {pending ? "처리 중" : "쿠폰 사용"}
           </button>
@@ -324,10 +325,19 @@ function EmptyWallet({ tab }: { tab: Tab }) {
   };
 
   return (
-    <div className="surface-card mt-10 px-6 py-20 text-center">
-      <p className="t-tile">{copy[tab]}</p>
-      <p className="t-body mt-3 text-hig-secondary">지금 열려 있는 브랜드 데이를 확인해 보세요.</p>
-      <Link to="/events" className="btn-primary mt-8">
+    <div className="yh-card mt-12 px-6 py-16 text-center">
+      {/* 사양서 §2 — 키비주얼(B)을 쓰도록 허용된 자리입니다. 폭 200px */}
+      <img
+        src="/hero-character.png"
+        alt=""
+        width={844}
+        height={595}
+        aria-hidden
+        className="mx-auto w-[200px]"
+      />
+      <p className="yh-title mt-6">{copy[tab]}</p>
+      <p className="yh-lede mt-4 text-yh-ink-2">지금 열려 있는 브랜드 데이를 확인해 보세요.</p>
+      <Link to="/events" className="yh-btn mt-8">
         브랜드 데이 보기
       </Link>
     </div>
@@ -336,12 +346,13 @@ function EmptyWallet({ tab }: { tab: Tab }) {
 
 function NeedLogin() {
   return (
-    <div className="mx-auto w-full max-w-md px-5 py-28 text-center">
-      <h1 className="t-tile">로그인이 필요합니다</h1>
-      <p className="t-body mt-3 text-hig-secondary">
+    <div className="mx-auto w-full max-w-2xl px-5 py-28">
+      <p className="yh-label">내 쿠폰함</p>
+      <h1 className="yh-hero mt-3">로그인이 필요합니다</h1>
+      <p className="yh-lede mt-4 max-w-[38ch] text-yh-ink-2">
         로그인하면 발급받은 쿠폰을 여기서 볼 수 있습니다.
       </p>
-      <Link to="/login" className="btn-primary mt-8">
+      <Link to="/login" className="yh-btn mt-9">
         로그인
       </Link>
     </div>
