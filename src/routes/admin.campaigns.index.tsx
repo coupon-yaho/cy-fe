@@ -372,6 +372,10 @@ function RoundReserver({
             <p className="t-body-sm rounded-xl bg-fill px-3.5 py-3 text-hig-secondary">
               규칙: 매달 {NTH_WEEK_LABEL[target.nthWeek]} {DAY_LABEL[target.dayOfWeek]}{" "}
               {trimSeconds(target.startTime)} · {target.durationHours}시간
+              {/* 하루 한 브랜드로 오해하면 일정을 못 짭니다. 막히는 건 시간대뿐입니다. */}
+              <span className="mt-1 block text-hig-muted">
+                같은 날에 다른 브랜드를 이어서 열 수 있습니다. 시간대만 겹치지 않으면 됩니다.
+              </span>
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">

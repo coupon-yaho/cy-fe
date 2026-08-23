@@ -497,8 +497,10 @@ interface ReservedRound {
   closeAt: number;
 }
 
-const reserved: ReservedRound[] = [];
-let nextReservedId = 9001;
+/** 예약 회차는 저장본에 들어 있습니다 — 새로고침해도 남아야 합니다. */
+function reservedRounds(): ReservedRound[] {
+  return loadStore().reservedRounds;
+}
 
 /** 24시간 — 백엔드 요청 DTO 의 @AssertTrue 와 같은 값입니다 */
 export const MAX_ROUND_SPAN_MS = 24 * HOUR;
@@ -546,9 +548,14 @@ export function reserveRound(
   }
 
   /* 시간이 겹치는 회차가 있으면 막습니다 (COUPON_ROUND-202).
-     **브랜드를 가리지 않습니다** — 백엔드 existsOverlappingSchedule 은 브랜드 조건 없이
-     전역으로 봅니다. 이 서비스는 한 시간대에 브랜드 데이가 하나만 열리게 설계돼 있습니다.
-     앞서 같은 브랜드만 보게 해 두어서 목이 백엔드보다 느슨했습니다.
+
+     막는 단위는 **시간대이지 날짜가 아닙니다.** 같은 날에 브랜드가 여러 개 잡히는 건
+     정상입니다 — 09-11 모카빈, 11-13 씨네플러스, 13-15 버거하우스처럼 이어서 열립니다.
+     경계가 맞닿는 것도 겹침이 아닙니다(앞 회차가 11:00 에 닫히면 11:00 시작은 통과).
+     여기서 날짜로 배제하도록 고치면 하루에 하나만 열리게 되어 사양이 바뀝니다.
+
+     **브랜드는 가리지 않습니다** — 백엔드 existsOverlappingSchedule 은 브랜드 조건 없이
+     전역으로 봅니다. 앞서 같은 브랜드만 보게 해 두어서 목이 백엔드보다 느슨했습니다.
      이미 끝난 회차(CLOSED)는 대상이 아닙니다 — 백엔드도 SCHEDULED·OPEN 만 셉니다. */
   const overlaps = live.some((s) => {
     if (s.round.status === "CLOSED") return false;
@@ -558,13 +565,15 @@ export function reserveRound(
   });
   if (overlaps) return { ok: false, reason: "SCHEDULE_CONFLICT" };
 
-  const entry: ReservedRound = { id: nextReservedId++, templateId, openAt, closeAt };
-  reserved.push(entry);
+  const st = loadStore();
+  const entry: ReservedRound = { id: st.nextReservedRoundId++, templateId, openAt, closeAt };
+  st.reservedRounds.push(entry);
+  saveStore();
   return { ok: true, state: buildRoundState(t, now, entry) };
 }
 
 function reservedStates(now: number): RoundState[] {
-  return reserved.flatMap((r) => {
+  return reservedRounds().flatMap((r) => {
     const t = templates.find((x) => x.id === r.templateId && x.active);
     return t ? [buildRoundState(t, now, r)] : [];
   });
@@ -578,7 +587,7 @@ export function listRoundStates(now: number): RoundState[] {
 }
 
 export function findRoundState(couponRoundId: number, now: number): RoundState | undefined {
-  const r = reserved.find((x) => x.id === couponRoundId);
+  const r = reservedRounds().find((x) => x.id === couponRoundId);
   if (r) {
     const t = templates.find((x) => x.id === r.templateId && x.active);
     return t ? buildRoundState(t, now, r) : undefined;
@@ -672,12 +681,23 @@ interface Persisted {
   issuances: StoredIssuance[];
   nextIssuanceId: number;
   seededMembers: number[];
+  /* 관리자가 예약한 회차. 새로고침에 사라지면 "예약했다" 는 화면이 거짓말이 됩니다 —
+     실서버라면 DB 에 남는 것이라 목도 남겨야 같은 것을 보여 줍니다. */
+  reservedRounds: ReservedRound[];
+  nextReservedRoundId: number;
 }
 
-const STORE_KEY = "coupon-yaho.mock.v5";
+// 저장 형식이 바뀌었으므로 키를 올립니다. 옛 키는 그대로 두고 무시합니다.
+const STORE_KEY = "coupon-yaho.mock.v6";
 
 function emptyState(): Persisted {
-  return { issuances: [], nextIssuanceId: 90001, seededMembers: [] };
+  return {
+    issuances: [],
+    nextIssuanceId: 90001,
+    seededMembers: [],
+    reservedRounds: [],
+    nextReservedRoundId: 9001,
+  };
 }
 
 let store: Persisted | null = null;
@@ -690,7 +710,8 @@ export function loadStore(): Persisted {
   }
   try {
     const raw = window.localStorage.getItem(STORE_KEY);
-    store = raw ? (JSON.parse(raw) as Persisted) : emptyState();
+    // 저장본에 없는 필드는 메웁니다 — 형식이 늘어도 옛 저장본이 화면을 깨지 않게.
+    store = raw ? { ...emptyState(), ...(JSON.parse(raw) as Partial<Persisted>) } : emptyState();
   } catch {
     store = emptyState();
   }
