@@ -210,14 +210,19 @@ function Figure({
 function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipGrade | null }) {
   const brand = brandOf(round.brandId);
   const remaining = remainingStock(round);
-  // 할인율은 "얼마나 큰가"가 메시지라 한 번 세어 올립니다. 시계에는 쓰지 않습니다.
-  const rate = useCountUp(round.discountRate ?? 0, 800);
   const eligible = !grade || round.eligibleGrades.includes(grade);
   const urgent = remaining > 0 && remaining / round.totalQuantity <= 0.1;
+  // 할인율은 "얼마나 큰가" 가 메시지라 한 번 세어 올립니다. 시계에는 쓰지 않습니다.
+  const rate = useCountUp(round.discountRate ?? 0, 800);
 
   return (
-    <div className="yh-rise yh-coupon grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto_18rem] lg:items-stretch lg:gap-0">
-      <div className="min-w-0">
+    /* 실물 쿠폰의 구조를 그대로 씁니다 — 위는 읽는 면, 절취선 아래는 뜯어 가는 면.
+       앞선 시안은 좌우로 나눠서 오른쪽 칸에 게이지와 버튼만 남고 가운데가 비었습니다.
+       가로로 긴 카드에서는 정보를 가로로 늘어놓아야 폭이 다 쓰입니다. */
+    /* overflow-hidden 을 두면 좌우 노치(반원)가 카드 경계에서 잘립니다.
+       노치는 카드 밖으로 나가야 뚫린 것처럼 보입니다. */
+    <div className="yh-rise yh-coupon">
+      <div className="p-6 pb-7 sm:px-8 sm:pt-7">
         <div className="flex flex-wrap items-center gap-3">
           <span className="yh-live">
             <span className="live-dot" />
@@ -231,51 +236,62 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
           </span>
         </div>
 
-        <h1 className="yh-hero mt-5">{round.name}</h1>
+        <h1 className="yh-hero mt-4">{round.name}</h1>
 
-        <div className="mt-7 flex flex-wrap items-end gap-x-12 gap-y-6">
+        {/* 세 값이 한 줄에 놓여야 "얼마나 싸고, 얼마나 남았고, 몇 장 남았나" 가
+            한눈에 비교됩니다. 라벨을 같은 높이에 두려면 크기도 같아야 합니다. */}
+        {/* 좁은 화면에서 셋을 세로로 쌓으면 카드가 첫 화면을 넘깁니다.
+            할인·마감을 두 칸으로 두고 남은 수량은 한 줄로 눕힙니다. */}
+        <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:mt-7 sm:grid-cols-3 sm:gap-x-10 sm:gap-y-6">
           <div>
             <p className="yh-label">할인</p>
-            <p className="yh-figure-xl mt-1 text-yh-navy">
+            <p className="yh-figure mt-1.5 text-yh-navy">
               {round.policyType === "PERCENT_CAPPED" ? `${rate}%` : discountHeadline(round)}
             </p>
+            <p className="yh-small mt-2 text-yh-ink-2">{discountDetail(round)}</p>
           </div>
-          <Figure label="마감까지" accent={urgent}>
-            <Countdown target={Date.parse(round.closeAt)} />
-          </Figure>
-        </div>
 
-        <p className="yh-small mt-4 text-yh-ink-2">
-          {discountDetail(round)}
-          <span className="ml-2 text-yh-ink-3">
-            ·{" "}
-            {eligible
-              ? gradesLabel(round.eligibleGrades)
-              : `${gradesLabel(round.eligibleGrades)} 전용`}
-          </span>
-        </p>
+          <div>
+            <p className="yh-label">마감까지</p>
+            <p className={`yh-figure mt-1.5 ${urgent ? "text-yh-accent" : "text-yh-navy"}`}>
+              <Countdown target={Date.parse(round.closeAt)} />
+            </p>
+            <p className="yh-num yh-small mt-2 text-yh-ink-2">
+              {formatDateTime(round.closeAt)} 마감
+            </p>
+          </div>
+
+          <div>
+            <p className="yh-label">남은 수량</p>
+            <p className={`yh-figure yh-num mt-1.5 ${urgent ? "text-yh-accent" : "text-yh-navy"}`}>
+              {remaining.toLocaleString("ko-KR")}
+            </p>
+            <div className="mt-3">
+              <StockGauge remaining={remaining} total={round.totalQuantity} label={false} />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 절취선 오른쪽이 실제로 뜯어 가는 쪽 — 수량과 버튼을 여기 모읍니다.
-          이 카드는 네이비와 종이 두 면에 걸쳐 있어 노치(반원)를 못 씁니다 —
-          한 색으로는 배경을 뚫을 수 없어 카드 위에 원이 떠 보입니다. 점선만 씁니다. */}
-      <div className="yh-tear-plain my-1 lg:hidden" />
-      <div className="yh-tear-y-plain hidden lg:mx-10 lg:block" />
+      {/* 절취선. 카드가 종이 면 위에만 놓이는 높이라 노치가 제대로 뚫립니다. */}
+      <div className="yh-tear mx-6 sm:mx-8" />
 
-      <div className="flex w-full flex-col justify-center lg:w-auto">
-        <StockGauge remaining={remaining} total={round.totalQuantity} />
-        <div className="mt-5 flex flex-row gap-2.5 lg:mt-7 lg:flex-col">
-          <Link
-            to="/events/$couponRoundId"
-            params={{ couponRoundId: String(round.id) }}
-            className="yh-btn-live w-full"
-          >
-            발급받기
-          </Link>
-          <Link to="/events" className="yh-btn-ghost w-full">
-            전체 일정 보기
-          </Link>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-b-[17px] bg-yh-paper px-6 py-5 sm:px-8">
+        <Link
+          to="/events/$couponRoundId"
+          params={{ couponRoundId: String(round.id) }}
+          className="yh-btn-live"
+        >
+          발급받기
+        </Link>
+        <Link to="/events" className="yh-btn-ghost">
+          전체 일정 보기
+        </Link>
+        <p className="yh-small ml-auto text-yh-ink-3">
+          {eligible
+            ? gradesLabel(round.eligibleGrades)
+            : `${gradesLabel(round.eligibleGrades)} 전용`}
+        </p>
       </div>
     </div>
   );

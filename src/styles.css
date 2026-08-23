@@ -422,12 +422,28 @@
 /* ── 발급 중 표시 ──────────────────────────────────
    컬러 액센트는 국소 구성마다 하나만. 여기서는 이 점 하나가 그 역할입니다. */
 @utility live-dot {
+  position: relative;
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 9999px;
   background: currentColor;
-  animation: live-pulse 2s ease-in-out infinite;
+  /* 점만 깜빡이면 장식으로 읽힙니다. 밖으로 번지는 파문 하나가
+     "지금 벌어지고 있다" 를 말합니다. */
+  box-shadow: 0 0 0 0 currentColor;
+  animation: live-ping 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes live-ping {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, currentColor 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px color-mix(in oklab, currentColor 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, currentColor 0%, transparent);
+  }
 }
 
 @keyframes live-pulse {
@@ -647,52 +663,64 @@
 
 @utility yh-hero {
   font-size: clamp(1.875rem, 4.2vw, 3rem);
+  /* 이 화면에서 800 을 쓰는 건 히어로와 큰 수치뿐입니다.
+     제목까지 800 이면 둘 다 "제일 큰 목소리" 가 되어 위계가 사라집니다. */
   font-weight: 800;
   line-height: 1.08;
-  letter-spacing: -0.03em;
+  /* 한글은 라틴보다 글자폭이 고르고 속공간이 커서, 큰 크기에서 자간을 더 조여야
+     낱글자가 흩어져 보이지 않습니다. */
+  letter-spacing: -0.038em;
   text-wrap: balance;
 }
 
 @utility yh-title {
   font-size: clamp(1.5rem, 2.8vw, 2.125rem);
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: -0.024em;
+  /* 히어로보다 한 단계 낮춥니다 — 섹션 제목은 안내이지 선언이 아닙니다 */
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
 @utility yh-sub {
   font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
   font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: -0.018em;
+  line-height: 1.4;
+  letter-spacing: -0.022em;
 }
 
 @utility yh-lede {
   font-size: 1.0625rem;
-  font-weight: 500;
-  line-height: 1.68;
-  letter-spacing: -0.012em;
+  /* 가변 폰트라 정수 단계 사이를 쓸 수 있습니다. 한글 본문에서 400 은 얇아 보이고
+     500 은 굵어 보여서 그 사이에 둡니다. */
+  font-weight: 450;
+  line-height: 1.72;
+  letter-spacing: -0.014em;
+  /* 마지막 줄에 한 단어만 남는 것을 막습니다 */
+  text-wrap: pretty;
 }
 
 @utility yh-body {
   font-size: 0.9375rem;
-  font-weight: 500;
-  line-height: 1.62;
-  letter-spacing: -0.008em;
+  font-weight: 450;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
 }
 
 @utility yh-small {
   font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1.5;
+  font-weight: 450;
+  line-height: 1.55;
+  letter-spacing: -0.006em;
 }
 
 @utility yh-label {
-  font-size: 0.75rem;
-  font-weight: 800;
-  line-height: 1.4;
-  letter-spacing: 0.02em;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.45;
+  /* 작은 글씨는 자간을 벌려야 라벨로 읽힙니다. 굵기만 올리면 그냥 작은 굵은 글씨입니다. */
+  letter-spacing: 0.075em;
   color: var(--yh-ink-3);
 }
 
@@ -710,7 +738,8 @@
   font-size: clamp(1.875rem, 3.6vw, 3rem);
   font-weight: 800;
   line-height: 1.05;
-  letter-spacing: -0.035em;
+  /* 숫자는 한글보다 덜 조입니다 — 같은 값을 주면 자릿수가 서로 붙습니다 */
+  letter-spacing: -0.022em;
   white-space: nowrap;
 }
 
@@ -718,7 +747,7 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 /* 로고 레터링의 흰 외곽선을 본문 큰 글자에 옮긴 것.
@@ -744,14 +773,20 @@
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1;
-  box-shadow: var(--yh-shadow-sm);
+  /* 위쪽 1px 하이라이트 — 단색 알약은 스티커처럼 납작합니다.
+     빛이 위에서 온다고 가정하면 이 한 줄이 두께를 만듭니다. */
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    var(--yh-shadow-sm);
   transition:
     background 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.12s ease;
   &:hover {
     background: var(--yh-navy-600);
-    box-shadow: var(--yh-shadow);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.2),
+      var(--yh-shadow);
   }
   &:active {
     transform: translateY(1px);
@@ -780,7 +815,10 @@
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1;
-  box-shadow: 0 2px 4px rgb(191 40 50 / 0.18), 0 8px 22px rgb(191 40 50 / 0.22);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.24),
+    0 2px 4px rgb(191 40 50 / 0.18),
+    0 8px 22px rgb(191 40 50 / 0.22);
   transition:
     background 0.18s ease,
     box-shadow 0.18s ease,
@@ -809,7 +847,8 @@
   border-radius: 999px;
   background: var(--yh-surface);
   color: var(--yh-navy);
-  border: 1.5px solid var(--yh-rule);
+  border: 1px solid var(--yh-rule);
+  box-shadow: 0 1px 2px rgb(22 48 92 / 0.04);
   font-size: 0.9375rem;
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -845,7 +884,9 @@
   font-size: 0.8125rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: var(--yh-shadow-sm);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    var(--yh-shadow-sm);
   transition:
     background 0.18s ease,
     transform 0.12s ease;
@@ -1033,7 +1074,9 @@
   &:focus {
     border-color: var(--yh-navy);
     outline: none;
-    box-shadow: 0 0 0 3px rgb(22 48 92 / 0.1);
+    box-shadow:
+      0 0 0 3px rgb(22 48 92 / 0.08),
+      inset 0 1px 2px rgb(22 48 92 / 0.05);
   }
 }
 
@@ -1053,7 +1096,10 @@
   }
   &[aria-pressed="true"] {
     border-color: var(--yh-navy);
-    box-shadow: 0 0 0 3px rgb(22 48 92 / 0.1);
+    background: var(--yh-paper-2);
+    box-shadow:
+      0 0 0 3px rgb(22 48 92 / 0.08),
+      inset 0 1px 0 rgb(255 255 255 / 0.7);
   }
 }
 
@@ -1160,6 +1206,8 @@
   position: relative;
   height: 0;
   border-top: 2px dashed var(--yh-rule);
+  /* 노치는 카드 바깥 색으로 칠해야 뚫린 것처럼 보입니다.
+     이 절취선은 카드가 종이 면 위에만 놓이는 높이에 둡니다. */
   &::before,
   &::after {
     content: "";
@@ -1238,7 +1286,7 @@
   font-size: clamp(2.75rem, 6vw, 4rem);
   font-weight: 800;
   line-height: 0.95;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.03em;
   white-space: nowrap;
 }
 
