@@ -8,6 +8,7 @@
  * ⏳ = PRD 확정 · 백엔드 미구현 (목만 응답)
  */
 import type {
+  BrandDay,
   CalendarEntry,
   CouponCancelResponse,
   CouponCancelUseResponse,
@@ -35,6 +36,9 @@ export interface CouponApi {
   listRounds(): Promise<CouponRoundView[]>;
   /** ⏳ GET /api/v1/coupon-rounds/{couponRoundId} */
   getRound(couponRoundId: number): Promise<CouponRoundView>;
+
+  /** ⏳ GET /api/v1/brand-days — 브랜드별 반복 일정(매달 N번째 X요일) */
+  listBrandDays(): Promise<BrandDay[]>;
 
   /**
    * ⏳ GET /api/v1/calendar?from&to — 기간 내 브랜드 데이 회차

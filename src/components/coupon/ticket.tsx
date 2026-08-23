@@ -25,7 +25,8 @@ const STATUS_TONE: Record<IssuanceStatus, string> = {
 /**
  * 보유 쿠폰 카드.
  *
- * 왼쪽 레일은 브랜드 고유색입니다 — 쿠폰함에 여러 브랜드가 쌓이면 색으로 먼저 찾습니다.
+ * 카드 가장자리에 브랜드색 띠를 두르지 않습니다. 어느 서비스에나 있는 장식이고,
+ * 브랜드는 이미 플레이트 색으로 구분됩니다 — 같은 정보를 두 번 칠할 이유가 없습니다.
  *
  * 상태 표현은 `cy-be/docs/05-design-handoff.md` §3 표를 따릅니다.
  * 라벨만으로도 상태는 전달되지만, 쿠폰함은 훑는 화면이라 **글자를 읽기 전에**
@@ -56,16 +57,10 @@ export function CouponTicket({
 
   return (
     <article
-      className={`yh-card relative overflow-hidden pl-2 ${
-        spent ? "border border-dashed border-yh-rule bg-yh-paper-2 saturate-[0.15]" : ""
+      className={`yh-card relative overflow-hidden ${
+        spent ? "border-dashed bg-yh-paper-2 saturate-[0.15]" : ""
       } ${used ? "saturate-[0.55]" : ""} ${dimmed && !spent ? "opacity-70" : ""}`}
     >
-      <span
-        className="absolute inset-y-0 left-0 w-2"
-        style={{ backgroundColor: spent ? "var(--yh-rule)" : brand.hue }}
-        aria-hidden
-      />
-
       {/* 사용 완료 — 실물 쿠폰에 찍는 도장 */}
       {used && (
         <span

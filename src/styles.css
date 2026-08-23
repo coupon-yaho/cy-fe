@@ -898,6 +898,9 @@
   position: relative;
   background: var(--yh-surface);
   border-radius: 16px;
+  /* 그림자만으로는 흰 카드가 밝은 지면 위에서 경계를 잃습니다.
+     네이비를 아주 옅게 섞은 실선 한 겹이 형태를 또렷하게 만듭니다. */
+  border: 1px solid rgb(22 48 92 / 0.07);
   box-shadow: var(--yh-shadow-sm);
   transition:
     box-shadow 0.2s ease,
@@ -1064,6 +1067,13 @@
   scroll-behavior: smooth;
 }
 
+/* 헤더가 sticky 라 앵커로 이동하면 제목이 그 아래에 깔립니다 */
+.yh h1,
+.yh h2,
+.yh h3 {
+  scroll-margin-top: 8.5rem;
+}
+
 .yh-skip {
   position: absolute;
   left: -9999px;
@@ -1139,6 +1149,7 @@
   position: relative;
   background: var(--yh-surface);
   border-radius: 18px;
+  border: 1px solid rgb(22 48 92 / 0.07);
   box-shadow:
     0 2px 6px rgb(22 48 92 / 0.06),
     0 12px 32px rgb(22 48 92 / 0.12);

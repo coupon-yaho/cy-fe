@@ -24,7 +24,7 @@ export function SectionHead({
         <div className="min-w-0">
           {eyebrow && <p className="yh-label">{eyebrow}</p>}
           <h2 className="yh-title mt-3 max-w-[18em]">{title}</h2>
-          {note && <p className="yh-lede mt-4 max-w-[44ch] text-yh-ink-2">{note}</p>}
+          {note && <p className="yh-lede mt-4 max-w-[42ch] break-keep text-yh-ink-2">{note}</p>}
         </div>
         {action}
       </div>

@@ -271,6 +271,31 @@ export interface CalendarEntry {
   queueActive: boolean;
 }
 
+/* ── 브랜드 데이 반복 일정 ─────────────────────────────
+   GET /api/v1/brand-days
+
+   "브랜드마다 정해진 주와 요일이 있다" 는 이 서비스의 규칙이고, 고객이 먼저 알고 싶어
+   하는 정보입니다. 그런데 그 규칙은 `coupon_templates.nth_week / day_of_week /
+   start_time` 에만 있고 회차 목록에는 없습니다 — 회차는 규칙이 만들어 낸 결과이지
+   규칙 자체가 아닙니다. 그래서 별도로 내려받습니다.
+
+   달력(/calendar)과 다른 점: 달력은 "이번 달 며칠"이고 이쪽은 "매달 몇째 주 무슨 요일"
+   입니다. 달력은 특정 월에 매이지만 이건 안 매입니다. */
+
+export interface BrandDay {
+  templateId: number;
+  brandId: number;
+  name: string;
+  /** 1~4 */
+  nthWeek: number;
+  dayOfWeek: CouponDayOfWeek;
+  /** "HH:mm:ss" */
+  startTime: string;
+  durationHours: number;
+  eligibleGradesMask: number;
+  eligibleGrades: MembershipGrade[];
+}
+
 /* ── 표시용 라벨 · 파생 계산 ─────────────────────────── */
 
 export const GRADE_LABEL: Record<MembershipGrade, string> = {

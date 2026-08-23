@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
@@ -135,7 +136,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
             aria-label="이전 달"
             className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
           >
-            <Chevron dir="left" />
+            <ChevronLeft className="size-4" strokeWidth={2.2} />
           </button>
           <p className="yh-sub yh-num min-w-[8.5rem] text-center">
             {year}년 {month + 1}월
@@ -146,7 +147,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
             aria-label="다음 달"
             className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
           >
-            <Chevron dir="right" />
+            <ChevronRight className="size-4" strokeWidth={2.2} />
           </button>
         </div>
 
@@ -441,11 +442,6 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
 
   const body = (
     <>
-      <span
-        className="absolute inset-x-0 top-0 h-1"
-        style={{ backgroundColor: entry.status === "CLOSED" ? "var(--yh-rule)" : brand.hue }}
-        aria-hidden
-      />
       <div className="flex items-center gap-3">
         <BrandPlate brandId={entry.brandId} size="md" />
         <div className="min-w-0">
@@ -479,7 +475,7 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
       </div>
 
       <p className="yh-small mt-5 flex items-center gap-1.5 border-t border-yh-rule pt-4 text-yh-ink-3">
-        {!eligible && <span aria-hidden>🔒</span>}
+        {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />}
         {eligible ? gradesLabel(entry.eligibleGrades) : `${gradesLabel(entry.eligibleGrades)} 전용`}
       </p>
     </>
@@ -500,22 +496,5 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
     </Link>
   ) : (
     <div className={cls}>{body}</div>
-  );
-}
-
-function Chevron({ dir }: { dir: "left" | "right" }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="size-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d={dir === "left" ? "M10 3 5 8l5 5" : "M6 3l5 5-5 5"} />
-    </svg>
   );
 }

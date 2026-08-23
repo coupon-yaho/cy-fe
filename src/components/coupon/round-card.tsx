@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Lock } from "lucide-react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { LiveLabel } from "@/components/coupon/section-head";
 import { StockGauge } from "@/components/coupon/stock-gauge";
@@ -41,13 +42,6 @@ export function RoundCard({
         closed ? "saturate-[0.2]" : ""
       }`}
     >
-      {/* 왼쪽 브랜드 레일 — 카드 그리드에서 색으로 먼저 찾습니다 */}
-      <span
-        className="absolute inset-x-0 top-0 h-1"
-        style={{ backgroundColor: closed ? "var(--yh-rule)" : brand.hue }}
-        aria-hidden
-      />
-
       {soldOut && (
         <span
           className="pointer-events-none absolute top-1/2 right-5 -translate-y-1/2 -rotate-12 rounded-md border-[3px] border-yh-ink-3/50 px-2.5 py-1 text-[0.9375rem] font-extrabold tracking-[0.16em] text-yh-ink-3/60"
@@ -103,7 +97,7 @@ export function RoundCard({
             eligible ? undefined : "inline-flex items-center gap-1.5 font-bold text-yh-ink-2"
           }
         >
-          {!eligible && <LockGlyph />}
+          {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />}
           {eligible
             ? gradesLabel(round.eligibleGrades)
             : `${gradesLabel(round.eligibleGrades)} 전용`}
@@ -137,12 +131,14 @@ export function RoundRow({
   const brand = brandOf(round.brandId);
   const remaining = remainingStock(round);
   const eligible = !grade || round.eligibleGrades.includes(grade);
+  const soldOutRow = remaining <= 0;
+  const urgentRow = !soldOutRow && remaining / round.totalQuantity <= 0.1;
 
   return (
     <Link
       to="/events/$couponRoundId"
       params={{ couponRoundId: String(round.id) }}
-      className="group -mx-3 grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 rounded-xl border-b border-yh-rule px-3 py-4 transition-colors last:border-b-0 hover:bg-yh-paper sm:grid-cols-[104px_auto_1fr_auto_136px_auto] sm:gap-x-5 sm:py-5"
+      className="group -mx-3 grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 rounded-xl border-b border-yh-rule px-3 py-4 transition-colors last:border-b-0 hover:bg-yh-paper sm:grid-cols-[104px_auto_minmax(0,1fr)_auto_96px_112px] sm:gap-x-6 sm:py-4"
     >
       {/* 좁은 화면에서는 시각을 별도 칸으로 두지 않습니다 — 네 칸이 들어가면
           회차 이름이 두세 글자만 남습니다. 이름 아래 줄로 내립니다. */}
@@ -164,47 +160,56 @@ export function RoundRow({
         </span>
       </span>
 
-      <span className="yh-figure-sm text-[1.375rem] whitespace-nowrap">
-        {discountHeadline(round)}
+      {/* 할인은 이 줄에서 비교하는 값이라 가장 큽니다. 보조 설명을 아래 줄에 붙여
+          숫자가 혼자 떠 있지 않게 합니다. */}
+      <span className="text-right whitespace-nowrap">
+        <span className="yh-figure-sm block text-[1.375rem] leading-none">
+          {discountHeadline(round)}
+        </span>
+        <span className="yh-small mt-1 hidden text-yh-ink-3 sm:block">{discountDetail(round)}</span>
       </span>
 
-      <span className="hidden sm:block">
+      {/* 여기에는 라벨 없는 게이지 막대가 떠 있었습니다. 폭이 좁아 남은 비율이
+          읽히지도 않고, 재고가 적을 땐 점 하나로 보여 오류처럼 읽혔습니다.
+          같은 자리에 실제 숫자를 둡니다 — 훑을 때 비교되는 건 수치입니다. */}
+      <span className="hidden text-right sm:block">
         {round.status === "SCHEDULED" ? (
-          <span className="yh-num yh-small text-yh-ink-3">
-            <Countdown target={Date.parse(round.openAt)} /> 후
-          </span>
+          <>
+            <span className="yh-num yh-small block font-bold text-yh-ink-2">
+              <Countdown target={Date.parse(round.openAt)} />
+            </span>
+            <span className="yh-small mt-0.5 block text-yh-ink-3">후 오픈</span>
+          </>
+        ) : soldOutRow ? (
+          <span className="yh-small font-bold text-yh-ink-3">품절</span>
         ) : (
-          <StockGauge remaining={remaining} total={round.totalQuantity} label={false} />
+          <>
+            <span
+              className={`yh-num yh-small block font-bold ${
+                urgentRow ? "text-yh-warn" : "text-yh-ink-2"
+              }`}
+            >
+              {remaining.toLocaleString("ko-KR")}장
+            </span>
+            <span className="yh-small mt-0.5 block text-yh-ink-3">
+              {urgentRow ? "품절 임박" : "남음"}
+            </span>
+          </>
         )}
       </span>
 
-      <span className="col-start-2 -col-end-1 justify-self-start sm:col-auto sm:justify-self-end">
+      {/* 대기열 표시를 배지 옆에 두면 그만큼 배지가 왼쪽으로 밀려 행마다 오른쪽 끝이
+          어긋납니다. 아래 줄로 내려서 오른쪽 기준선을 지킵니다. */}
+      <span className="col-start-2 -col-end-1 justify-self-start sm:col-auto sm:justify-self-end sm:text-right">
         {round.status === "OPEN" ? (
-          <span className="flex items-center gap-2.5">
+          <>
             <LiveLabel />
-            {round.queueActive && <span className="yh-small text-yh-ink-3">대기열</span>}
-          </span>
+            {round.queueActive && <span className="yh-small mt-1 block text-yh-ink-3">대기열</span>}
+          </>
         ) : (
           <span className="yh-label">{ROUND_STATUS_LABEL[round.status]}</span>
         )}
       </span>
     </Link>
-  );
-}
-
-/** 등급 미달 표시 — 색만으로 알리지 않도록 모양을 함께 씁니다 */
-function LockGlyph() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="size-3.5 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      aria-hidden
-    >
-      <rect x="3.5" y="7" width="9" height="6" rx="1.5" />
-      <path d="M5.75 7V5a2.25 2.25 0 0 1 4.5 0v2" />
-    </svg>
   );
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
-import { BRANDS } from "@/lib/coupon";
 import { Reveal, useCountUp } from "@/components/coupon/reveal";
 import { SectionHead } from "@/components/coupon/section-head";
 import { GradeChip } from "@/components/coupon/grade-chip";
@@ -11,8 +11,12 @@ import { Countdown, formatDateTime } from "@/components/coupon/timer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  DAY_LABEL,
   GRADES,
   GRADE_LABEL,
+  NTH_WEEK_LABEL,
+  trimSeconds,
+  type BrandDay,
   brandOf,
   couponApi,
   discountDetail,
@@ -366,7 +370,6 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
     <section className="bg-yh-paper-2">
       <div className="mx-auto w-full max-w-6xl px-5 py-14">
         <SectionHead
-          eyebrow="참여 조건"
           title={
             grade
               ? `${GRADE_LABEL[grade]} 등급으로 참여할 수 있는 회차`
@@ -394,11 +397,13 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
                     </div>
                     <p className="yh-figure-sm mt-5 text-[2.5rem] leading-none">
                       {openCount(g)}
-                      <span className="yh-small ml-1.5 align-middle font-medium text-yh-ink-3">
-                        개 회차
+                      <span className="yh-small ml-1 align-baseline font-medium text-yh-ink-2">
+                        개
                       </span>
                     </p>
-                    <p className="yh-small mt-1.5 text-yh-ink-3">지금 참여 가능</p>
+                    <p className="yh-small mt-2 text-yh-ink-3">
+                      전체 {rounds.length}개 중 참여 가능
+                    </p>
                   </div>
                 </li>
               </Reveal>
@@ -415,30 +420,64 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
    "이 서비스를 쓸 이유"라서 회차 목록보다 먼저 알고 싶어 하는 정보입니다. */
 
 function BrandGrid() {
+  const { data } = useQuery({
+    queryKey: ["brand-days"],
+    queryFn: () => couponApi.listBrandDays(),
+    staleTime: 5 * 60_000,
+  });
+
+  // 매달 N번째 주로 묶습니다. 브랜드를 그냥 늘어놓으면 "12개가 있다" 만 말하지만,
+  // 주차로 묶으면 "언제 열리는가" 를 말합니다 — 섹션 설명이 이미 그 얘기입니다.
+  const weeks = useMemo(() => {
+    const map = new Map<number, BrandDay[]>();
+    for (const d of data ?? []) {
+      const list = map.get(d.nthWeek);
+      if (list) list.push(d);
+      else map.set(d.nthWeek, [d]);
+    }
+    return [...map.entries()].sort(([a], [b]) => a - b);
+  }, [data]);
+
   return (
     <section className="mx-auto w-full max-w-6xl px-5 py-14">
       <SectionHead
-        eyebrow="참여 브랜드"
         title="12개 브랜드가 돌아가며 열립니다"
         note="브랜드마다 정해진 주와 요일이 있습니다. 한 달에 한 번씩 순서대로 돌아옵니다."
       />
-      {/* 흰 카드 12장은 전부 같아 보입니다. 고유색을 옅게 깔면 타일마다 다른 면이 됩니다. */}
-      <ul className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-12">
-        {BRANDS.map((b, i) => (
-          <Reveal key={b.brandId} delay={i * 35}>
-            <li
-              className="yh-tile flex h-full flex-col items-center gap-1.5 px-1.5 py-4"
-              style={{ background: `color-mix(in oklab, ${b.hue} 13%, #fff)` }}
-            >
-              <BrandPlate brandId={b.brandId} size="sm" />
-              <div className="text-center">
-                <p className="yh-body font-bold">{b.name}</p>
-                <p className="yh-small text-yh-ink-2">{b.category}</p>
+
+      {weeks.length === 0 ? (
+        <div className="mt-8 space-y-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <dl className="mt-8">
+          {weeks.map(([nth, items], wi) => (
+            <Reveal key={nth} delay={wi * 60}>
+              <div className="grid gap-x-8 gap-y-3 border-t border-yh-rule py-5 sm:grid-cols-[7rem_1fr]">
+                <dt className="yh-sub text-yh-ink-2">{NTH_WEEK_LABEL[nth] ?? nth}&nbsp;주</dt>
+                <dd className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+                  {items.map((d) => {
+                    const brand = brandOf(d.brandId);
+                    return (
+                      <span key={d.templateId} className="flex items-center gap-3">
+                        <BrandPlate brandId={d.brandId} size="sm" />
+                        <span className="min-w-0">
+                          <span className="yh-body block truncate font-bold">{brand.name}</span>
+                          <span className="yh-num yh-small block text-yh-ink-3">
+                            {DAY_LABEL[d.dayOfWeek]} {trimSeconds(d.startTime)}
+                          </span>
+                        </span>
+                      </span>
+                    );
+                  })}
+                </dd>
               </div>
-            </li>
-          </Reveal>
-        ))}
-      </ul>
+            </Reveal>
+          ))}
+        </dl>
+      )}
     </section>
   );
 }
@@ -525,8 +564,7 @@ function Closing() {
           </div>
 
           <div>
-            <p className="yh-label text-white/50">발급 규칙</p>
-            <h2 className="yh-title mt-3 text-white">선착순은 이렇게 지켜집니다</h2>
+            <h2 className="yh-title text-white">선착순은 이렇게 지켜집니다</h2>
 
             <dl className="mt-7 space-y-5">
               {RULES.map((r) => (

@@ -38,6 +38,7 @@ import {
   type Page,
   type QueuePlace,
   gradesToMask,
+  DAYS_OF_WEEK,
   type CalendarEntry,
 } from "./types";
 
@@ -150,6 +151,30 @@ export function createMockApi(): CouponApi {
   }
 
   return {
+    async listBrandDays() {
+      await wait(110);
+      const order = DAYS_OF_WEEK;
+      return listTemplates()
+        .filter((t) => t.active)
+        .map((t) => ({
+          templateId: t.id,
+          brandId: t.brandId,
+          name: t.name,
+          nthWeek: t.nthWeek,
+          dayOfWeek: t.dayOfWeek,
+          startTime: t.startTime,
+          durationHours: t.durationHours,
+          eligibleGradesMask: t.eligibleGradesMask,
+          eligibleGrades: t.eligibleGrades,
+        }))
+        .sort(
+          (a, b) =>
+            a.nthWeek - b.nthWeek ||
+            order.indexOf(a.dayOfWeek) - order.indexOf(b.dayOfWeek) ||
+            a.startTime.localeCompare(b.startTime),
+        );
+    },
+
     async listCalendar(from: string, to: string) {
       await wait(120);
       const now = Date.now();

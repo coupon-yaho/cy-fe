@@ -13,6 +13,7 @@
 import { CouponApiError } from "./errors";
 import type { CouponApi, MemberContext } from "./contract";
 import type {
+  BrandDay,
   CalendarEntry,
   CouponCancelResponse,
   CouponCancelUseResponse,
@@ -99,6 +100,8 @@ export function createHttpApi(baseUrl: string): CouponApi {
   const admin = { [USER_ROLE]: "ADMIN" };
 
   return {
+    listBrandDays: () => call<BrandDay[]>("/api/v1/brand-days"),
+
     // 사양서 U2 가 요구한 신규 엔드포인트. 백엔드 미구현이라 붙으면 그대로 동작합니다.
     listCalendar: (from, to) =>
       call<CalendarEntry[]>(

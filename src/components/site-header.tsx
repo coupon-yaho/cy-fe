@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
+import { Bell, Menu } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { GradeChip } from "@/components/coupon/grade-chip";
 import { LiveStrip } from "@/components/coupon/live-strip";
@@ -80,7 +81,7 @@ export function SiteHeader() {
                 className="relative grid size-9 place-items-center rounded text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
                 aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
               >
-                <BellGlyph />
+                <Bell className="size-[18px]" strokeWidth={1.8} aria-hidden />
                 {unread > 0 && (
                   <span
                     className="absolute top-1.5 right-1.5 size-2 rounded-full bg-yh-accent"
@@ -154,7 +155,7 @@ export function SiteHeader() {
                 className="grid size-9 place-items-center rounded text-yh-ink-2 transition-colors hover:bg-yh-paper-2 md:hidden"
                 aria-label="메뉴"
               >
-                <MenuGlyph />
+                <Menu className="size-5" strokeWidth={1.8} aria-hidden />
               </SheetTrigger>
               <SheetContent side="right" className="yh w-72 bg-yh-paper">
                 <SheetTitle className="sr-only">메뉴</SheetTitle>
@@ -189,37 +190,5 @@ export function SiteHeader() {
 
       <LiveStrip />
     </header>
-  );
-}
-
-function BellGlyph() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      className="size-[18px]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M5 8a5 5 0 0 1 10 0c0 3 .8 4.4 1.5 5.2H3.5C4.2 12.4 5 11 5 8Z" />
-      <path d="M8 16a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
-
-function MenuGlyph() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      className="size-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      aria-hidden
-    >
-      <path d="M3 7h14M3 13h14" />
-    </svg>
   );
 }
