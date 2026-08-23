@@ -8,7 +8,10 @@ import { BrandLogo } from "@/components/brand-logo";
  */
 export function SiteFooter() {
   return (
-    <footer className="mt-28 border-t border-yh-rule bg-yh-paper-2">
+    /* 여백을 두지 않습니다. 홈은 마무리가 어두운 띠로 끝나는데 그 사이에 밝은 띠가
+       112px 끼면 페이지가 두 번 끝나는 것처럼 보입니다. 숨 쉴 공간은 각 화면이
+       자기 하단 여백으로 갖습니다. */
+    <footer className="border-t border-yh-rule bg-yh-paper-2">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-5 py-10 sm:grid-cols-[1fr_auto]">
         <div>
           <BrandLogo variant="key" className="h-16" />

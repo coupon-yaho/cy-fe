@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import { Bell, Menu } from "lucide-react";
+import { ThemeToggle } from "@/components/coupon/theme-toggle";
 import { BrandLogo } from "@/components/brand-logo";
 import { GradeChip } from "@/components/coupon/grade-chip";
 import { LiveStrip } from "@/components/coupon/live-strip";
@@ -76,6 +77,8 @@ export function SiteHeader() {
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5">
+            <ThemeToggle />
+
             <DropdownMenu onOpenChange={(o) => o && markAllRead()}>
               <DropdownMenuTrigger
                 className="relative grid size-9 place-items-center rounded text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"

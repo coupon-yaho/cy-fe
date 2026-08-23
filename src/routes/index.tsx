@@ -383,7 +383,7 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
     rounds.filter((r) => r.eligibleGrades.includes(g)).length;
 
   return (
-    <section className="bg-yh-paper-2">
+    <section>
       <div className="mx-auto w-full max-w-6xl px-5 py-14">
         <SectionHead
           title={
@@ -400,7 +400,7 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
             return (
               <Reveal key={g} delay={i * 60}>
                 <li
-                  className={`yh-tile h-full ${GRADE_TINT[g]} ${mine ? "ring-2 ring-yh-navy" : ""}`}
+                  className={`yh-tile yh-tinted h-full ${GRADE_TINT[g]} ${mine ? "ring-2 ring-yh-navy" : ""}`}
                 >
                   <div className="p-5">
                     <div className="flex items-center justify-between gap-2">
@@ -455,48 +455,52 @@ function BrandGrid() {
   }, [data]);
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 py-14">
-      {/* 주·요일은 coupon_templates 값이고 관리자가 /admin/campaigns 에서 바꿉니다.
+    /* 앞(일정)과 뒤(등급)가 모두 밝은 면이라 셋이 이어지면 가운데가 늘어집니다.
+       한 단계 눌러 면을 교차시킵니다. */
+    <section className="bg-yh-paper-2">
+      <div className="mx-auto w-full max-w-6xl px-5 py-14">
+        {/* 주·요일은 coupon_templates 값이고 관리자가 /admin/campaigns 에서 바꿉니다.
           "정해져 있다" 고 단정하면 일정이 바뀌는 순간 화면이 거짓말을 합니다.
           지금 등록된 것을 보여 주는 화면이라고 말합니다. */}
-      <SectionHead
-        title="브랜드 데이 순서"
-        note="지금 등록된 일정입니다. 브랜드마다 열리는 주와 요일이 다르고, 운영 상황에 따라 바뀔 수 있습니다."
-      />
+        <SectionHead
+          title="브랜드 데이 순서"
+          note="지금 등록된 일정입니다. 브랜드마다 열리는 주와 요일이 다르고, 운영 상황에 따라 바뀔 수 있습니다."
+        />
 
-      {weeks.length === 0 ? (
-        <div className="mt-8 space-y-3">
-          {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-20 rounded-xl" />
-          ))}
-        </div>
-      ) : (
-        <dl className="mt-8">
-          {weeks.map(([nth, items], wi) => (
-            <Reveal key={nth} delay={wi * 60}>
-              <div className="grid gap-x-8 gap-y-3 border-t border-yh-rule py-5 sm:grid-cols-[7rem_1fr]">
-                <dt className="yh-sub text-yh-ink-2">{NTH_WEEK_LABEL[nth] ?? nth}&nbsp;주</dt>
-                <dd className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                  {items.map((d) => {
-                    const brand = brandOf(d.brandId);
-                    return (
-                      <span key={d.templateId} className="flex items-center gap-3">
-                        <BrandPlate brandId={d.brandId} size="sm" />
-                        <span className="min-w-0">
-                          <span className="yh-body block truncate font-bold">{brand.name}</span>
-                          <span className="yh-num yh-small block text-yh-ink-3">
-                            {DAY_LABEL[d.dayOfWeek]} {trimSeconds(d.startTime)}
+        {weeks.length === 0 ? (
+          <div className="mt-8 space-y-3">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-20 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <dl className="mt-8">
+            {weeks.map(([nth, items], wi) => (
+              <Reveal key={nth} delay={wi * 60}>
+                <div className="-mx-4 grid gap-x-8 gap-y-3 rounded-xl border-t border-yh-rule px-4 py-5 transition-colors hover:bg-yh-surface/70 sm:grid-cols-[7rem_1fr]">
+                  <dt className="yh-sub text-yh-ink-2">{NTH_WEEK_LABEL[nth] ?? nth}&nbsp;주</dt>
+                  <dd className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+                    {items.map((d) => {
+                      const brand = brandOf(d.brandId);
+                      return (
+                        <span key={d.templateId} className="flex items-center gap-3">
+                          <BrandPlate brandId={d.brandId} size="sm" />
+                          <span className="min-w-0">
+                            <span className="yh-body block truncate font-bold">{brand.name}</span>
+                            <span className="yh-num yh-small block text-yh-ink-3">
+                              {DAY_LABEL[d.dayOfWeek]} {trimSeconds(d.startTime)}
+                            </span>
                           </span>
                         </span>
-                      </span>
-                    );
-                  })}
-                </dd>
-              </div>
-            </Reveal>
-          ))}
-        </dl>
-      )}
+                      );
+                    })}
+                  </dd>
+                </div>
+              </Reveal>
+            ))}
+          </dl>
+        )}
+      </div>
     </section>
   );
 }

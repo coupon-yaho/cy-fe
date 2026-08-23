@@ -482,7 +482,7 @@ function Terms({ round }: { round: CouponRoundView }) {
   ];
 
   return (
-    <section className="mt-12 border-t border-yh-rule pt-8 pb-4">
+    <section className="mt-12 border-t border-yh-rule pt-8 pb-16">
       {/* 네 줄에 각각 괘선을 그으면 표처럼 보이는데, 읽는 순서가 있는 목록이 아니라
           나란한 조건 네 개입니다. 두 칸으로 묶고 선은 위에 한 줄만 둡니다. */}
       <h2 className="yh-label">사용 조건</h2>

@@ -16,6 +16,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
+import { THEME_BOOT_SCRIPT } from "@/hooks/use-theme";
 import { NotificationProvider } from "@/hooks/use-notifications";
 
 function NotFoundComponent() {
@@ -123,6 +124,9 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="ko">
       <head>
         <HeadContent />
+        {/* 저장해 둔 밝기 설정을 첫 페인트 전에 적용합니다.
+            리액트가 붙기를 기다리면 다크를 고른 사용자에게 흰 화면이 한 번 번쩍입니다. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
         {children}
