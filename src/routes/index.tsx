@@ -218,13 +218,27 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
   const rate = useCountUp(round.discountRate ?? 0, 800);
 
   return (
-    /* 실물 쿠폰의 구조를 그대로 씁니다 — 위는 읽는 면, 절취선 아래는 뜯어 가는 면.
-       앞선 시안은 좌우로 나눠서 오른쪽 칸에 게이지와 버튼만 남고 가운데가 비었습니다.
-       가로로 긴 카드에서는 정보를 가로로 늘어놓아야 폭이 다 쓰입니다. */
-    /* overflow-hidden 을 두면 좌우 노치(반원)가 카드 경계에서 잘립니다.
-       노치는 카드 밖으로 나가야 뚫린 것처럼 보입니다. */
-    <div className="yh-rise yh-coupon">
-      <div className="p-6 pb-7 sm:px-8 sm:pt-7">
+    /* 실물 쿠폰의 구조 — 왼쪽은 읽는 면, 절취선 오른쪽은 뜯어 가는 면.
+       쿠폰함 티켓과 같은 형태라 두 화면이 같은 물건으로 읽힙니다.
+
+       앞서 세 수치(할인·마감·수량)를 가로로 나란히 놓았습니다. 폭 1112px 짜리 카드에서
+       한 칸이 340px 인데 내용은 100px 남짓이라, 셋이 서로 관계없이 떠 있는 섬처럼
+       보였습니다. 뜯는 면도 왼쪽 끝 버튼 하나와 오른쪽 끝 작은 글자 하나뿐이라
+       가운데 800px 가 비었습니다.
+
+       그래서 **읽을 것과 할 것으로** 가릅니다. 왼쪽은 "무엇을 얼마나" (브랜드·이름·
+       할인·재고), 오른쪽은 "언제까지, 지금 하기" (카운트다운·발급 버튼). 서두르게
+       만드는 시계는 버튼 옆에 있어야 일을 합니다.
+
+       노치(반원)는 못 씁니다 — 이 카드는 네이비 띠와 종이 면 두 배경에 걸쳐 있어서
+       반원을 한 색으로 칠하면 한쪽에서는 카드 위에 뜬 동그라미가 됩니다.
+       좁은 화면에서는 카드가 종이 면 위에만 놓이므로 그때만 노치를 뚫습니다.
+
+       좌우로 가르는 시점은 sm(640px)이 아니라 md(768px)입니다. 640px 에서 갈랐더니
+       오른쪽 20rem 을 떼고 남은 왼쪽에서 재고 칸이 76px 까지 눌려 게이지가 손톱만
+       해졌습니다(실측). 그 폭에서는 위아래로 쌓는 쪽이 낫습니다. */
+    <div className="yh-rise yh-coupon grid md:grid-cols-[minmax(0,1fr)_auto_20rem]">
+      <div className="min-w-0 p-6 md:p-8">
         <div className="flex flex-wrap items-center gap-3">
           <span className="yh-live">
             <span className="live-dot" />
@@ -240,11 +254,11 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
 
         <h1 className="yh-hero mt-4">{round.name}</h1>
 
-        {/* 세 값이 한 줄에 놓여야 "얼마나 싸고, 얼마나 남았고, 몇 장 남았나" 가
-            한눈에 비교됩니다. 라벨을 같은 높이에 두려면 크기도 같아야 합니다. */}
-        {/* 좁은 화면에서 셋을 세로로 쌓으면 카드가 첫 화면을 넘깁니다.
-            할인·마감을 두 칸으로 두고 남은 수량은 한 줄로 눕힙니다. */}
-        <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:mt-7 sm:grid-cols-3 sm:gap-x-10 sm:gap-y-6">
+        {/* 할인과 재고는 같은 질문("이 쿠폰이 지금 쓸 만한가")의 두 쪽이라 붙여 둡니다.
+            할인은 폭이 글자 수에 따라 달라지므로 auto, 재고는 게이지가 남는 폭을 씁니다. */}
+        {/* 좁은 화면에서 둘을 세로로 쌓으면 카드가 579px 이 되어 발급 버튼이 화면
+            아래로 내려갑니다(실측). 두 칸으로 눕히면 게이지가 좁아질 뿐입니다. */}
+        <div className="mt-7 grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-6 md:gap-x-10">
           <div>
             <p className="yh-label">할인</p>
             <p className="yh-figure mt-1.5 text-yh-navy">
@@ -253,20 +267,13 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
             <p className="yh-small mt-2 text-yh-ink-2">{discountDetail(round)}</p>
           </div>
 
-          <div>
-            <p className="yh-label">마감까지</p>
-            <p className={`yh-figure mt-1.5 ${urgent ? "text-yh-accent" : "text-yh-navy"}`}>
-              <Countdown target={Date.parse(round.closeAt)} />
-            </p>
-            <p className="yh-num yh-small mt-2 text-yh-ink-2">
-              {formatDateTime(round.closeAt)} 마감
-            </p>
-          </div>
-
-          <div>
+          <div className="min-w-0">
             <p className="yh-label">남은 수량</p>
             <p className={`yh-figure yh-num mt-1.5 ${urgent ? "text-yh-accent" : "text-yh-navy"}`}>
               {remaining.toLocaleString("ko-KR")}
+              <span className="yh-small yh-num ml-2 align-baseline font-medium text-yh-ink-2">
+                / {round.totalQuantity.toLocaleString("ko-KR")}
+              </span>
             </p>
             <div className="mt-3">
               <StockGauge remaining={remaining} total={round.totalQuantity} label={false} />
@@ -275,28 +282,39 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
         </div>
       </div>
 
-      {/* 절취선. 카드가 종이 면 위에만 놓이는 높이라 노치가 제대로 뚫립니다. */}
-      <div className="yh-tear mx-6 sm:mx-8" />
+      <div className="yh-tear mx-6 md:hidden" />
+      <div className="yh-tear-y-plain hidden md:block" />
 
-      {/* 뜯어 가는 쪽입니다. 종이 색(--yh-paper)으로 두면 페이지 바탕과 정확히
-          같은 값이라(#f6f9fd) 절취선 아래가 카드 밖처럼 보입니다. 한 단계 눌러
-          두 면을 갈라 놓습니다 — 쿠폰함 티켓의 번호 칸과 같은 처리입니다. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-b-[15px] bg-yh-paper-2 px-6 py-5 sm:px-8">
-        <Link
-          to="/events/$couponRoundId"
-          params={{ couponRoundId: String(round.id) }}
-          className="yh-btn-live"
-        >
-          발급받기
-        </Link>
-        {/* "전체 일정 보기" 를 여기 두지 않습니다. 바로 아래 일정 섹션 머리에 같은
-            버튼이 있고 헤더 네비에도 같은 곳으로 가는 항목이 있어서, 한 화면에
-            같은 말이 셋이었습니다. 이 카드의 일은 "이 회차를 받는 것" 하나입니다. */}
-        <p className="yh-small ml-auto text-yh-ink-3">
-          {eligible
-            ? `${gradesLabel(round.eligibleGrades)} 참여 가능`
-            : `${gradesLabel(round.eligibleGrades)} 전용`}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4 rounded-b-[15px] bg-yh-paper-2 p-6 md:flex-col md:flex-nowrap md:items-stretch md:justify-center md:gap-6 md:rounded-b-none md:rounded-r-[15px] md:p-8">
+        <div>
+          <p className="yh-label">마감까지</p>
+          {/* 20rem 칸 안이라 히어로 수치보다 한 단계 작게 둡니다 — 같은 크기면 넘칩니다 */}
+          <p
+            className={`yh-figure yh-num mt-1.5 text-[2.25rem] ${
+              urgent ? "text-yh-accent" : "text-yh-navy"
+            }`}
+          >
+            <Countdown target={Date.parse(round.closeAt)} />
+          </p>
+          <p className="yh-num yh-small mt-1.5 text-yh-ink-2">
+            {formatDateTime(round.closeAt)} 마감
+          </p>
+        </div>
+
+        <div className="min-w-[9rem] flex-1">
+          <Link
+            to="/events/$couponRoundId"
+            params={{ couponRoundId: String(round.id) }}
+            className="yh-btn-live w-full"
+          >
+            발급받기
+          </Link>
+          <p className="yh-small mt-3 text-center text-yh-ink-3">
+            {eligible
+              ? `${gradesLabel(round.eligibleGrades)} 참여 가능`
+              : `${gradesLabel(round.eligibleGrades)} 전용`}
+          </p>
+        </div>
       </div>
     </div>
   );

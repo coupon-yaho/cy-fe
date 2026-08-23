@@ -734,7 +734,7 @@
   /* 한글은 라틴보다 글자폭이 고르고 속공간이 커서, 큰 크기에서 자간을 더 조여야
      낱글자가 흩어져 보이지 않습니다. */
   letter-spacing: -0.038em;
-  text-wrap: balance;
+  text-wrap-style: balance;
 }
 
 @utility yh-title {
@@ -743,7 +743,7 @@
   font-weight: 700;
   line-height: 1.22;
   letter-spacing: -0.03em;
-  text-wrap: balance;
+  text-wrap-style: balance;
 }
 
 @utility yh-sub {
@@ -761,7 +761,11 @@
   line-height: 1.72;
   letter-spacing: -0.014em;
   /* 마지막 줄에 한 단어만 남는 것을 막습니다 */
-  text-wrap: pretty;
+  /* 짧은 마지막 줄을 막습니다. **shorthand 를 쓰면 안 됩니다** — text-wrap 은
+     mode 와 style 을 함께 정하는 축약형이라, nowrap 인 부모 안에서 이 값을 쓰면
+     mode 가 wrap 으로 되돌아갑니다. 실제로 "6,240 / 12,000" 의 분모가 숫자에서
+     떨어져 다음 줄로 넘어갔습니다(실측). style 만 정하는 longhand 를 씁니다. */
+  text-wrap-style: pretty;
 }
 
 @utility yh-body {
@@ -769,7 +773,7 @@
   font-weight: 450;
   line-height: 1.65;
   letter-spacing: -0.01em;
-  text-wrap: pretty;
+  text-wrap-style: pretty;
 }
 
 @utility yh-small {
@@ -777,7 +781,7 @@
   font-weight: 450;
   line-height: 1.55;
   letter-spacing: -0.006em;
-  text-wrap: pretty;
+  text-wrap-style: pretty;
 }
 
 @utility yh-label {
