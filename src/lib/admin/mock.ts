@@ -23,6 +23,7 @@ import {
 import { brandOf } from "@/lib/coupon/brands";
 import { readQueueSettings, writeQueueSettings } from "@/lib/runtime-config";
 import type { AdminApi } from "./contract";
+import { WINDOW_NAME } from "./types";
 import type {
   ActionSeverity,
   AdminAnalyticsResponse,
@@ -37,6 +38,7 @@ import type {
   GapType,
   GapValue,
   LatencyGroupStat,
+  Percentiles,
   HistorySlice,
   IssuanceAttemptEvent,
   IssuanceHistoryRow,
@@ -953,11 +955,9 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
       };
     });
 
-  const trafficCounter = (key: TrafficKey, label: string, value: number) => ({
-    key,
-    label,
-    value: value === 0 && t > LOAD_END_T ? sv(0, "NO_TRAFFIC", now) : sv(value, "VALID", now),
-  });
+  // 트래픽이 0 인 것은 장애가 아닙니다 — NO_TRAFFIC 은 값 0 을 그대로 싣습니다(carriesValue).
+  const trafficCounter = (value: number) =>
+    value === 0 && t > LOAD_END_T ? sv(0, "NO_TRAFFIC", now) : sv(value, "VALID", now);
 
   return {
     meta: meta(now, window, {
@@ -967,8 +967,10 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
       KAFKA: draining ? "PENDING" : "VALID",
       IN_MEMORY: "VALID",
     }),
-    window,
+    window: WINDOW_NAME[window],
+    snapshotAt: new Date(now).toISOString(),
     scope: {
+      type: "GLOBAL",
       runId: "bm_20260820_soak_v3",
       engine: "v3",
       queueMode: readQueueSettings().mode,
@@ -976,40 +978,6 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
       instances: 4,
       aggregation: "max",
       runState,
-    },
-    kpi: {
-      overIssued: draining ? gapAbsent("PENDING", now) : gv(0, "VALID", now),
-      overIssuedZeroSeconds: Math.min(60, Math.round(t - 4)),
-      gapsValid: 2,
-      gapsPending: draining ? 2 : 0,
-      issueAttemptRps: attempts === 0 ? sv(0, "NO_TRAFFIC", now) : sv(attempts, "VALID", now),
-      issueAttemptDelta: Math.round(wobble(t, 41, 260)),
-      attemptBreakdown: {
-        success: issueSuccessTps(t),
-        reject: policyRejectRps(t),
-        queued: queueAcceptedRps(t),
-      },
-      issueP99Ms: attempts === 0 ? absent<number>("NO_TRAFFIC", now) : sv(p99, "VALID", now),
-      issueP99Delta: Math.round(wobble(t, 42, 60)),
-      issueP99TargetMs: 500,
-      systemFailureRate:
-        attempts === 0
-          ? absent<number>("NO_TRAFFIC", now, "분모가 0입니다")
-          : sv(Number(((failures / attempts) * 100).toFixed(3)), "VALID", now),
-      systemFailureTargetPct: 0.1,
-      persistLag: sv(lag, "VALID", now),
-      persistLagDeltaPerSec: draining ? -1240 : 0,
-      persistLagDrainSeconds: draining ? Math.ceil(lag / CONSUME_RPS) : 0,
-      breakers: [
-        { name: "dbCB", failureRate: sv(8, "VALID", now), state: "CLOSED" },
-        { name: "redisCB", failureRate: sv(4, "VALID", now), state: "CLOSED" },
-        {
-          name: "kafkaCB",
-          failureRate: absent<number>("WARMING_UP", now),
-          state: null,
-        },
-      ],
-      breakerThresholdPct: 50,
     },
     consistency: {
       phase: draining ? "LIVE" : "FINAL",
@@ -1020,60 +988,60 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
       overIssued: draining ? gapAbsent("PENDING", now) : gv(0, "VALID", now),
       issuedPlusUsed: issuedByTime(t),
       totalQuantity: RUN_STOCK,
-      gaps: (["LUA_GAP", "ACTIVE_DB_GAP", "PERSIST_GAP", "DB_COUNTER_GAP"] as GapType[]).map(
-        (type) => ({
-          type,
-          value: gapValue(type),
-        }),
-      ),
+      // 서버는 gap 을 평탄한 필드로 내려줍니다 (admin-api-spec §6.1)
+      luaGap: gapValue("LUA_GAP"),
+      activeDbGap: gapValue("ACTIVE_DB_GAP"),
+      dbCounterGap: gapValue("DB_COUNTER_GAP"),
+      persistGap: gapValue("PERSIST_GAP"),
     },
     latency: {
-      success: {
-        p50: sv(Math.round(p99 * 0.137), "VALID", now),
-        p95: sv(Math.round(p99 * 0.394), "VALID", now),
-        p99: sv(p99, "VALID", now),
-        targetMs: 500,
-        percentileMode: "instance-max",
-        series: windowSeries(now, window, (x) => ({
-          p50: Math.round(successP99(x) * 0.137),
-          p95: Math.round(successP99(x) * 0.394),
-          p99: successP99(x),
-        })),
-        groups: latencyGroups(SUCCESS_GROUP_FACTOR, successP99),
-      },
-      failure: {
-        p50: sv(0.8, "VALID", now),
-        p95: sv(2, "VALID", now),
-        p99: sv(4, "VALID", now),
-        systemFailureP99Ms: sv(1204, "VALID", now, "축이 달라 별도 표기"),
-        series: windowSeries(now, window, (x) => ({
-          p50: Number((0.8 + wobble(x, 51, 0.2)).toFixed(2)),
-          p95: Number((2 + wobble(x, 52, 0.4)).toFixed(2)),
-          p99: Number((4 + wobble(x, 53, 0.6)).toFixed(2)),
-        })),
-        groups: latencyGroups(FAILURE_GROUP_FACTOR, (x) => 4 + wobble(x, 53, 0.6)),
-      },
-      dependency: {
-        redisP99Ms: sv(1.2, "VALID", now),
-        hikariP99Ms: sv(118, "VALID", now),
-        kafkaAvgMs: sv(9, "VALID", now),
-        // 통계 종류가 서로 달라 절대 ms 를 한 축에 두지 않고 계열별 최댓값 대비 %로 정규화합니다.
-        series: windowSeries(now, window, (x) => ({
-          redis: Math.round(60 + wobble(x, 61, 18)),
-          hikari: Math.round(88 + wobble(x, 62, 10)),
-          kafka: Math.round(42 + wobble(x, 63, 14)),
-        })),
-      },
+      // 백분위 3종은 한 원천에서 같이 나옵니다 — 상태도 하나입니다.
+      success: sv(
+        {
+          p50Millis: Math.round(p99 * 0.137),
+          p95Millis: Math.round(p99 * 0.394),
+          p99Millis: p99,
+        },
+        "VALID",
+        now,
+      ),
+      // 실패 경로는 OBS-4 Timer 가 outcome 을 둘로만 등록해 아직 분리되지 않습니다.
+      policyReject: absent<Percentiles>("PENDING", now),
+      systemFailure: absent<Percentiles>("PENDING", now),
+      successSeries: windowSeries(now, window, (x) => ({
+        p50: Math.round(successP99(x) * 0.137),
+        p95: Math.round(successP99(x) * 0.394),
+        p99: successP99(x),
+      })),
+      groups: latencyGroups(SUCCESS_GROUP_FACTOR, successP99),
     },
+    dependencies: {
+      redis: sv({ p95Millis: 0.9, p99Millis: 1.2, errorRate: 0 }, "VALID", now),
+      hikari: sv({ p95Millis: 96, p99Millis: 118, errorRate: 0 }, "VALID", now),
+      kafka: sv({ p95Millis: 7, p99Millis: 9, errorRate: 0 }, "VALID", now),
+    },
+    persistence: sv(
+      {
+        lagTotal: lag,
+        partitionMax: Math.round(lag / 12),
+        arrivalRate: issueSuccessTps(t),
+        consumeRate: CONSUME_RPS,
+        netDrainRate: issueSuccessTps(t) - CONSUME_RPS,
+        drainEtaMillis: draining ? Math.ceil(lag / CONSUME_RPS) * 1000 : null,
+      },
+      "VALID",
+      now,
+    ),
+    circuitBreakers: [
+      { name: "dbCB", state: "CLOSED" as const },
+      { name: "redisCB", state: "CLOSED" as const },
+    ],
     traffic: {
-      counters: [
-        trafficCounter("totalRps", "전체 요청", totalRps(t)),
-        trafficCounter("issueAttemptRps", "발급 시도", attempts),
-        trafficCounter("issueSuccessTps", "발급 성공", issueSuccessTps(t)),
-        trafficCounter("queueAcceptedRps", "대기 진입", queueAcceptedRps(t)),
-        trafficCounter("policyRejectRps", "정책 거절", policyRejectRps(t)),
-        trafficCounter("systemFailureRps", "시스템 실패", failures),
-      ],
+      issueAttemptRps: trafficCounter(attempts),
+      issueSuccessTps: trafficCounter(issueSuccessTps(t)),
+      queueAcceptedRps: trafficCounter(queueAcceptedRps(t)),
+      policyRejectRps: trafficCounter(policyRejectRps(t)),
+      systemFailureRps: trafficCounter(failures),
       series: windowSeries(now, window, (x) => ({
         issueSuccessTps: issueSuccessTps(x),
         queueAcceptedRps: queueAcceptedRps(x),
