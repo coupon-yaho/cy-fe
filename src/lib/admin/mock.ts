@@ -1091,26 +1091,31 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
         {
           key: "dependencyFailure",
           label: "dependencyFailure",
-          definition: "503 중 의존성 · CB 원인",
+          definition: "httpStatus >= 500 && dependency != NONE",
           excludedFromNumerator: false,
-          rate: attempts === 0 ? absent<number>("NO_TRAFFIC", now) : sv(0, "VALID", now),
+          // 요청이 0건이면 나눌 것이 없어 비율이 "0" 이 아니라 정의되지 않습니다
+          rate:
+            attempts === 0
+              ? absent<number>("N_A", now, "요청 없음 — 발급 시도 0건이라 비율이 정의되지 않습니다")
+              : sv(0, "VALID", now),
         },
         {
           key: "applicationFailure",
           label: "applicationFailure",
-          definition: "5xx 전부에서 dependencyFailure 를 뺀 값",
+          definition: "httpStatus >= 500 && dependency == NONE (뺄셈 아닌 독립 판정)",
           excludedFromNumerator: false,
           rate:
             attempts === 0
-              ? absent<number>("NO_TRAFFIC", now)
+              ? absent<number>("N_A", now, "요청 없음 — 발급 시도 0건이라 비율이 정의되지 않습니다")
               : sv(Number(((failures / attempts) * 100).toFixed(3)), "VALID", now),
         },
         {
           key: "clientObservedFailure",
           label: "clientObservedFailure",
           definition: "k6 timeout · connection error · 기대 밖 응답",
-          excludedFromNumerator: false,
-          rate: sv(0.02, "VALID", now),
+          excludedFromNumerator: true,
+          // 부하 생성기 업로드가 범위 밖이라 원천이 없습니다. 0 으로 그리면 "클라이언트 실패 없음" 이라는 거짓 신호가 됩니다
+          rate: absent<number>("N_A", now, "부하 생성기 지표 업로드 범위 밖"),
         },
         {
           key: "policyReject",
@@ -1119,7 +1124,7 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
           excludedFromNumerator: true,
           rate:
             attempts === 0
-              ? absent<number>("NO_TRAFFIC", now)
+              ? absent<number>("N_A", now, "요청 없음 — 발급 시도 0건이라 비율이 정의되지 않습니다")
               : sv(Number(((policyRejectRps(t) / attempts) * 100).toFixed(1)), "VALID", now),
         },
       ],
@@ -1128,14 +1133,15 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
         return {
           dependencyFailure: 0,
           applicationFailure: Number(((systemFailureRps(x) / a) * 100).toFixed(3)),
-          clientObservedFailure: Number((0.02 + wobble(x, 71, 0.01)).toFixed(3)),
+          // clientObservedFailure 는 N_A 라 계열을 만들지 않습니다 (없는 값을 선으로 그리지 않음)
         };
       }),
       // 차단기가 모두 CLOSED 라 의존성 실패는 0 입니다. 원인도 애플리케이션 쪽만 남습니다.
       topReasons: (() => {
+        // 클라이언트 관측 실패는 원천이 없어(N_A) 원인 목록에도 지어내지 않습니다
         const appWindow = Math.round(failures * 60);
-        const clientWindow = Math.round(attempts * 0.0002 * 60);
-        return [
+        // 0 건 행을 거르는 건 서버가 아니라 화면 몫입니다 (백엔드 3차 회신 2절)
+        const rows = [
           {
             httpStatus: 500,
             reasonCode: "APP_REDIS_COMMAND_TIMEOUT · i-3",
@@ -1151,10 +1157,8 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
             reasonCode: "APP_SERIALIZATION_ERROR",
             count: Math.round(appWindow * 0.15),
           },
-          { httpStatus: "k6" as const, reasonCode: "CLIENT_CONNECTION_RESET", count: clientWindow },
-        ]
-          .filter((r) => r.count > 0)
-          .sort((a, b) => b.count - a.count);
+        ];
+        return rows.sort((a, b) => b.count - a.count);
       })(),
     },
     saturation: {

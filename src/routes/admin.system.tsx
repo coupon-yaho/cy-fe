@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { SeriesChart, SeriesLegend, UtilBar, type SeriesSpec } from "@/components/admin/charts";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
@@ -11,6 +11,7 @@ import {
   GAP_LABEL,
   adminApi,
   type AdminMetricsResponse,
+  type ErrorPanel,
   type MetricsWindow,
 } from "@/lib/admin";
 
@@ -523,17 +524,40 @@ function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
 /* ── E ───────────────────────────────────────────── */
 
 function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
-  const e = data.errors;
+  // 서버(OBS-13 본체)가 아직 errors 를 내려주지 않습니다. 계약상 필수 필드라 타입에는 있지만
+  // 실응답에는 없어서, 없는 채로 렌더하면 화면이 죽습니다. 0 으로 채우지 않고 미구현이라 적습니다.
+  const e = data.errors as ErrorPanel | undefined;
+  if (!e) {
+    return (
+      <Panel title="실패 분류">
+        <p className="t-body-sm text-hig-muted">
+          서버가 실패 분류를 아직 내려주지 않습니다 — 백엔드 OBS-13 구현 대기.
+        </p>
+      </Panel>
+    );
+  }
+  // 분모는 서버가 denominator 로 알려줍니다. 화면에 문자열을 박으면 서버가 바꿔도 캡션이 거짓말합니다.
+  const denominatorLabel =
+    data.traffic.counters.find((c) => c.key === e.denominator)?.label ?? e.denominator;
   const series: SeriesSpec[] = [
     { key: "dependencyFailure", label: "의존성", color: "var(--viz-2)" },
     { key: "applicationFailure", label: "애플리케이션", color: "var(--viz-8)" },
-    { key: "clientObservedFailure", label: "클라이언트 관측", color: "var(--viz-7)" },
+    // clientObservedFailure 는 원천이 없어 N_A 입니다 — 선으로 그리지 않습니다
   ];
+  // 0 건 행을 거르는 건 서버가 아니라 화면 몫입니다 (백엔드 3차 회신 2절)
+  const visibleReasons = e.topReasons.filter((r) => r.count > 0);
+  // 판정식(서버가 내려주는 사실)과 "지금 이 값을 믿지 마라"(한시적 경고)는 성격이 다릅니다.
+  // 서버 definition 에 섞지 않고 화면 상수로 둡니다 — OBS-5 후속(발급 경로 dependency 표기)이
+  // 끝나면 이 상수만 지우면 됩니다.
+  const CAVEAT: Partial<Record<ErrorPanel["classes"][number]["key"], string>> = {
+    dependencyFailure:
+      "발급 경로가 dependency 를 아직 표기하지 않아 실제 의존성 장애는 applicationFailure 에 섞입니다 (OBS-5 후속 대기)",
+  };
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
-        <TablePanel title="실패 분류" hint="발급 시도 기준">
+        <TablePanel title="실패 분류" hint={`${denominatorLabel} 기준`}>
           <table className="ops-table">
             <thead>
               <tr>
@@ -545,15 +569,28 @@ function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
             <tbody>
               {e.classes.map((c) => (
                 <tr key={c.key}>
-                  <td className="num font-medium">
+                  <td className="num font-medium whitespace-nowrap">
                     {c.label}
                     {c.excludedFromNumerator && (
                       <span className="t-caption block font-normal text-hig-muted">
                         비율에서 제외
                       </span>
                     )}
+                    {c.key === "policyReject" && (
+                      <Link
+                        to="/admin"
+                        className="t-caption block font-normal whitespace-nowrap text-hig-link hover:underline"
+                      >
+                        구성비는 운영 현황에서 →
+                      </Link>
+                    )}
                   </td>
-                  <td className="text-hig-secondary">{c.definition}</td>
+                  <td className="text-hig-secondary">
+                    {c.definition}
+                    {CAVEAT[c.key] && (
+                      <span className="t-caption mt-1 block text-attention">⚠ {CAVEAT[c.key]}</span>
+                    )}
+                  </td>
                   <td className="num text-right font-semibold">
                     <StatedValue source={c.rate} render={(v) => `${v}%`} />
                   </td>
@@ -566,7 +603,14 @@ function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
         <TablePanel title="실패 원인 Top 5">
           <table className="ops-table">
             <tbody>
-              {e.topReasons.map((r) => (
+              {visibleReasons.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="t-caption text-hig-muted">
+                    실패 원인 없음
+                  </td>
+                </tr>
+              )}
+              {visibleReasons.map((r) => (
                 <tr key={r.reasonCode}>
                   <td className="num w-10 text-hig-muted">{r.httpStatus}</td>
                   <td className="num">{r.reasonCode}</td>
