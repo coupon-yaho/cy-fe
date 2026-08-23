@@ -71,12 +71,30 @@ const COPY: Record<string, Copy> = {
   "COUPON-405": { title: "처리하고 있습니다", next: "잠시 후 다시 확인해 주세요." },
   "COUPON-409": { title: "취소할 사용 내역이 없습니다" },
 
-  "COUPON-102": { title: "쿠폰 템플릿을 찾을 수 없습니다" },
-  "COUPON-101": {
+  /* 템플릿·회차는 접두어가 다릅니다. 발급/사용은 COUPON- 이지만
+     이 둘은 COUPON_TEMPLATE- · COUPON_ROUND- 입니다(백엔드 enum 실측).
+     앞서 COUPON-101 처럼 적어 두어서 실서버가 붙으면 안내 문구가 안 잡혔습니다. */
+  "COUPON_TEMPLATE-102": { title: "쿠폰 템플릿을 찾을 수 없습니다" },
+  "COUPON_TEMPLATE-101": {
     title: "템플릿 값이 올바르지 않습니다",
     next: "정책·수량·일정 항목을 확인하세요.",
   },
-  "COUPON-201": { title: "같은 일정의 회차가 이미 있습니다", next: "오픈 시각을 바꿔 주세요." },
+  "COUPON_TEMPLATE-103": {
+    title: "템플릿을 저장하지 못했습니다",
+    next: "잠시 후 다시 시도해 주세요.",
+  },
+  "COUPON_ROUND-201": {
+    title: "같은 일정의 회차가 이미 있습니다",
+    next: "오픈 시각을 바꿔 주세요.",
+  },
+  "COUPON_ROUND-202": {
+    title: "그 시간에 다른 발급이 예약돼 있습니다",
+    next: "겹치지 않는 시각으로 옮겨 주세요.",
+  },
+  "COUPON_ROUND-203": {
+    title: "예약 시각이 올바르지 않습니다",
+    next: "오픈은 지금 이후, 마감은 오픈 뒤 24시간 안이어야 합니다.",
+  },
 
   "COMMON-001": { title: "입력값을 확인해 주세요" },
   "COMMON-002": { title: "찾을 수 없습니다" },

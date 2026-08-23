@@ -9,6 +9,8 @@
  */
 import type {
   BrandDay,
+  CouponRoundReservation,
+  CouponRoundReservationRequest,
   CalendarEntry,
   CouponCancelResponse,
   CouponCancelUseResponse,
@@ -91,6 +93,18 @@ export interface CouponApi {
     member: MemberContext,
     idempotencyKey: string,
   ): Promise<CouponCancelResponse>;
+
+  /**
+   * ✅ POST /api/v1/admin/coupon-templates/{couponTemplateId}/rounds → 201
+   *
+   * 템플릿에서 회차 한 건을 예약합니다. 평소에는 배치
+   * (CouponRoundGenerationScheduler)가 규칙대로 미리 찍어 두고,
+   * 이 API 는 그 밖의 회차를 끼워 넣을 때 씁니다.
+   */
+  reserveRound(
+    couponTemplateId: number,
+    request: CouponRoundReservationRequest,
+  ): Promise<CouponRoundReservation>;
 
   /** ✅ GET /api/v1/admin/coupon-templates */
   listTemplates(params?: { page?: number; size?: number }): Promise<Page<CouponTemplateDetail>>;

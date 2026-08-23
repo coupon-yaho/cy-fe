@@ -18,6 +18,8 @@ import type {
   CouponCancelResponse,
   CouponCancelUseResponse,
   CouponIssueResponse,
+  CouponRoundReservation,
+  CouponRoundReservationRequest,
   CouponRoundView,
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
@@ -166,6 +168,13 @@ export function createHttpApi(baseUrl: string): CouponApi {
       call<CouponCancelResponse>(`/api/v1/coupons/${issuanceId}/cancel`, {
         method: "POST",
         headers: { ...memberHeaders(member), [IDEMPOTENCY_KEY]: idempotencyKey },
+      }),
+
+    reserveRound: (couponTemplateId, request: CouponRoundReservationRequest) =>
+      call<CouponRoundReservation>(`/api/v1/admin/coupon-templates/${couponTemplateId}/rounds`, {
+        method: "POST",
+        headers: admin,
+        body: JSON.stringify(request),
       }),
 
     listTemplates: (params = {}) => {

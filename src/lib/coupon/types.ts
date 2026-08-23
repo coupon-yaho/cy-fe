@@ -182,6 +182,35 @@ export interface MemberCoupon {
   orderId: number | null;
 }
 
+/* ── 회차 예약 ─────────────────────────────────────────
+   POST /api/v1/admin/coupon-templates/{couponTemplateId}/rounds
+
+   템플릿(반복 규칙) 하나를 골라 **실제 회차 한 건**을 찍어 냅니다.
+   재고는 템플릿의 stockPerOccurrence 로 백엔드가 알아서 초기화합니다.
+
+   백엔드 검증(CouponRoundReservationService + 요청 DTO 실측):
+     · 템플릿이 존재하고 active 여야 합니다
+     · openAt 은 지금 이후여야 합니다
+     · closeAt > openAt 이고 둘 사이가 24시간 이내여야 합니다
+   위반하면 COUPON_ROUND-203, 시간이 겹치면 -202, 같은 일정이 있으면 -201. */
+
+export interface CouponRoundReservationRequest {
+  /** ISO 8601 (Instant) */
+  openAt: string;
+  /** ISO 8601 (Instant) */
+  closeAt: string;
+}
+
+export interface CouponRoundReservation {
+  id: number;
+  templateId: number;
+  brandId: number;
+  name: string;
+  openAt: string;
+  closeAt: string;
+  status: CouponRoundStatus;
+}
+
 /* ── 쿠폰 회차 조회 ────────────────────────────────────
    백엔드 미구현. CouponRound 도메인 레코드 필드 그대로 잡아 두었으므로
    컨트롤러가 붙으면 이 타입 그대로 씁니다. PRD 대기열 규약(§입장과 발급의 분리)도 같습니다. */

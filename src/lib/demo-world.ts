@@ -391,12 +391,21 @@ export interface RoundState {
   queueEtaSeconds: number | null;
 }
 
-function buildRoundState(t: CouponTemplateDetail, now: number): RoundState {
+function buildRoundState(
+  t: CouponTemplateDetail,
+  now: number,
+  /* 예약으로 만들어진 회차는 규칙이 아니라 **지정된 시각**을 씁니다.
+     이게 없으면 예약을 해도 화면에는 규칙에서 계산한 회차만 보여서,
+     방금 예약한 것이 어디로 갔는지 알 수 없습니다. */
+  fixed?: { id: number; openAt: number; closeAt: number },
+): RoundState {
   const demo = demoOf(t.id, t.brandId);
   const ref = new Date(now);
 
   let openAt: number;
-  if (demo.openOffsetMin !== undefined) {
+  if (fixed) {
+    openAt = fixed.openAt;
+  } else if (demo.openOffsetMin !== undefined) {
     openAt = snap5(now + demo.openOffsetMin * MINUTE);
   } else {
     const thisMonth = nthWeekdayOf(
@@ -415,19 +424,21 @@ function buildRoundState(t: CouponTemplateDetail, now: number): RoundState {
     );
     openAt = thisMonth + t.durationHours * HOUR > now ? thisMonth : nextMonth;
   }
-  const closeAt = openAt + t.durationHours * HOUR;
+  const closeAt = fixed ? fixed.closeAt : openAt + t.durationHours * HOUR;
   const total = t.stockPerOccurrence;
 
   // 오픈 전에는 아무도 못 받았고, 마감이 지난 회차는 완판으로 둡니다.
   const opened = now >= openAt;
   const finished = now >= closeAt;
   const sinceBootMin = Math.max(0, (Math.min(now, closeAt) - BOOT) / MINUTE);
-  const simulated = !opened
-    ? 0
-    : finished
-      ? total
-      : Math.floor(total * demo.consumed + sinceBootMin * demo.demandPerMinute);
-  const activeCount = Math.max(0, Math.min(total, simulated + issuedCountOf(t.id)));
+  const simulated =
+    fixed || !opened
+      ? 0
+      : finished
+        ? total
+        : Math.floor(total * demo.consumed + sinceBootMin * demo.demandPerMinute);
+  const roundId = fixed ? fixed.id : t.id;
+  const activeCount = Math.max(0, Math.min(total, simulated + issuedCountOf(roundId)));
 
   let status: CouponRoundStatus;
   if (now < openAt) status = "SCHEDULED";
@@ -443,7 +454,7 @@ function buildRoundState(t: CouponTemplateDetail, now: number): RoundState {
 
   return {
     round: {
-      id: t.id,
+      id: roundId,
       templateId: t.id,
       brandId: t.brandId,
       name: t.name,
@@ -474,11 +485,104 @@ function buildRoundState(t: CouponTemplateDetail, now: number): RoundState {
   };
 }
 
+/* ── 예약된 회차 ───────────────────────────────────
+   POST /admin/coupon-templates/{id}/rounds 가 만든 것들입니다.
+   규칙에서 계산되는 회차와 달리 시각이 못 박혀 있어 따로 들고 있습니다.
+   id 는 템플릿 id 와 겹치지 않게 9000번대에서 셉니다. */
+
+interface ReservedRound {
+  id: number;
+  templateId: number;
+  openAt: number;
+  closeAt: number;
+}
+
+const reserved: ReservedRound[] = [];
+let nextReservedId = 9001;
+
+/** 24시간 — 백엔드 요청 DTO 의 @AssertTrue 와 같은 값입니다 */
+export const MAX_ROUND_SPAN_MS = 24 * HOUR;
+
+export type ReserveFailure =
+  | "TEMPLATE_NOT_FOUND"
+  | "TEMPLATE_INACTIVE"
+  | "INVALID_SCHEDULE"
+  | "ALREADY_EXISTS"
+  | "SCHEDULE_CONFLICT";
+
+/**
+ * 회차 예약. 백엔드 CouponRoundReservationService 와 같은 순서로 검사합니다.
+ * 성공하면 만들어진 회차를, 실패하면 사유를 돌려줍니다 —
+ * 목이 화면용 문구를 정하지 않도록 사유만 주고 번역은 어댑터가 합니다.
+ */
+export function reserveRound(
+  templateId: number,
+  openAt: number,
+  closeAt: number,
+  now: number,
+): { ok: true; state: RoundState } | { ok: false; reason: ReserveFailure } {
+  const t = templates.find((x) => x.id === templateId);
+  if (!t) return { ok: false, reason: "TEMPLATE_NOT_FOUND" };
+  if (!t.active) return { ok: false, reason: "TEMPLATE_INACTIVE" };
+
+  if (
+    !Number.isFinite(openAt) ||
+    !Number.isFinite(closeAt) ||
+    closeAt <= openAt ||
+    closeAt - openAt > MAX_ROUND_SPAN_MS ||
+    openAt < now
+  ) {
+    return { ok: false, reason: "INVALID_SCHEDULE" };
+  }
+
+  const live = listRoundStates(now);
+
+  // 같은 템플릿을 같은 시각에 두 번 열 수 없습니다 (COUPON_ROUND-201).
+  // 백엔드 existsByTemplateIdAndOpenAt 와 같은 검사입니다.
+  if (
+    live.some((s) => s.round.templateId === templateId && Date.parse(s.round.openAt) === openAt)
+  ) {
+    return { ok: false, reason: "ALREADY_EXISTS" };
+  }
+
+  /* 시간이 겹치는 회차가 있으면 막습니다 (COUPON_ROUND-202).
+     **브랜드를 가리지 않습니다** — 백엔드 existsOverlappingSchedule 은 브랜드 조건 없이
+     전역으로 봅니다. 이 서비스는 한 시간대에 브랜드 데이가 하나만 열리게 설계돼 있습니다.
+     앞서 같은 브랜드만 보게 해 두어서 목이 백엔드보다 느슨했습니다.
+     이미 끝난 회차(CLOSED)는 대상이 아닙니다 — 백엔드도 SCHEDULED·OPEN 만 셉니다. */
+  const overlaps = live.some((s) => {
+    if (s.round.status === "CLOSED") return false;
+    const a = Date.parse(s.round.openAt);
+    const b = Date.parse(s.round.closeAt);
+    return openAt < b && closeAt > a;
+  });
+  if (overlaps) return { ok: false, reason: "SCHEDULE_CONFLICT" };
+
+  const entry: ReservedRound = { id: nextReservedId++, templateId, openAt, closeAt };
+  reserved.push(entry);
+  return { ok: true, state: buildRoundState(t, now, entry) };
+}
+
+function reservedStates(now: number): RoundState[] {
+  return reserved.flatMap((r) => {
+    const t = templates.find((x) => x.id === r.templateId && x.active);
+    return t ? [buildRoundState(t, now, r)] : [];
+  });
+}
+
 export function listRoundStates(now: number): RoundState[] {
-  return templates.filter((t) => t.active).map((t) => buildRoundState(t, now));
+  return [
+    ...templates.filter((t) => t.active).map((t) => buildRoundState(t, now)),
+    ...reservedStates(now),
+  ];
 }
 
 export function findRoundState(couponRoundId: number, now: number): RoundState | undefined {
+  const r = reserved.find((x) => x.id === couponRoundId);
+  if (r) {
+    const t = templates.find((x) => x.id === r.templateId && x.active);
+    return t ? buildRoundState(t, now, r) : undefined;
+  }
   const t = templates.find((x) => x.id === couponRoundId && x.active);
   return t ? buildRoundState(t, now) : undefined;
 }

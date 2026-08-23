@@ -23,6 +23,7 @@ import {
   mulberry32,
   putTemplate,
   remainingOf,
+  reserveRound as reserveRoundInWorld,
   saveStore,
   seedMember,
 } from "@/lib/demo-world";
@@ -45,8 +46,14 @@ import {
 /* ── 에러 카탈로그 (백엔드 enum 과 동일) ────────────── */
 
 const CATALOG: Record<string, { status: number; message: string }> = {
-  "COUPON-101": { status: 400, message: "쿠폰 템플릿 값이 올바르지 않습니다." },
-  "COUPON-102": { status: 404, message: "쿠폰 템플릿을 찾을 수 없습니다." },
+  "COUPON_TEMPLATE-101": { status: 400, message: "쿠폰 템플릿 값이 올바르지 않습니다." },
+  "COUPON_TEMPLATE-102": { status: 404, message: "쿠폰 템플릿을 찾을 수 없습니다." },
+  "COUPON_ROUND-201": { status: 409, message: "동일한 일정의 쿠폰 회차가 이미 존재합니다." },
+  "COUPON_ROUND-202": {
+    status: 409,
+    message: "해당 시간에는 다른 쿠폰 발급 이벤트가 예약되어 있습니다.",
+  },
+  "COUPON_ROUND-203": { status: 400, message: "쿠폰 회차 예약 시간이 올바르지 않습니다." },
   "COUPON-301": { status: 404, message: "쿠폰 회차를 찾을 수 없습니다." },
   "COUPON-302": { status: 409, message: "아직 쿠폰 발급이 시작되지 않았습니다." },
   "COUPON-303": { status: 409, message: "쿠폰 발급이 마감되었습니다." },
@@ -486,6 +493,38 @@ export function createMockApi(): CouponApi {
       });
     },
 
+    async reserveRound(couponTemplateId, request) {
+      await wait(150);
+      const now = Date.now();
+      const result = reserveRoundInWorld(
+        couponTemplateId,
+        Date.parse(request.openAt),
+        Date.parse(request.closeAt),
+        now,
+      );
+
+      /* 목이 화면 문구를 정하지 않습니다. 세계는 사유만 돌려주고
+         여기서 백엔드가 쓰는 코드로 옮깁니다 — 실서버가 붙어도 화면은 그대로입니다. */
+      if (!result.ok) {
+        if (result.reason === "TEMPLATE_NOT_FOUND") reject("COUPON_TEMPLATE-102");
+        if (result.reason === "TEMPLATE_INACTIVE") reject("COUPON_TEMPLATE-101");
+        if (result.reason === "ALREADY_EXISTS") reject("COUPON_ROUND-201");
+        if (result.reason === "SCHEDULE_CONFLICT") reject("COUPON_ROUND-202");
+        reject("COUPON_ROUND-203");
+      }
+
+      const r = result.state.round;
+      return {
+        id: r.id,
+        templateId: r.templateId,
+        brandId: r.brandId,
+        name: r.name,
+        openAt: r.openAt,
+        closeAt: r.closeAt,
+        status: r.status,
+      };
+    },
+
     async listTemplates(params = {}) {
       await wait(130);
       return paginate(listTemplates().slice(), params.page ?? 0, params.size ?? 20);
@@ -494,7 +533,7 @@ export function createMockApi(): CouponApi {
     async getTemplate(couponTemplateId) {
       await wait(90);
       const hit = findTemplate(couponTemplateId);
-      if (!hit) reject("COUPON-102");
+      if (!hit) reject("COUPON_TEMPLATE-102");
       return hit;
     },
 
@@ -506,7 +545,7 @@ export function createMockApi(): CouponApi {
     async updateTemplate(couponTemplateId, request) {
       await wait(220);
       const current = findTemplate(couponTemplateId);
-      if (!current) reject("COUPON-102");
+      if (!current) reject("COUPON_TEMPLATE-102");
       return putTemplate({
         id: couponTemplateId,
         active: current.active,
@@ -518,7 +557,7 @@ export function createMockApi(): CouponApi {
     async changeTemplateActivation(couponTemplateId, active) {
       await wait(160);
       const current = findTemplate(couponTemplateId);
-      if (!current) reject("COUPON-102");
+      if (!current) reject("COUPON_TEMPLATE-102");
       const updated: CouponTemplateDetail = { ...current, active };
       return putTemplate(updated);
     },

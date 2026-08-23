@@ -54,6 +54,7 @@ const TABS: { value: Tab; label: string }[] = [
 function CampaignAdmin() {
   const [tab, setTab] = useState<Tab>("rounds");
   const [editing, setEditing] = useState<CouponTemplateDetail | "new" | null>(null);
+  const [reserving, setReserving] = useState<CouponTemplateDetail | null>(null);
 
   return (
     <>
@@ -72,10 +73,11 @@ function CampaignAdmin() {
       />
 
       {tab === "rounds" && <RoundTable />}
-      {tab === "templates" && <TemplateTable onEdit={setEditing} />}
+      {tab === "templates" && <TemplateTable onEdit={setEditing} onReserve={setReserving} />}
       {tab === "analytics" && <Analytics />}
 
       <TemplateEditor target={editing} onClose={() => setEditing(null)} />
+      <RoundReserver target={reserving} onClose={() => setReserving(null)} />
     </>
   );
 }
@@ -162,7 +164,13 @@ function RoundTable() {
 
 /* ── 템플릿 ──────────────────────────────────────── */
 
-function TemplateTable({ onEdit }: { onEdit: (t: CouponTemplateDetail) => void }) {
+function TemplateTable({
+  onEdit,
+  onReserve,
+}: {
+  onEdit: (t: CouponTemplateDetail) => void;
+  onReserve: (t: CouponTemplateDetail) => void;
+}) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "templates"],
@@ -233,19 +241,190 @@ function TemplateTable({ onEdit }: { onEdit: (t: CouponTemplateDetail) => void }
                 </button>
               </td>
               <td className="text-right">
-                <button
-                  type="button"
-                  onClick={() => onEdit(t)}
-                  className="t-body-sm text-hig-link hover:underline"
-                >
-                  수정
-                </button>
+                <span className="inline-flex items-center gap-3">
+                  {/* 규칙을 만들 수는 있는데 그 규칙으로 회차를 여는 길이 화면에
+                      없었습니다. 백엔드에는 예약 API 가 이미 있습니다. */}
+                  <button
+                    type="button"
+                    disabled={!t.active}
+                    onClick={() => onReserve(t)}
+                    className="t-body-sm text-hig-link hover:underline disabled:text-hig-muted disabled:no-underline"
+                    title={t.active ? undefined : "비활성 템플릿으로는 회차를 예약할 수 없습니다"}
+                  >
+                    회차 예약
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEdit(t)}
+                    className="t-body-sm text-hig-link hover:underline"
+                  >
+                    수정
+                  </button>
+                </span>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
     </TablePanel>
+  );
+}
+
+/* ── 회차 예약 ───────────────────────────────────────
+   템플릿(반복 규칙) 하나로 실제 회차 한 건을 엽니다.
+   POST /api/v1/admin/coupon-templates/{id}/rounds — 백엔드에 이미 있는 API인데
+   화면에 동선이 없어서 만들어 둔 규칙을 열 방법이 없었습니다.
+
+   평소에는 배치가 규칙대로 미리 찍습니다. 이 화면은 그 밖의 회차 —
+   임시 이벤트나 놓친 회차를 끼워 넣는 자리입니다. */
+
+/** datetime-local 입력이 읽는 형식. 초는 버립니다. */
+function toLocalInput(ms: number): string {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60_000);
+  return d.toISOString().slice(0, 16);
+}
+
+/** 템플릿 규칙이 가리키는 다음 오픈 시각. 이미 지났으면 다음 달로 넘깁니다. */
+function nextOpenFor(t: CouponTemplateDetail, now: number): number {
+  const [h = 0, m = 0] = trimSeconds(t.startTime).split(":").map(Number);
+  const dayIndex = DAYS_OF_WEEK.indexOf(t.dayOfWeek);
+  const at = (year: number, month: number) => {
+    const first = new Date(year, month, 1);
+    // getDay 는 일=0 이고 DAYS_OF_WEEK 는 월=0 이라 맞춰 줍니다
+    const firstIdx = (first.getDay() + 6) % 7;
+    const day = 1 + ((dayIndex - firstIdx + 7) % 7) + (t.nthWeek - 1) * 7;
+    return new Date(year, month, day, h, m, 0, 0).getTime();
+  };
+  const ref = new Date(now);
+  const thisMonth = at(ref.getFullYear(), ref.getMonth());
+  return thisMonth > now ? thisMonth : at(ref.getFullYear(), ref.getMonth() + 1);
+}
+
+const HOUR_MS = 3_600_000;
+/** 백엔드 요청 DTO 의 @AssertTrue 와 같은 값입니다 */
+const MAX_SPAN_HOURS = 24;
+
+function RoundReserver({
+  target,
+  onClose,
+}: {
+  target: CouponTemplateDetail | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [openLocal, setOpenLocal] = useState("");
+  const [closeLocal, setCloseLocal] = useState("");
+  const [key, setKey] = useState<number | null>(null);
+
+  // 열릴 때마다 그 템플릿의 다음 회차 시각으로 채웁니다 — 규칙대로 여는 게 기본이고,
+  // 다르게 열고 싶을 때만 고치면 됩니다.
+  if (target && key !== target.id) {
+    setKey(target.id);
+    const open = nextOpenFor(target, Date.now());
+    setOpenLocal(toLocalInput(open));
+    setCloseLocal(toLocalInput(open + target.durationHours * HOUR_MS));
+  }
+
+  const openMs = openLocal ? new Date(openLocal).getTime() : NaN;
+  const closeMs = closeLocal ? new Date(closeLocal).getTime() : NaN;
+  const spanH = (closeMs - openMs) / HOUR_MS;
+
+  // 백엔드가 400 으로 돌려보낼 조건을 여기서 먼저 말해 줍니다.
+  let problem: string | null = null;
+  if (!Number.isFinite(openMs) || !Number.isFinite(closeMs))
+    problem = "오픈·마감 시각을 채워 주세요.";
+  else if (openMs < Date.now()) problem = "이미 지난 시각으로는 예약할 수 없습니다.";
+  else if (closeMs <= openMs) problem = "마감은 오픈보다 뒤여야 합니다.";
+  else if (spanH > MAX_SPAN_HOURS) problem = `한 회차는 ${MAX_SPAN_HOURS}시간을 넘길 수 없습니다.`;
+
+  const reserve = useMutation({
+    mutationFn: () =>
+      couponApi.reserveRound(target!.id, {
+        openAt: new Date(openMs).toISOString(),
+        closeAt: new Date(closeMs).toISOString(),
+      }),
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["rounds"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      toast.success(`${r.name} 회차를 예약했습니다`);
+      onClose();
+    },
+    onError: (e) => toast.error(errorLine(e)),
+  });
+
+  return (
+    <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-2xl sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="t-tile">회차 예약</DialogTitle>
+          <DialogDescription className="t-body-sm text-hig-secondary">
+            {target ? (
+              <>
+                {brandOf(target.brandId).name} · {target.name} 규칙으로 회차 한 건을 엽니다. 재고{" "}
+                {target.stockPerOccurrence.toLocaleString("ko-KR")}장은 템플릿에서 그대로 옵니다.
+              </>
+            ) : null}
+          </DialogDescription>
+        </DialogHeader>
+
+        {target && (
+          <div className="space-y-5 py-2">
+            <p className="t-body-sm rounded-xl bg-fill px-3.5 py-3 text-hig-secondary">
+              규칙: 매달 {NTH_WEEK_LABEL[target.nthWeek]} {DAY_LABEL[target.dayOfWeek]}{" "}
+              {trimSeconds(target.startTime)} · {target.durationHours}시간
+            </p>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="오픈">
+                <input
+                  type="datetime-local"
+                  value={openLocal}
+                  onChange={(e) => setOpenLocal(e.target.value)}
+                  className="input-line"
+                />
+              </Field>
+              <Field label="마감">
+                <input
+                  type="datetime-local"
+                  value={closeLocal}
+                  onChange={(e) => setCloseLocal(e.target.value)}
+                  className="input-line"
+                />
+              </Field>
+            </div>
+
+            <p className="t-body-sm text-hig-secondary">
+              {problem ? (
+                <span className="font-semibold text-viz-critical">{problem}</span>
+              ) : (
+                <>
+                  발급 시간 <span className="num font-semibold text-hig-fg">{spanH}시간</span> ·
+                  최대 {MAX_SPAN_HOURS}시간
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={onClose}
+            className="t-body px-4 text-hig-link hover:underline"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={!!problem || reserve.isPending}
+            onClick={() => reserve.mutate()}
+            className="btn-primary"
+          >
+            {reserve.isPending ? "예약하는 중" : "예약"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
