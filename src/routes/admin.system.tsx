@@ -462,22 +462,43 @@ function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
   ];
   const last = t.series[t.series.length - 1];
 
+  // 거절 = RPS − TPS 는 폐기됐습니다. totalRps 에는 /entry·/queue 폴링과 조회가 섞여
+  // 있어 그 차이가 거절이 아닙니다. 분모는 issueAttemptRps 하나이고 totalRps 는 배경
+  // 참고용이므로, 6개를 평평하게 늘어놓지 않고 역할별로 끊어서 보여 줍니다.
+  const denominator = t.counters.filter((c) => c.key === "issueAttemptRps");
+  const outcomes = t.counters.filter((c) => c.key !== "issueAttemptRps" && c.key !== "totalRps");
+  const background = t.counters.filter((c) => c.key === "totalRps");
+  const counterRow = (c: (typeof t.counters)[number]) => (
+    <tr key={c.key}>
+      <td className="font-medium">
+        {c.label}
+        <span className="num t-caption ml-2 text-hig-muted">{c.key}</span>
+      </td>
+      <td className="num text-right font-semibold">
+        <StatedValue source={c.value} render={(v) => v.toLocaleString("ko-KR")} />
+      </td>
+    </tr>
+  );
+  const groupRow = (label: string, note: string) => (
+    <tr>
+      <td className="t-caption pt-4 text-hig-muted" colSpan={2}>
+        <span className="font-semibold text-hig-secondary">{label}</span>
+        <span className="ml-2">{note}</span>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_1.6fr]">
-      <TablePanel title="결과 분류">
+      <TablePanel title="결과 분류" hint="분모는 발급 시도">
         <table className="ops-table">
           <tbody>
-            {t.counters.map((c) => (
-              <tr key={c.key}>
-                <td className="font-medium">
-                  {c.label}
-                  <span className="num t-caption ml-2 text-hig-muted">{c.key}</span>
-                </td>
-                <td className="num text-right font-semibold">
-                  <StatedValue source={c.value} render={(v) => v.toLocaleString("ko-KR")} />
-                </td>
-              </tr>
-            ))}
+            {groupRow("기준 분모", "비율 계산은 전부 이 값이 분모입니다")}
+            {denominator.map(counterRow)}
+            {groupRow("결과 분류", "합이 아니라 위의 발급 시도가 분모입니다")}
+            {outcomes.map(counterRow)}
+            {groupRow("배경 참고", "폴링·조회가 섞여 있어 분모로 쓰지 않습니다")}
+            {background.map(counterRow)}
           </tbody>
         </table>
       </TablePanel>

@@ -68,7 +68,17 @@ export function createHttpApi(baseUrl: string): CouponApi {
     }
 
     const text = await res.text();
-    const envelope = text ? (JSON.parse(text) as ResponseEnvelope<T>) : null;
+    // 게이트웨이가 502·504 를 HTML 로 돌려주면 여기서 SyntaxError 가 납니다.
+    // 그러면 CouponApiError 를 기다리는 화면 분기가 통째로 무력화되므로, 파싱 실패는
+    // 응답 없음으로 처리하고 아래 !res.ok 경로가 받게 둡니다.
+    let envelope: ResponseEnvelope<T> | null = null;
+    if (text) {
+      try {
+        envelope = JSON.parse(text) as ResponseEnvelope<T>;
+      } catch {
+        envelope = null;
+      }
+    }
 
     if (!res.ok || !envelope?.success) {
       throw new CouponApiError(
