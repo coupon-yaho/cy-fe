@@ -294,16 +294,6 @@ export interface BrandDay {
   durationHours: number;
   eligibleGradesMask: number;
   eligibleGrades: MembershipGrade[];
-
-  /* 할인 정책. 위 필드들과 같은 coupon_templates 행에서 옵니다.
-     "누가 언제" 만 있고 "얼마" 가 없으면 브랜드 순서표가 전화번호부가 됩니다 —
-     이 화면을 보는 이유가 바로 그 값입니다.
-     ⚠️ /api/v1/brand-days 응답에 이 다섯 필드가 필요합니다(백엔드 A 와 합의 대상). */
-  policyType: CouponPolicyType;
-  discountRate: number | null;
-  maxDiscountAmount: number | null;
-  discountAmount: number | null;
-  dataGrantMb: number | null;
 }
 
 /* ── 표시용 라벨 · 파생 계산 ─────────────────────────── */

@@ -500,7 +500,7 @@ function BrandGrid() {
           지금 등록된 것을 보여 주는 화면이라고 말합니다. */}
         <SectionHead
           title="브랜드 데이 순서"
-          note="지금 등록된 일정입니다. 브랜드마다 열리는 주·요일과 깎아 주는 폭이 다르고, 운영 상황에 따라 바뀔 수 있습니다."
+          note="지금 등록된 일정입니다. 브랜드마다 열리는 주와 요일이 다르고, 운영 상황에 따라 바뀔 수 있습니다."
         />
 
         {weeks.length === 0 ? (
@@ -519,22 +519,17 @@ function BrandGrid() {
                     {items.map((d) => {
                       const brand = brandOf(d.brandId);
                       return (
-                        /* 이 표에는 "누가 언제" 만 있고 "얼마" 가 없었습니다. 그래서
-                           12줄을 다 읽어도 어느 브랜드 데이를 기다려야 하는지 알 수
-                           없었습니다 — 이 화면을 보는 이유가 바로 그 값입니다.
-                           할인율을 이름 아래 줄에 시각과 함께 둡니다. */
-                        <span key={d.templateId} className="flex items-center gap-3">
-                          <BrandPlate brandId={d.brandId} size="md" />
-                          <span className="min-w-0">
-                            <span className="yh-body block truncate font-bold">{brand.name}</span>
-                            <span className="yh-small mt-0.5 block truncate">
-                              <span className="yh-num font-bold text-yh-navy">
-                                {discountHeadline(d)}
-                              </span>
-                              <span className="yh-num text-yh-ink-3">
-                                {" · "}
-                                {DAY_LABEL[d.dayOfWeek]} {trimSeconds(d.startTime)}
-                              </span>
+                        /* 이름 밑에 시각을 쌓아 두면 셀 폭 330px 중 90px 만 쓰고
+                           나머지가 빕니다. 옆으로 눕히면 한 줄에 다 들어갑니다.
+                           셀 오른쪽 끝까지 밀지는 않습니다 — 그러면 시각이 제 이름보다
+                           옆 브랜드에 더 가까워져서 누구의 시각인지 헷갈립니다.
+                           남는 폭은 셀과 셀 **사이**에 둡니다. */
+                        <span key={d.templateId} className="flex items-center gap-2.5">
+                          <BrandPlate brandId={d.brandId} size="sm" />
+                          <span className="flex min-w-0 items-baseline gap-2.5">
+                            <span className="yh-body truncate font-bold">{brand.name}</span>
+                            <span className="yh-num yh-small shrink-0 text-yh-ink-3">
+                              {DAY_LABEL[d.dayOfWeek]} {trimSeconds(d.startTime)}
                             </span>
                           </span>
                         </span>

@@ -166,11 +166,6 @@ export function createMockApi(): CouponApi {
           durationHours: t.durationHours,
           eligibleGradesMask: t.eligibleGradesMask,
           eligibleGrades: t.eligibleGrades,
-          policyType: t.policyType,
-          discountRate: t.discountRate,
-          maxDiscountAmount: t.maxDiscountAmount,
-          discountAmount: t.discountAmount,
-          dataGrantMb: t.dataGrantMb,
         }))
         .sort(
           (a, b) =>
