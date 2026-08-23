@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AuthLayout } from "@/components/coupon/auth-layout";
 import { GradeChip } from "@/components/coupon/grade-chip";
 import { useAuth } from "@/hooks/use-auth";
 import type { Role } from "@/lib/auth-storage";
@@ -34,14 +35,12 @@ function LoginPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-md px-5 py-20">
-      <p className="yh-label">시작하기</p>
-      <h1 className="yh-hero mt-3">로그인</h1>
-      <p className="yh-lede mt-4 text-yh-ink-2">
-        닉네임과 등급만 고르면 바로 시작합니다. 비밀번호는 받지 않습니다.
-      </p>
-
-      <form onSubmit={submit} className="mt-10 border-t border-yh-rule pt-9">
+    <AuthLayout
+      eyebrow="시작하기"
+      title="로그인"
+      lede="닉네임과 등급만 고르면 바로 시작합니다. 비밀번호는 받지 않습니다."
+    >
+      <form onSubmit={submit} className="mt-5 border-t border-yh-rule pt-5">
         <label className="block">
           <span className="yh-label">닉네임</span>
           <input
@@ -49,14 +48,14 @@ function LoginPage() {
             onChange={(e) => setNickname(e.target.value)}
             placeholder="예: 야호"
             autoFocus
-            className="yh-input mt-2.5"
+            className="yh-input mt-2"
           />
-          <span className="yh-small mt-2.5 block text-yh-ink-3">
+          <span className="yh-small mt-2 block text-yh-ink-3">
             같은 닉네임으로 다시 들어오면 쿠폰함이 그대로 있습니다.
           </span>
         </label>
 
-        <fieldset className="mt-8">
+        <fieldset className="mt-5">
           <legend className="yh-label">멤버십 등급</legend>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {GRADES.map((g) => (
@@ -65,7 +64,7 @@ function LoginPage() {
                 type="button"
                 onClick={() => setGrade(g)}
                 aria-pressed={grade === g}
-                className="yh-choice px-2 py-4 text-center"
+                className="yh-choice px-2 py-2.5 text-center"
               >
                 <GradeChip grade={g} size="sm" />
               </button>
@@ -73,7 +72,7 @@ function LoginPage() {
           </div>
         </fieldset>
 
-        <fieldset className="mt-8">
+        <fieldset className="mt-5">
           <legend className="yh-label">들어갈 화면</legend>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {DESTINATIONS.map((r) => (
@@ -82,7 +81,7 @@ function LoginPage() {
                 type="button"
                 onClick={() => setRole(r.key)}
                 aria-pressed={role === r.key}
-                className="yh-choice px-4 py-3.5 text-left"
+                className="yh-choice px-4 py-2.5 text-left"
               >
                 <span className="yh-body block font-bold">{r.label}</span>
                 <span className="yh-small block text-yh-ink-3">{r.desc}</span>
@@ -91,17 +90,17 @@ function LoginPage() {
           </div>
         </fieldset>
 
-        <button type="submit" disabled={!trimmed} className="yh-btn mt-9 w-full">
+        <button type="submit" disabled={!trimmed} className="yh-btn mt-6 w-full">
           로그인
         </button>
 
-        <p className="yh-body mt-6 text-center text-yh-ink-3">
+        <p className="yh-small mt-3.5 text-center text-yh-ink-3">
           처음이신가요?{" "}
           <Link to="/signup" className="font-bold text-yh-navy underline underline-offset-4">
             회원가입
           </Link>
         </p>
       </form>
-    </div>
+    </AuthLayout>
   );
 }

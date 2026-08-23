@@ -136,6 +136,9 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = pathname.startsWith("/admin");
+  // 로그인·회원가입은 한 화면 안에서 끝나야 하는 할 일 화면입니다. 마케팅 푸터가
+  // 253px 를 먹어서 폼이 접혔습니다. 푸터의 링크는 헤더에도 있습니다.
+  const isAuth = pathname === "/login" || pathname === "/signup";
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -155,7 +158,7 @@ function RootComponent() {
                 {/* Required: nested routes render here. */}
                 <Outlet />
               </main>
-              <SiteFooter />
+              {!isAuth && <SiteFooter />}
             </div>
           )}
           <Toaster position="top-center" richColors />

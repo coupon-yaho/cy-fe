@@ -135,12 +135,17 @@ function RoundDetail() {
 
   if (isLoading || !round) {
     return (
-      <div className="mx-auto w-full max-w-5xl px-5 py-12">
-        <Skeleton className="h-4 w-40 rounded-[3px]" />
-        {/* 실제 지면과 같은 폭·높이라야 값이 들어올 때 화면이 밀리지 않습니다 */}
-        <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_360px]">
-          <Skeleton className="h-[420px] rounded-[6px]" />
-          <Skeleton className="h-[340px] rounded-[6px]" />
+      <div>
+        {/* 실제 지면과 같은 순서·높이라야 값이 들어올 때 화면이 밀리지 않습니다 */}
+        <section className="yh-deep pb-24">
+          <div className="mx-auto w-full max-w-5xl px-5 pt-8">
+            <Skeleton className="h-4 w-40 rounded-full bg-white/12" />
+            <Skeleton className="mt-8 h-11 w-80 max-w-full rounded-xl bg-white/12" />
+            <Skeleton className="mt-9 h-16 w-full max-w-lg rounded-xl bg-white/12" />
+          </div>
+        </section>
+        <div className="mx-auto -mt-20 w-full max-w-5xl px-5">
+          <Skeleton className="h-56 rounded-2xl" />
         </div>
       </div>
     );
@@ -150,28 +155,43 @@ function RoundDetail() {
   const remaining = remainingStock(round);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-5 py-12">
-      <nav className="yh-small mb-9 text-yh-ink-3">
-        <Link
-          to="/events"
-          className="font-semibold text-yh-navy underline-offset-4 hover:underline"
-        >
-          브랜드 데이
-        </Link>
-        <span className="mx-2">/</span>
-        <span>{brand.name}</span>
-      </nav>
+    <div>
+      {/* 홈과 같은 리듬 — 어두운 띠가 회차를 소개하고, 흰 쿠폰이 그 위에 걸쳐
+          "여기서 받는다" 를 말합니다. 앞선 시안은 전부 밝은 면이라 이 화면에서
+          무엇이 주인공인지 알 수 없었고, 오른쪽 아래에 400px 짜리 빈 공간이 남았습니다. */}
+      <section className="yh-deep yh-grain relative overflow-hidden pb-24">
+        <div className="relative z-[1] mx-auto w-full max-w-5xl px-5 pt-8">
+          <nav className="yh-small text-white/55">
+            <Link
+              to="/events"
+              className="font-semibold text-white/85 underline-offset-4 hover:underline"
+            >
+              브랜드 데이
+            </Link>
+            <span className="mx-2">/</span>
+            <span>{brand.name}</span>
+          </nav>
 
-      {/* 왼쪽은 읽는 지면, 오른쪽은 누르는 자리. 액션 패널을 붙여 두면
-          아래로 내려가도 발급 버튼이 시야에서 사라지지 않습니다. */}
-      <div className="grid gap-12 lg:grid-cols-[1fr_360px] lg:gap-14">
-        <div className="min-w-0">
           <RoundHead round={round} remaining={remaining} />
-          <Terms round={round} />
         </div>
+      </section>
 
-        <aside className="lg:sticky lg:top-32 lg:self-start">
-          <div className="yh-card p-6">
+      <div className="relative z-[2] mx-auto -mt-20 w-full max-w-5xl px-5">
+        <div className="yh-coupon grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto_20rem] lg:items-stretch lg:gap-0">
+          <div className="min-w-0 self-center">
+            <StockGauge remaining={remaining} total={round.totalQuantity} />
+            <dl className="yh-small mt-6 grid grid-cols-2 gap-x-8 gap-y-3">
+              <Field label="오픈">{formatDateTime(round.openAt)}</Field>
+              <Field label="마감">{formatDateTime(round.closeAt)}</Field>
+              <Field label="사용 기한">발급일로부터 {round.validDays}일</Field>
+              <Field label="참여 등급">{gradesLabel(round.eligibleGrades)}</Field>
+            </dl>
+          </div>
+
+          <div className="yh-tear-plain my-1 lg:hidden" />
+          <div className="yh-tear-y-plain hidden lg:mx-9 lg:block" />
+
+          <div className="flex flex-col justify-center">
             {phase.kind === "done" ? (
               <Issued issuance={phase.issuance} />
             ) : phase.kind === "error" ? (
@@ -180,14 +200,9 @@ function RoundDetail() {
               <Ready round={round} remaining={remaining} phase={phase} onStart={start} />
             )}
           </div>
+        </div>
 
-          <dl className="yh-small mt-7 border-t border-yh-rule">
-            <Field label="오픈">{formatDateTime(round.openAt)}</Field>
-            <Field label="마감">{formatDateTime(round.closeAt)}</Field>
-            <Field label="사용 기한">발급일로부터 {round.validDays}일</Field>
-            <Field label="참여 등급">{gradesLabel(round.eligibleGrades)}</Field>
-          </dl>
-        </aside>
+        <Terms round={round} />
       </div>
 
       <QueueDialog
@@ -212,50 +227,53 @@ function RoundHead({ round, remaining }: { round: CouponRoundView; remaining: nu
   const closed = round.status === "CLOSED" || remaining <= 0;
 
   return (
-    <section>
-      {round.status === "OPEN" ? (
-        <p className="yh-live">
-          <span className="live-dot" />
-          발급 중
-        </p>
-      ) : (
-        <p className="yh-label">{ROUND_STATUS_LABEL[round.status]}</p>
-      )}
-
-      <div className="mt-6 flex items-center gap-3">
-        <BrandPlate brandId={round.brandId} size="md" />
-        <p className="yh-small text-yh-ink-3">
-          {brand.name} · {brand.category}
-        </p>
+    <section className="mt-7">
+      <div className="flex flex-wrap items-center gap-3">
+        {round.status === "OPEN" ? (
+          <span className="yh-live-on-navy">
+            <span className="live-dot" />
+            발급 중
+          </span>
+        ) : (
+          <span className="yh-label text-white/50">{ROUND_STATUS_LABEL[round.status]}</span>
+        )}
+        <span className="flex items-center gap-2">
+          <BrandPlate brandId={round.brandId} size="sm" />
+          <span className="yh-small text-white/60">
+            {brand.name} · {brand.category}
+          </span>
+        </span>
       </div>
 
-      <h1 className="yh-hero mt-5 max-w-[13em]">{round.name}</h1>
+      <h1 className="yh-hero mt-5 max-w-[13em] text-white">{round.name}</h1>
 
-      <div className="mt-10 grid gap-y-8 border-t border-yh-rule pt-8 sm:grid-cols-2 sm:gap-x-10">
+      <div className="mt-9 flex flex-wrap items-end gap-x-14 gap-y-7">
         <div>
-          <p className="yh-label">할인</p>
-          <p className="yh-figure mt-2.5">{discountHeadline(round)}</p>
-          <p className="yh-small mt-3 text-yh-ink-2">{discountDetail(round)}</p>
+          <p className="yh-label text-white/45">할인</p>
+          <p className="yh-figure mt-1.5 text-white">{discountHeadline(round)}</p>
+          <p className="yh-small mt-2 text-white/60">{discountDetail(round)}</p>
         </div>
         <div>
-          <p className="yh-label">{round.status === "SCHEDULED" ? "오픈까지" : "마감까지"}</p>
-          <p className={`yh-figure mt-2.5 ${urgent && !closed ? "text-yh-accent" : ""}`}>
+          <p className="yh-label text-white/45">
+            {round.status === "SCHEDULED" ? "오픈까지" : "마감까지"}
+          </p>
+          <p
+            className={`yh-figure mt-1.5 ${
+              urgent && !closed ? "text-yh-accent-on-navy" : "text-white"
+            }`}
+          >
             {closed ? (
-              "—"
+              "-"
             ) : (
               <Countdown
                 target={Date.parse(round.status === "SCHEDULED" ? round.openAt : round.closeAt)}
               />
             )}
           </p>
-          <p className="yh-small yh-num mt-3 text-yh-ink-2">
+          <p className="yh-small yh-num mt-2 text-white/60">
             {formatDateTime(round.status === "SCHEDULED" ? round.openAt : round.closeAt)}
           </p>
         </div>
-      </div>
-
-      <div className="mt-10">
-        <StockGauge remaining={remaining} total={round.totalQuantity} />
       </div>
     </section>
   );
@@ -263,9 +281,9 @@ function RoundHead({ round, remaining }: { round: CouponRoundView; remaining: nu
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-yh-rule py-3">
-      <dt className="text-yh-ink-3">{label}</dt>
-      <dd className="yh-num font-semibold">{children}</dd>
+    <div>
+      <dt className="yh-label">{label}</dt>
+      <dd className="yh-num mt-1 font-semibold">{children}</dd>
     </div>
   );
 }
@@ -464,12 +482,15 @@ function Terms({ round }: { round: CouponRoundView }) {
   ];
 
   return (
-    <section className="mt-14">
-      <h2 className="yh-label yh-rule-head pt-4">사용 조건</h2>
-      <ul className="mt-2">
+    <section className="mt-12 border-t border-yh-rule pt-8 pb-4">
+      {/* 네 줄에 각각 괘선을 그으면 표처럼 보이는데, 읽는 순서가 있는 목록이 아니라
+          나란한 조건 네 개입니다. 두 칸으로 묶고 선은 위에 한 줄만 둡니다. */}
+      <h2 className="yh-label">사용 조건</h2>
+      <ul className="yh-body mt-4 grid gap-x-12 gap-y-2.5 text-yh-ink-2 sm:grid-cols-2">
         {rules.map((r) => (
-          <li key={r} className="yh-body border-b border-yh-rule py-4 text-yh-ink-2">
-            {r}
+          <li key={r} className="flex gap-2.5">
+            <span className="mt-[0.6em] size-1 shrink-0 rounded-full bg-yh-ink-3" aria-hidden />
+            <span className="min-w-0">{r}</span>
           </li>
         ))}
       </ul>

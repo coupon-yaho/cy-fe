@@ -1280,3 +1280,54 @@
     display: none;
   }
 }
+
+/* 로그인·회원가입은 스크롤 없이 한 화면에서 끝나야 합니다.
+   세로가 아주 좁으면 설명 문구를 접습니다 — 입력칸과 버튼이 먼저입니다. */
+@media (max-height: 740px) {
+  .yh-auth-col {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .yh-auth-col form {
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+  .yh-auth-col fieldset {
+    margin-top: 1rem;
+  }
+  .yh-auth-col form > button[type="submit"] {
+    margin-top: 1.125rem;
+  }
+}
+
+@media (max-height: 660px) {
+  .yh-auth-col .yh-auth-lede {
+    display: none;
+  }
+  /* 선택 버튼의 세로 여백은 손가락이 닿는 크기라 마지막에 줄입니다 */
+  .yh-auth-col [aria-pressed] {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .yh-auth-col form {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+  }
+}
+
+@media (max-height: 620px) {
+  .yh-auth-col {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  .yh-auth-col h1 {
+    font-size: 1.5rem;
+  }
+  .yh-auth-col form {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+  }
+  .yh-auth-col fieldset {
+    margin-top: 0.75rem;
+  }
+}

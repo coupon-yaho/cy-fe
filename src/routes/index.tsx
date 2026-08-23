@@ -440,9 +440,12 @@ function BrandGrid() {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-5 py-14">
+      {/* 주·요일은 coupon_templates 값이고 관리자가 /admin/campaigns 에서 바꿉니다.
+          "정해져 있다" 고 단정하면 일정이 바뀌는 순간 화면이 거짓말을 합니다.
+          지금 등록된 것을 보여 주는 화면이라고 말합니다. */}
       <SectionHead
-        title="12개 브랜드가 돌아가며 열립니다"
-        note="브랜드마다 정해진 주와 요일이 있습니다. 한 달에 한 번씩 순서대로 돌아옵니다."
+        title="브랜드 데이 순서"
+        note="지금 등록된 일정입니다. 브랜드마다 열리는 주와 요일이 다르고, 운영 상황에 따라 바뀔 수 있습니다."
       />
 
       {weeks.length === 0 ? (
