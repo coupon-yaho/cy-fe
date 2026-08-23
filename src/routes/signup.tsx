@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AuthLayout } from "@/components/coupon/auth-layout";
 import { GradeChip } from "@/components/coupon/grade-chip";
@@ -26,11 +26,20 @@ function SignupPage() {
   const [nickname, setNickname] = useState("");
   const [grade, setGrade] = useState<MembershipGrade>("WELCOME");
 
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const trimmed = nickname.trim();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trimmed) return;
+    /* 버튼을 비활성으로 두면 회색 버튼만 남고 **무엇이 모자란지는 말하지 않습니다.**
+       누를 수 있게 두고, 빈 채로 누르면 어디에 무엇을 적어야 하는지 답합니다. */
+    if (!trimmed) {
+      setError("닉네임을 적어 주세요.");
+      inputRef.current?.focus();
+      return;
+    }
     login({ nickname: trimmed, grade, role: "USER" });
     toast.success(`${trimmed}님, 환영합니다`);
     navigate({ to: "/events" });
@@ -46,12 +55,27 @@ function SignupPage() {
         <label className="block">
           <span className="yh-label">닉네임</span>
           <input
+            ref={inputRef}
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={(e) => {
+              setNickname(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="예: 야호"
             autoFocus
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "nickname-error" : undefined}
             className="yh-input mt-2"
           />
+          {error && (
+            <span
+              id="nickname-error"
+              role="alert"
+              className="yh-small mt-2 block font-bold text-yh-accent-dark"
+            >
+              {error}
+            </span>
+          )}
         </label>
 
         <fieldset className="mt-5">
@@ -72,13 +96,18 @@ function SignupPage() {
           </div>
         </fieldset>
 
-        {trimmed && (
-          <p className="yh-small mt-5 border-t border-yh-rule pt-4 text-yh-ink-3">
-            회원 번호 <span className="yh-num font-bold text-yh-navy">{memberIdFor(trimmed)}</span>
-          </p>
-        )}
+        {/* 첫 글자를 치는 순간 이 줄이 생기면서 아래 버튼이 통째로 내려갔습니다.
+            누르려던 자리가 입력 중에 움직이는 셈입니다. 자리를 미리 잡아 둡니다. */}
+        <p className="yh-auth-aside yh-small mt-5 border-t border-yh-rule pt-4 text-yh-ink-3">
+          회원 번호{" "}
+          {trimmed ? (
+            <span className="yh-num font-bold text-yh-navy">{memberIdFor(trimmed)}</span>
+          ) : (
+            <span className="text-yh-ink-3">닉네임을 적으면 정해집니다</span>
+          )}
+        </p>
 
-        <button type="submit" disabled={!trimmed} className="yh-btn mt-6 w-full">
+        <button type="submit" className="yh-btn mt-6 w-full">
           시작하기
         </button>
 

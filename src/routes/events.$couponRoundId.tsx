@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { GradeList } from "@/components/coupon/grade-chip";
 import { StockGauge } from "@/components/coupon/stock-gauge";
-import { Countdown, formatDate, formatDateTime } from "@/components/coupon/timer";
+import { Countdown, formatClock, formatDate, formatDateTime } from "@/components/coupon/timer";
 import { QueueDialog } from "@/components/coupon/queue-dialog";
 import { Sparkle } from "@/components/coupon/sparkle";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -253,9 +253,12 @@ function RoundHead({ round, remaining }: { round: CouponRoundView; remaining: nu
           <p className="yh-figure mt-1.5 text-white">{discountHeadline(round)}</p>
           <p className="yh-small mt-2 text-white/60">{discountDetail(round)}</p>
         </div>
+        {/* 끝난 회차에는 셀 시간이 없습니다. 그렇다고 "마감까지 -" 로 두면 아직
+            세는 중인데 값을 못 읽은 것처럼 보입니다. 끝난 회차에서 이 자리가 답해야
+            할 질문은 "언제 끝났나" 이므로 라벨과 값을 함께 바꿉니다. */}
         <div>
           <p className="yh-label text-white/55">
-            {round.status === "SCHEDULED" ? "오픈까지" : "마감까지"}
+            {closed ? "마감" : round.status === "SCHEDULED" ? "오픈까지" : "마감까지"}
           </p>
           <p
             className={`yh-figure mt-1.5 ${
@@ -263,7 +266,7 @@ function RoundHead({ round, remaining }: { round: CouponRoundView; remaining: nu
             }`}
           >
             {closed ? (
-              "-"
+              <span className="yh-num">{formatClock(round.closeAt)}</span>
             ) : (
               <Countdown
                 target={Date.parse(round.status === "SCHEDULED" ? round.openAt : round.closeAt)}
@@ -271,7 +274,9 @@ function RoundHead({ round, remaining }: { round: CouponRoundView; remaining: nu
             )}
           </p>
           <p className="yh-small yh-num mt-2 text-white/60">
-            {formatDateTime(round.status === "SCHEDULED" ? round.openAt : round.closeAt)}
+            {closed
+              ? `${formatDate(round.closeAt)}${remaining <= 0 ? " · 수량이 떨어져 마감" : ""}`
+              : formatDateTime(round.status === "SCHEDULED" ? round.openAt : round.closeAt)}
           </p>
         </div>
       </div>
@@ -303,13 +308,20 @@ function Ready({
   const soldOut = remaining <= 0;
   const busy = phase.kind !== "idle";
 
-  if (!session) {
+  /* 회차 상태를 로그인 여부보다 **먼저** 봅니다.
+     반대로 두었더니 이미 끝난 회차에서 로그아웃 상태인 사람에게
+     "로그인하면 발급받을 수 있습니다" 라고 말했습니다. 로그인해도 못 받습니다. */
+  if (soldOut || round.status === "CLOSED") {
     return (
       <div>
-        <h2 className="yh-sub">로그인하면 발급받을 수 있습니다</h2>
-        <p className="yh-body mt-2.5 text-yh-ink-2">등급에 따라 참여할 수 있는 회차가 다릅니다.</p>
-        <Link to="/login" className="yh-btn mt-6 w-full">
-          로그인하고 발급받기
+        <h2 className="yh-sub">{soldOut ? "모두 품절됐습니다" : "마감된 회차입니다"}</h2>
+        <p className="yh-body mt-2.5 text-yh-ink-2">
+          {soldOut
+            ? `준비된 ${round.totalQuantity.toLocaleString("ko-KR")}장이 모두 나갔습니다.`
+            : "마감 시각이 지났습니다."}
+        </p>
+        <Link to="/events" className="yh-btn-ghost mt-6 w-full">
+          다른 브랜드 데이 보기
         </Link>
       </div>
     );
@@ -323,23 +335,27 @@ function Ready({
           <Countdown target={Date.parse(round.openAt)} />
         </p>
         <p className="yh-body mt-5 text-yh-ink-2">
-          오픈 시각이 되면 이 화면에서 바로 발급받을 수 있습니다.
+          {session
+            ? "오픈 시각이 되면 이 화면에서 바로 발급받을 수 있습니다."
+            : "선착순이라 오픈 뒤에 로그인하면 늦습니다. 미리 해 두세요."}
         </p>
+        {/* 아직 안 열린 회차에서 로그아웃 상태라면, 지금 할 수 있는 일이 하나 있습니다 */}
+        {!session && (
+          <Link to="/login" className="yh-btn mt-6 w-full">
+            로그인
+          </Link>
+        )}
       </div>
     );
   }
 
-  if (soldOut || round.status === "CLOSED") {
+  if (!session) {
     return (
       <div>
-        <h2 className="yh-sub">{soldOut ? "모두 품절됐습니다" : "마감된 회차입니다"}</h2>
-        <p className="yh-body mt-2.5 text-yh-ink-2">
-          {soldOut
-            ? `준비된 ${round.totalQuantity.toLocaleString("ko-KR")}장이 모두 나갔습니다.`
-            : "마감 시각이 지났습니다."}
-        </p>
-        <Link to="/events" className="yh-btn-ghost mt-6 w-full">
-          다른 브랜드 데이 보기
+        <h2 className="yh-sub">로그인하면 발급받을 수 있습니다</h2>
+        <p className="yh-body mt-2.5 text-yh-ink-2">등급에 따라 참여할 수 있는 회차가 다릅니다.</p>
+        <Link to="/login" className="yh-btn mt-6 w-full">
+          로그인하고 발급받기
         </Link>
       </div>
     );

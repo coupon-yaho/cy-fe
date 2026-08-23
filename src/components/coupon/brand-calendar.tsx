@@ -444,16 +444,25 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
         </span>
       </p>
 
+      {/* 아직 안 열린 회차에 재고 막대를 그리면 100% 로 꽉 찬 띠가 나옵니다.
+          한 장도 안 나간 게 당연한 상태라 그 띠는 아무것도 알려 주지 않고,
+          이미 열린 회차의 막대와 나란히 놓이면 "제일 많이 남았다" 로 오독됩니다.
+          안 열린 회차가 답해야 할 질문은 "언제 열리나" 하나입니다. */}
       <div className="mt-4">
-        {hasStock ? (
+        {entry.status === "SCHEDULED" ? (
+          <p className="yh-small text-yh-ink-3">
+            오픈까지 <Countdown target={openAt} className="yh-num font-bold text-yh-navy" />
+            {entry.totalQuantity !== null && (
+              <span className="yh-num ml-2">
+                · {entry.totalQuantity.toLocaleString("ko-KR")}장 준비
+              </span>
+            )}
+          </p>
+        ) : hasStock ? (
           <StockGauge
             remaining={Math.max(0, entry.totalQuantity! - entry.activeCount!)}
             total={entry.totalQuantity!}
           />
-        ) : entry.status === "SCHEDULED" ? (
-          <p className="yh-small text-yh-ink-3">
-            오픈까지 <Countdown target={openAt} className="yh-num font-bold text-yh-navy" />
-          </p>
         ) : (
           // 지난 달 회차에는 재고 기록이 없습니다. 0 으로 그리면 "품절"이라 거짓말합니다.
           <p className="yh-small text-yh-ink-3">지난 회차라 재고 기록이 없습니다</p>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AuthLayout } from "@/components/coupon/auth-layout";
 import { GradeChip } from "@/components/coupon/grade-chip";
@@ -24,11 +24,20 @@ function LoginPage() {
   const [grade, setGrade] = useState<MembershipGrade>("GOLD");
   const [role, setRole] = useState<Role>("USER");
 
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const trimmed = nickname.trim();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trimmed) return;
+    /* 버튼을 비활성으로 두면 회색 버튼만 남고 **무엇이 모자란지는 말하지 않습니다.**
+       누를 수 있게 두고, 빈 채로 누르면 어디에 무엇을 적어야 하는지 답합니다. */
+    if (!trimmed) {
+      setError("닉네임을 적어 주세요.");
+      inputRef.current?.focus();
+      return;
+    }
     login({ nickname: trimmed, grade, role });
     toast.success(`${trimmed}님, 환영합니다`);
     navigate({ to: role === "ADMIN" ? "/admin" : "/events" });
@@ -44,12 +53,27 @@ function LoginPage() {
         <label className="block">
           <span className="yh-label">닉네임</span>
           <input
+            ref={inputRef}
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={(e) => {
+              setNickname(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="예: 야호"
             autoFocus
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "nickname-error" : undefined}
             className="yh-input mt-2"
           />
+          {error && (
+            <span
+              id="nickname-error"
+              role="alert"
+              className="yh-small mt-2 block font-bold text-yh-accent-dark"
+            >
+              {error}
+            </span>
+          )}
           <span className="yh-small mt-2 block text-yh-ink-3">
             같은 닉네임으로 다시 들어오면 쿠폰함이 그대로 있습니다.
           </span>
@@ -90,7 +114,7 @@ function LoginPage() {
           </div>
         </fieldset>
 
-        <button type="submit" disabled={!trimmed} className="yh-btn mt-6 w-full">
+        <button type="submit" className="yh-btn mt-6 w-full">
           로그인
         </button>
 

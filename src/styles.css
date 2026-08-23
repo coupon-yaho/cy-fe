@@ -1169,6 +1169,16 @@
       0 0 0 3px rgb(22 48 92 / 0.08),
       inset 0 1px 2px rgb(22 48 92 / 0.05);
   }
+  /* 잘못된 입력. 색만 바꾸면 색을 못 보는 사람에게 아무 일도 안 일어난 화면입니다 —
+     항상 밑에 문장을 함께 답니다(aria-describedby). 테두리는 그 문장을 어디서
+     찾아야 하는지 가리키는 역할입니다. */
+  &[aria-invalid="true"] {
+    border-color: var(--yh-accent-dark);
+    &:focus {
+      border-color: var(--yh-accent-dark);
+      box-shadow: 0 0 0 3px rgb(199 44 55 / 0.14);
+    }
+  }
 }
 
 @utility yh-choice {
@@ -1444,6 +1454,11 @@
 
 @media (max-height: 660px) {
   .yh-auth-col .yh-auth-lede {
+    display: none;
+  }
+  /* 회원 번호 미리보기는 알아 두면 좋은 정보이지 입력에 필요한 것이 아닙니다.
+     세로가 모자라면 입력칸과 버튼이 먼저입니다 — 가입 뒤 헤더 메뉴에서 다시 봅니다. */
+  .yh-auth-col .yh-auth-aside {
     display: none;
   }
   /* 선택 버튼의 세로 여백은 손가락이 닿는 크기라 마지막에 줄입니다 */
