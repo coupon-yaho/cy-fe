@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { SeriesChart, SeriesLegend, UtilBar, type SeriesSpec } from "@/components/admin/charts";
+import { ConsistencyStatus } from "@/components/admin/consistency-status";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
 import { MetaChips, PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
 import { StateBadge, StatedValue, Value } from "@/components/admin/state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
+import { consistencySeverityTone } from "@/lib/admin/consistency-view";
 import {
   ENGINE_LABEL,
   GAP_LABEL,
@@ -207,7 +209,7 @@ function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Sign
       <Tile
         label="시스템 실패율"
         onClick={() => onJump("E")}
-        alert={rate !== null && rate > KPI_TARGET.systemFailurePct}
+        alert={rate != null && rate > KPI_TARGET.systemFailurePct}
         sub={`목표 ${KPI_TARGET.systemFailurePct}% 이하`}
       >
         <StatedValue source={rateSource} render={(v) => `${v.toFixed(3)}%`} />
@@ -285,7 +287,7 @@ function systemFailureRate(classes: ErrorPanel["classes"]): SourceValue<number> 
 }
 
 function signalTone(data: AdminMetricsResponse, s: Signal): string {
-  if (s === "C") return data.consistency.verdict == null ? "bg-attention" : "bg-positive";
+  if (s === "C") return consistencySeverityTone(data.consistency.severity);
   if (s === "L") {
     const p99 = data.latency.success.value?.p99Millis ?? null;
     return p99 !== null && p99 > KPI_TARGET.issueP99Ms ? "bg-attention" : "bg-positive";
@@ -296,7 +298,7 @@ function signalTone(data: AdminMetricsResponse, s: Signal): string {
     // errors 가 없으면 판정하지 않습니다 — 실패가 없다는 뜻이 아닙니다.
     const classes = data.errors?.classes.filter((k) => !k.excludedFromNumerator) ?? [];
     const rate = systemFailureRate(classes).value;
-    if (rate === null) return "bg-hig-muted";
+    if (rate == null) return "bg-hig-muted";
     return rate > KPI_TARGET.systemFailurePct ? "bg-viz-critical" : "bg-viz-good";
   }
   // saturation 은 서버 미구현입니다. 값이 없으면 회색 — 정상(초록)으로 칠하지 않습니다.
@@ -364,11 +366,16 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1fr_1.2fr]">
-      <Panel
-        title="초과 발급"
-        hint={c.phase === "LIVE" ? "집계 진행 중" : "최종"}
-        state={c.overIssued.state}
-      >
+      <div className="xl:col-span-3">
+        <ConsistencyStatus
+          phase={c.phase}
+          verdict={c.verdict}
+          severity={c.severity}
+          gaps={gaps.map((gap) => gap.value)}
+        />
+      </div>
+
+      <Panel title="초과 발급" state={c.overIssued.state}>
         <p className="t-hero num">
           <Value source={c.overIssued} render={(v) => v.toLocaleString("ko-KR")} />
         </p>
@@ -378,12 +385,6 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
             <span className="num">{c.totalQuantity.toLocaleString("ko-KR")}</span>
           </p>
         )}
-        <p className="t-body-sm mt-4">
-          판정{" "}
-          <b className={c.verdict === "PASS" ? "text-positive" : "text-attention"}>
-            {c.verdict ?? "대기"}
-          </b>
-        </p>
       </Panel>
 
       <TablePanel title="Redis ↔ DB 격차">
@@ -793,7 +794,7 @@ function SaturationSignal({ data }: { data: AdminMetricsResponse }) {
                 </div>
                 <div className="mt-1.5">
                   <UtilBar
-                    value={r.utilization.value}
+                    value={r.utilization.value ?? null}
                     warnAt={r.warnAt}
                     thresholds={s.thresholds}
                   />

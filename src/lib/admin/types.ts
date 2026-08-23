@@ -62,9 +62,9 @@ export type SourceKind = "REDIS" | "MICROMETER" | "MYSQL" | "IN_MEMORY" | "KAFKA
 
 /** 값과 상태는 항상 분리합니다. 값이 null 이면서 state 가 VALID 인 경우는 없습니다. */
 export interface SourceValue<T> {
-  value: T | null;
+  value?: T | null | undefined;
   state: SourceState;
-  observedAt: string | null;
+  observedAt?: string | null | undefined;
   /** 화면에 그대로 노출할 짧은 단서 */
   note?: string;
 }
@@ -82,9 +82,9 @@ export interface SourceValue<T> {
 export type GapState = Extract<SourceState, "VALID" | "PENDING" | "STALE" | "UNAVAILABLE" | "N_A">;
 
 export interface GapValue {
-  value: number | null;
+  value?: number | null | undefined;
   state: GapState;
-  observedAt: string | null;
+  observedAt?: string | null | undefined;
   note?: string;
 }
 
@@ -448,13 +448,13 @@ export interface AdminMetricsKpi {
 
 export interface ConsistencyPanel {
   phase: ConsistencyPhase;
-  /** 정합성 판정 — LIVE 에서는 null */
-  verdict: Verdict;
+  /** 정합성 판정 — LIVE 에서는 키가 생략되거나 null */
+  verdict?: Verdict;
   /**
    * 운영 대응 우선순위 — verdict 와는 다른 축입니다.
    * 어느 한쪽에서 파생시키지 않습니다. 평가 가능한 gap 이 없으면 null.
    */
-  severity: Severity | null;
+  severity?: Severity | null;
   /** gap 과 같은 층이 아닙니다 (G0-04). 배열에 넣으면 렌더 루프가 다섯 칸을 그립니다 */
   overIssued: GapValue;
   /** gap 4종 — 서버가 평탄한 필드로 내려줍니다 (admin-api-spec §6.1) */
