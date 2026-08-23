@@ -41,10 +41,13 @@ export function BrandLogo({
           aria-hidden
           className="h-full w-auto shrink-0 rounded-full bg-white object-cover shadow-[0_2px_8px_rgba(22,48,92,0.16)] ring-2 ring-white"
         />
+        {/* 360px 미만에서는 워드마크를 접습니다. 여기서는 로고 + 알림 + 로그인 +
+            메뉴가 23px 넘쳤고(실측), 넷 중 접었을 때 가장 덜 잃는 것이 워드마크입니다
+            — 얼굴만 남아도 브랜드는 알아보고, 링크 이름은 aria-label 이 갖고 있습니다. */}
         <img
           src="/logo-yaho-lockup.png"
           alt="쿠폰 야~호 — 할인 생활의 즐거움"
-          className="h-[56%] w-auto object-contain"
+          className="h-[56%] w-auto object-contain max-[359px]:hidden"
         />
       </span>
     );

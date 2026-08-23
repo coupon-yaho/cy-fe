@@ -205,7 +205,6 @@
   --color-viz-grid: var(--viz-grid);
   --color-viz-axis: var(--viz-axis);
 
-
   /* DESIGN.md tokens.typography.family
      SF Pro 는 Apple 기기에서 system-ui 로 잡힙니다. 그 밖의 환경에서는
      한글 본문을 감당할 폴백이 필요해 Noto Sans KR 을 함께 싣습니다.
@@ -550,7 +549,6 @@
   }
 }
 
-
 /* ══════════════════════════════════════════════════════════════════
    야호 브랜드 레이어 (v2) — 고객 화면 전용
    ══════════════════════════════════════════════════════════════════
@@ -591,26 +589,48 @@
   --yh-navy-600: light-dark(#24497f, #c7d6ec);
   --yh-navy-400: light-dark(#6d8cba, #6f88ad);
   --yh-ink-2: light-dark(#4a6288, #a6b6cc);
-  --yh-ink-3: light-dark(#617387, #8394ab);
+  --yh-ink-3: light-dark(#5b6c7f, #8394ab);
   --yh-rule: light-dark(#dbe5f2, #2b3648);
   --yh-paper: light-dark(#f6f9fd, #0e131b);
   --yh-paper-2: light-dark(#e9f1fa, #161d27);
   --yh-surface: light-dark(#ffffff, #1b2432);
   --yh-accent: light-dark(#ef4a55, #ff5d66);
-  --yh-accent-dark: light-dark(#d32f3a, #ff7f86);
+  --yh-accent-dark: light-dark(#c72c37, #ff7f86);
+  /* 액센트는 두 가지로 갈립니다. 밝은 면 위의 **글자**는 눈에 띄어야 해서 채도를
+     높게 두고, 흰 글씨를 얹는 **버튼 면**은 그 위에서 흰 글씨가 읽혀야 해서
+     한 단계 눌러 둡니다. 한 값으로 쓰면 버튼이 3.63:1 이 됩니다(측정). */
+  --yh-accent-btn: light-dark(#d13f49, #cb4a51);
+  --yh-accent-btn-hover: light-dark(#b92f38, #a93a41);
   --yh-accent-soft: light-dark(#fde5e7, #351a1e);
   --yh-accent-on-navy: #ff8a90;
-  --yh-warn: light-dark(#c07a10, #f2b544);
+  --yh-warn: light-dark(#a5690e, #f2b544);
   --yh-warn-on-navy: #ffc95c;
   --yh-good: light-dark(#1d7a45, #4ade80);
-  --yh-t-yellow: light-dark(#fbe9b6, #3a3218);
-  --yh-t-pink: light-dark(#f9cbd0, #3b2228);
-  --yh-t-peri: light-dark(#ccd4ef, #262a44);
-  --yh-t-sky: light-dark(#d5e6f7, #182b3d);
-  --yh-t-mint: light-dark(#cde8db, #17322b);
-  --yh-shadow-sm: light-dark(0 1px 2px rgb(22 48 92 / 0.06), 0 2px 6px rgb(22 48 92 / 0.05), 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.3));
-  --yh-shadow: light-dark(0 2px 4px rgb(22 48 92 / 0.06), 0 8px 22px rgb(22 48 92 / 0.09), 0 2px 6px rgb(0 0 0 / 0.45), 0 10px 28px rgb(0 0 0 / 0.4));
-  --yh-shadow-lg: light-dark(0 4px 10px rgb(22 48 92 / 0.08), 0 18px 44px rgb(22 48 92 / 0.14), 0 4px 12px rgb(0 0 0 / 0.5), 0 20px 48px rgb(0 0 0 / 0.55));
+  /* 아트워크의 티켓 색입니다. 글자가 얹히는 면이라 잉크가 4.5:1 을 넘는 선까지만
+     밀었습니다 — 페리·핑크만 반 단계 밝고, 나머지 셋은 원색 그대로입니다. */
+  --yh-t-yellow: light-dark(#fbe9b6, #2e2813);
+  --yh-t-pink: light-dark(#fad3d7, #3b2228);
+  --yh-t-peri: light-dark(#d5dcf2, #242840);
+  --yh-t-sky: light-dark(#d5e6f7, #182a3c);
+  --yh-t-mint: light-dark(#cde8db, #152d27);
+  --yh-shadow-sm: light-dark(
+    0 1px 2px rgb(22 48 92 / 0.06),
+    0 2px 6px rgb(22 48 92 / 0.05),
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 2px 6px rgb(0 0 0 / 0.3)
+  );
+  --yh-shadow: light-dark(
+    0 2px 4px rgb(22 48 92 / 0.06),
+    0 8px 22px rgb(22 48 92 / 0.09),
+    0 2px 6px rgb(0 0 0 / 0.45),
+    0 10px 28px rgb(0 0 0 / 0.4)
+  );
+  --yh-shadow-lg: light-dark(
+    0 4px 10px rgb(22 48 92 / 0.08),
+    0 18px 44px rgb(22 48 92 / 0.14),
+    0 4px 12px rgb(0 0 0 / 0.5),
+    0 20px 48px rgb(0 0 0 / 0.55)
+  );
   --yh-solid: light-dark(var(--yh-navy), #e6edf7);
   --yh-solid-hover: light-dark(var(--yh-navy-600), #ffffff);
   --yh-on-solid: light-dark(#ffffff, #0e131b);
@@ -619,6 +639,15 @@
   --yh-live-bg: light-dark(var(--yh-accent-soft), #351a1e);
   --yh-live-fg: light-dark(var(--yh-accent-dark), #ff9198);
   --yh-card-border: light-dark(rgb(22 48 92 / 0.07), rgb(255 255 255 / 0.08));
+
+  /* 등급색. :root 의 --grade-* 는 관제가 쓰는 값이라 건드리지 않고, 고객 화면
+     안에서만 덮습니다(AGENTS.md §3 — 관제 색 체계는 OBS-16 몫).
+     원래 값은 틴트 카드 위에서 3.44~4.42:1 이었고 다크에서는 2.23:1 까지
+     떨어졌습니다 — 색상은 그대로 두고 명도만 옮겼습니다. */
+  --grade-welcome: light-dark(#005ab5, #4e95dc);
+  --grade-silver: light-dark(#5c5c60, #919195);
+  --grade-gold: light-dark(#894d00, #b98543);
+  --grade-vip: light-dark(#773db0, #a982cf);
 
   --yh-font:
     "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
@@ -646,7 +675,6 @@
   filter: var(--yh-logo-filter);
 }
 
-
 @theme inline {
   --color-yh-navy-900: var(--yh-navy-900);
   --color-yh-navy: var(--yh-navy);
@@ -662,6 +690,7 @@
   --color-yh-paper-2: var(--yh-paper-2);
   --color-yh-surface: var(--yh-surface);
   --color-yh-accent: var(--yh-accent);
+  --color-yh-accent-dark: var(--yh-accent-dark);
   --color-yh-accent-soft: var(--yh-accent-soft);
   --color-yh-accent-on-navy: var(--yh-accent-on-navy);
   --color-yh-warn: var(--yh-warn);
@@ -746,6 +775,7 @@
   font-weight: 450;
   line-height: 1.55;
   letter-spacing: -0.006em;
+  text-wrap: pretty;
 }
 
 @utility yh-label {
@@ -796,6 +826,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 라벨이 접히면 알약 버튼이 두 줄짜리 덩어리가 됩니다.
+     좁아지면 줄이 늘어나는 게 아니라 버튼이 밀려야 합니다. */
+  white-space: nowrap;
+  flex-shrink: 0;
   gap: 0.5rem;
   height: 3rem;
   padding: 0 1.625rem;
@@ -838,11 +872,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 라벨이 접히면 알약 버튼이 두 줄짜리 덩어리가 됩니다.
+     좁아지면 줄이 늘어나는 게 아니라 버튼이 밀려야 합니다. */
+  white-space: nowrap;
+  flex-shrink: 0;
   gap: 0.5rem;
   height: 3rem;
   padding: 0 1.625rem;
   border-radius: 999px;
-  background: var(--yh-accent);
+  background: var(--yh-accent-btn);
   color: #fff;
   font-size: 0.9375rem;
   font-weight: 800;
@@ -857,7 +895,7 @@
     box-shadow 0.18s ease,
     transform 0.12s ease;
   &:hover {
-    background: var(--yh-accent-dark);
+    background: var(--yh-accent-btn-hover);
   }
   &:active {
     transform: translateY(1px);
@@ -874,6 +912,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 라벨이 접히면 알약 버튼이 두 줄짜리 덩어리가 됩니다.
+     좁아지면 줄이 늘어나는 게 아니라 버튼이 밀려야 합니다. */
+  white-space: nowrap;
+  flex-shrink: 0;
   gap: 0.5rem;
   height: 3rem;
   padding: 0 1.5rem;
@@ -908,6 +950,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 라벨이 접히면 알약 버튼이 두 줄짜리 덩어리가 됩니다.
+     좁아지면 줄이 늘어나는 게 아니라 버튼이 밀려야 합니다. */
+  white-space: nowrap;
+  flex-shrink: 0;
   gap: 0.375rem;
   height: 2.25rem;
   padding: 0 1rem;
@@ -1202,8 +1248,7 @@
   position: relative;
   background:
     radial-gradient(110% 80% at 18% 0%, var(--yh-band-glow) 0%, transparent 58%),
-    radial-gradient(90% 70% at 92% 100%, var(--yh-band-glow) 0%, transparent 55%),
-    var(--yh-band);
+    radial-gradient(90% 70% at 92% 100%, var(--yh-band-glow) 0%, transparent 55%), var(--yh-band);
   color: #fff;
   isolation: isolate;
 }

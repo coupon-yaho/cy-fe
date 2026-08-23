@@ -212,10 +212,9 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
           <div className="yh-card mt-6 hidden overflow-hidden sm:block">
             <div className="grid grid-cols-7 border-b border-yh-rule bg-yh-paper">
               {WEEKDAYS.map((d, i) => (
-                <p
-                  key={d}
-                  className={`yh-label py-2.5 text-center ${i >= 5 ? "text-yh-ink-3/70" : ""}`}
-                >
+                /* 주말을 흐리게 두던 것을 되돌립니다 — 2.85:1 이었고(측정), 무엇보다
+                   이 서비스에는 토요일 회차가 둘 있어서 주말이 죽은 칸이 아닙니다. */
+                <p key={d} className="yh-label py-2.5 text-center">
                   {d}
                 </p>
               ))}
@@ -262,7 +261,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
                         <BrandPlate key={e.templateId} brandId={e.brandId} size="sm" />
                       ))}
                       {list.length > 4 && (
-                        <span className="yh-num yh-small font-extrabold text-yh-ink-3">
+                        <span className="yh-num yh-small font-extrabold text-yh-ink-2">
                           +{list.length - 4}
                         </span>
                       )}
@@ -327,10 +326,10 @@ function WeekRow({
               <span
                 className={`yh-num yh-small ${
                   isToday
-                    ? "font-extrabold text-yh-accent"
+                    ? "font-extrabold text-yh-accent-dark"
                     : outside || past
-                      ? "text-yh-ink-3/60"
-                      : "text-yh-ink-3"
+                      ? "text-yh-ink-3"
+                      : "text-yh-ink-2"
                 }`}
               >
                 {d.getDate()}
@@ -353,7 +352,7 @@ function WeekRow({
             <span className="flex items-center justify-between">
               <span
                 className={`yh-num yh-small font-extrabold ${
-                  isToday ? "text-yh-accent" : "text-yh-navy"
+                  isToday ? "text-yh-accent-dark" : "text-yh-navy"
                 }`}
               >
                 {d.getDate()}
@@ -367,14 +366,14 @@ function WeekRow({
               ))}
               {/* 칸이 좁아 3개까지만 보입니다 — 나머지를 숨기면 그날 회차 수를 오해합니다 */}
               {list.length > 3 && (
-                <span className="yh-num yh-small font-extrabold text-yh-ink-3">
+                <span className="yh-num yh-small font-extrabold text-yh-ink-2">
                   +{list.length - 3}
                 </span>
               )}
             </span>
 
             {!past && !live && (
-              <span className="yh-num yh-small mt-1 block text-yh-ink-3">
+              <span className="yh-num yh-small mt-1 block text-yh-ink-2">
                 D-{Math.max(0, Math.ceil((d.getTime() - today.getTime()) / 86400000))}
               </span>
             )}

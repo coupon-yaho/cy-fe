@@ -148,7 +148,9 @@ function Hero() {
             하루씩 문을 엽니다
           </h1>
 
-          <p className="yh-lede mt-5 max-w-[40ch] text-yh-ink-2">
+          {/* 어두운 띠 위입니다. --yh-ink-2 는 종이 면에서 본문 다음 단계로 쓰는
+              잉크라 여기 얹으면 2.55:1 이 됩니다(측정). 흰색을 눌러서 씁니다. */}
+          <p className="yh-lede mt-5 max-w-[40ch] text-white/72">
             정해진 수량을 선착순으로 나눠 드립니다. 수량이 떨어지면 마감 시각 전에도 닫히니, 열리는
             시각을 미리 확인해 두세요.
           </p>
@@ -276,7 +278,10 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
       {/* 절취선. 카드가 종이 면 위에만 놓이는 높이라 노치가 제대로 뚫립니다. */}
       <div className="yh-tear mx-6 sm:mx-8" />
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-b-[17px] bg-yh-paper px-6 py-5 sm:px-8">
+      {/* 뜯어 가는 쪽입니다. 종이 색(--yh-paper)으로 두면 페이지 바탕과 정확히
+          같은 값이라(#f6f9fd) 절취선 아래가 카드 밖처럼 보입니다. 한 단계 눌러
+          두 면을 갈라 놓습니다 — 쿠폰함 티켓의 번호 칸과 같은 처리입니다. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-b-[17px] bg-yh-paper-2 px-6 py-5 sm:px-8">
         <Link
           to="/events/$couponRoundId"
           params={{ couponRoundId: String(round.id) }}
@@ -287,9 +292,10 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
         <Link to="/events" className="yh-btn-ghost">
           전체 일정 보기
         </Link>
+        {/* 값만 두면 "전체 등급" 이 무슨 말인지 알 수 없습니다 — 서술어를 붙입니다. */}
         <p className="yh-small ml-auto text-yh-ink-3">
           {eligible
-            ? gradesLabel(round.eligibleGrades)
+            ? `${gradesLabel(round.eligibleGrades)} 참여 가능`
             : `${gradesLabel(round.eligibleGrades)} 전용`}
         </p>
       </div>
@@ -391,7 +397,7 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
               ? `${GRADE_LABEL[grade]} 등급으로 참여할 수 있는 회차`
               : "등급마다 열리는 회차가 다릅니다"
           }
-          note="회차마다 참여할 수 있는 등급이 정해져 있습니다."
+          note={`회차마다 참여할 수 있는 등급이 정해져 있습니다. 숫자는 전체 ${rounds.length}개 회차 중 그 등급으로 참여할 수 있는 수입니다.`}
         />
 
         <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -411,14 +417,15 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
                         </span>
                       )}
                     </div>
-                    <p className="yh-figure-sm mt-5 text-[2.5rem] leading-none">
+                    {/* 분모를 숫자 옆에 붙입니다. 카드마다 "전체 12개 중 참여 가능" 을
+                        한 줄씩 달면 같은 문장이 네 번 반복되는데, 정작 비교해야 할
+                        7·9·11·12 는 서로 떨어져 있습니다. 분모는 섹션 설명이 한 번만
+                        말하고, 카드에는 비율만 남깁니다. */}
+                    <p className="yh-figure-sm mt-6 text-[2.75rem] leading-none">
                       {openCount(g)}
-                      <span className="yh-small ml-1 align-baseline font-medium text-yh-ink-2">
-                        개
+                      <span className="yh-figure-sm ml-1.5 align-baseline text-[1.375rem] text-yh-ink-2">
+                        / {rounds.length}
                       </span>
-                    </p>
-                    <p className="yh-small mt-2 text-yh-ink-3">
-                      전체 {rounds.length}개 중 참여 가능
                     </p>
                   </div>
                 </li>
@@ -483,11 +490,16 @@ function BrandGrid() {
                     {items.map((d) => {
                       const brand = brandOf(d.brandId);
                       return (
-                        <span key={d.templateId} className="flex items-center gap-3">
+                        /* 이름 밑에 시각을 쌓아 두면 셀 폭 330px 중 90px 만 쓰고
+                           나머지가 빕니다. 옆으로 눕히면 한 줄에 다 들어갑니다.
+                           셀 오른쪽 끝까지 밀지는 않습니다 — 그러면 시각이 제 이름보다
+                           옆 브랜드에 더 가까워져서 누구의 시각인지 헷갈립니다.
+                           남는 폭은 셀과 셀 **사이**에 둡니다. */
+                        <span key={d.templateId} className="flex items-center gap-2.5">
                           <BrandPlate brandId={d.brandId} size="sm" />
-                          <span className="min-w-0">
-                            <span className="yh-body block truncate font-bold">{brand.name}</span>
-                            <span className="yh-num yh-small block text-yh-ink-3">
+                          <span className="flex min-w-0 items-baseline gap-2.5">
+                            <span className="yh-body truncate font-bold">{brand.name}</span>
+                            <span className="yh-num yh-small shrink-0 text-yh-ink-3">
                               {DAY_LABEL[d.dayOfWeek]} {trimSeconds(d.startTime)}
                             </span>
                           </span>
@@ -536,17 +548,14 @@ const RULES = [
   {
     head: "한 회차에 한 장",
     body: "한 사람이 같은 회차에서 발급받을 수 있는 쿠폰은 한 장입니다.",
-    tint: "bg-yh-t-sky",
   },
   {
     head: "수량이 떨어지면 바로 마감",
     body: "마감 시각이 남아 있어도 수량이 떨어지면 그 자리에서 닫힙니다. 남은 수량은 실시간으로 셉니다.",
-    tint: "bg-yh-t-yellow",
   },
   {
     head: "정해진 수량만",
     body: "몇 명이 동시에 눌러도 준비된 수량을 넘겨 발급하지 않습니다.",
-    tint: "bg-yh-t-mint",
   },
 ];
 
@@ -587,7 +596,10 @@ function Closing() {
           </div>
 
           <div>
-            <h2 className="yh-title text-white">선착순은 이렇게 지켜집니다</h2>
+            {/* 왼쪽 칸에만 라벨이 있어 두 제목의 밑선이 28px 어긋났습니다.
+                나란히 놓인 두 칸은 같은 줄에서 시작해야 한 덩어리로 읽힙니다. */}
+            <p className="yh-label text-white/50">발급 원칙</p>
+            <h2 className="yh-title mt-3 text-white">선착순은 이렇게 지켜집니다</h2>
 
             <dl className="mt-7 space-y-5">
               {RULES.map((r) => (

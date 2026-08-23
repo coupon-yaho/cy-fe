@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import { Bell, Menu } from "lucide-react";
-import { ThemeToggle } from "@/components/coupon/theme-toggle";
+import { ThemeChoices, ThemeToggle } from "@/components/coupon/theme-toggle";
 import { BrandLogo } from "@/components/brand-logo";
 import { GradeChip } from "@/components/coupon/grade-chip";
 import { LiveStrip } from "@/components/coupon/live-strip";
@@ -45,11 +45,11 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50">
       <div className="border-b border-yh-rule bg-yh-paper/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center gap-8 px-5">
+        <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center gap-4 px-5 md:gap-8">
           {/* 사양서 §2 — 데스크탑은 A-mark 40px, 모바일은 워드마크만 28px.
               키비주얼(B)은 이 자리에 쓰지 않습니다. */}
           <Link to="/" className="shrink-0" aria-label="쿠폰 야~호 홈">
-            <BrandLogo variant="mark" className="h-11" />
+            <BrandLogo variant="mark" className="h-10 sm:h-11" />
           </Link>
 
           <nav className="hidden items-center gap-7 md:flex">
@@ -77,7 +77,9 @@ export function SiteHeader() {
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5">
-            <ThemeToggle />
+            {/* 360px 에서는 이 아이콘 하나가 더 들어갈 자리가 없습니다.
+                그 폭에서는 메뉴 시트 안의 ThemeChoices 가 같은 일을 합니다. */}
+            <ThemeToggle className="hidden sm:grid" />
 
             <DropdownMenu onOpenChange={(o) => o && markAllRead()}>
               <DropdownMenuTrigger
@@ -185,6 +187,9 @@ export function SiteHeader() {
                     </Link>
                   )}
                 </nav>
+                <div className="mt-8 px-5 sm:hidden">
+                  <ThemeChoices />
+                </div>
               </SheetContent>
             </Sheet>
           </div>

@@ -249,12 +249,12 @@ function RoundHead({ round, remaining }: { round: CouponRoundView; remaining: nu
 
       <div className="mt-9 flex flex-wrap items-end gap-x-14 gap-y-7">
         <div>
-          <p className="yh-label text-white/45">할인</p>
+          <p className="yh-label text-white/55">할인</p>
           <p className="yh-figure mt-1.5 text-white">{discountHeadline(round)}</p>
           <p className="yh-small mt-2 text-white/60">{discountDetail(round)}</p>
         </div>
         <div>
-          <p className="yh-label text-white/45">
+          <p className="yh-label text-white/55">
             {round.status === "SCHEDULED" ? "오픈까지" : "마감까지"}
           </p>
           <p
