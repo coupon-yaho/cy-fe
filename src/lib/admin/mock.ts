@@ -37,7 +37,6 @@ import type {
   GapState,
   GapType,
   GapValue,
-  LatencyGroupStat,
   Percentiles,
   HistorySlice,
   IssuanceAttemptEvent,
@@ -52,7 +51,6 @@ import type {
   SourceState,
   SourceValue,
   TrafficKey,
-  UriGroup,
 } from "./types";
 
 /** 템플릿의 요일 문자열을 히트맵 행 번호(월=0)로 바꿉니다. */
@@ -119,6 +117,11 @@ function absent<T>(state: SourceState, observedAt: number, note?: string): Sourc
     observedAt: new Date(observedAt).toISOString(),
     ...(note ? { note } : {}),
   };
+}
+
+/** 실제 JSON이 값과 관측 시각 키를 생략하는 미집계 상태입니다. */
+function pending<T>(): SourceValue<T> {
+  return { state: "PENDING" };
 }
 
 /** gap 전용 — 허용 상태가 5종으로 좁습니다. */
@@ -871,35 +874,6 @@ function buildHistories(now: number, couponRoundId: number | null, limit: number
   };
 }
 
-/**
- * uri 그룹별 응답 시간 배율.
- *
- * 자릿수로 다르게 둡니다 — 순번 폴링은 Redis 한 번이고 발급은 Lua + DB + Kafka 입니다.
- * 한 선에 합치면 폴링이 전체를 끌어내려 발급 지연이 보이지 않습니다.
- */
-const URI_GROUPS: UriGroup[] = ["ISSUE", "ENTRY", "QUEUE_POLL", "LOOKUP", "TRANSITION"];
-
-const SUCCESS_GROUP_FACTOR: Record<UriGroup, number> = {
-  ISSUE: 1,
-  ENTRY: 0.42,
-  TRANSITION: 0.3,
-  LOOKUP: 0.085,
-  QUEUE_POLL: 0.016,
-};
-
-const FAILURE_GROUP_FACTOR: Record<UriGroup, number> = {
-  ISSUE: 1,
-  ENTRY: 0.6,
-  TRANSITION: 0.45,
-  LOOKUP: 0.2,
-  QUEUE_POLL: 0.05,
-};
-
-/** 소수 자리는 ms 단위가 한 자리로 내려갈 때만 남깁니다. */
-function ms(v: number) {
-  return v >= 10 ? Math.round(v) : Number(v.toFixed(2));
-}
-
 /** 측정 대상 회차. 지금 트래픽이 가장 많은 회차를 대상으로 잡습니다. */
 function measuredCampaign(now: number) {
   const target = listRoundStates(now)
@@ -935,25 +909,6 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
     if (type === "LUA_GAP" || type === "ACTIVE_DB_GAP") return gv(0, "VALID", now);
     return draining ? gapAbsent("PENDING", now) : gv(0, "VALID", now);
   };
-
-  const latencyGroups = (
-    factors: Record<UriGroup, number>,
-    base: (x: number) => number,
-  ): LatencyGroupStat[] =>
-    URI_GROUPS.map((group) => {
-      const f = factors[group];
-      return {
-        group,
-        p50: sv(ms(base(t) * f * 0.137), "VALID", now),
-        p95: sv(ms(base(t) * f * 0.394), "VALID", now),
-        p99: sv(ms(base(t) * f), "VALID", now),
-        series: windowSeries(now, window, (x) => ({
-          p50: ms(base(x) * f * 0.137),
-          p95: ms(base(x) * f * 0.394),
-          p99: ms(base(x) * f),
-        })),
-      };
-    });
 
   // 트래픽이 0 인 것은 장애가 아닙니다 — NO_TRAFFIC 은 값 0 을 그대로 싣습니다(carriesValue).
   const trafficCounter = (value: number) =>
@@ -1006,19 +961,13 @@ function buildMetrics(now: number, window: MetricsWindow): AdminMetricsResponse 
         now,
       ),
       // 실패 경로는 OBS-4 Timer 가 outcome 을 둘로만 등록해 아직 분리되지 않습니다.
-      policyReject: absent<Percentiles>("PENDING", now),
-      systemFailure: absent<Percentiles>("PENDING", now),
-      successSeries: windowSeries(now, window, (x) => ({
-        p50: Math.round(successP99(x) * 0.137),
-        p95: Math.round(successP99(x) * 0.394),
-        p99: successP99(x),
-      })),
-      groups: latencyGroups(SUCCESS_GROUP_FACTOR, successP99),
+      policyReject: pending<Percentiles>(),
+      systemFailure: pending<Percentiles>(),
     },
     dependencies: {
-      redis: sv({ p95Millis: 0.9, p99Millis: 1.2, errorRate: 0 }, "VALID", now),
-      hikari: sv({ p95Millis: 96, p99Millis: 118, errorRate: 0 }, "VALID", now),
-      kafka: sv({ p95Millis: 7, p99Millis: 9, errorRate: 0 }, "VALID", now),
+      redis: pending(),
+      hikari: pending(),
+      kafka: pending(),
     },
     persistence: sv(
       {
