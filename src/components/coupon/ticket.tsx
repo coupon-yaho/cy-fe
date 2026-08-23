@@ -78,12 +78,26 @@ export function CouponTicket({
           </div>
         </div>
 
-        <p className="yh-figure-sm mt-6 text-[2rem] leading-none">
-          {discountHeadline(coupon)}
-          <span className="yh-small ml-3 align-middle font-normal text-yh-ink-2">
-            {discountDetail(coupon)}
-          </span>
-        </p>
+        <div className="relative mt-6">
+          <p className="yh-figure-sm text-[2rem] leading-none">
+            {discountHeadline(coupon)}
+            <span className="yh-small ml-3 align-middle font-normal text-yh-ink-2">
+              {discountDetail(coupon)}
+            </span>
+          </p>
+
+          {/* 사용 완료 도장. 할인 줄의 오른쪽 빈 자리에 찍습니다 — 아래 쿠폰 번호 칸은
+              폭을 다 쓰기 때문에 그 위에 겹치면 번호를 가립니다.
+              좁은 화면에는 그 빈 자리도 없어 찍지 않습니다. */}
+          {used && (
+            <span
+              className="pointer-events-none absolute top-1/2 right-0 hidden -translate-y-1/2 -rotate-12 rounded-md border-[3px] border-yh-good/45 px-3 py-1 text-[1.125rem] font-extrabold tracking-[0.18em] text-yh-good/45 sm:block"
+              aria-hidden
+            >
+              USED
+            </span>
+          )}
+        </div>
 
         {/* 코드는 읽어서 옮겨 적는 값입니다. 본문과 같은 면에 두면 문장으로 읽힙니다. */}
         <div
@@ -100,18 +114,6 @@ export function CouponTicket({
             {groupCode(coupon.code)}
           </span>
         </div>
-
-        {/* 사용 완료 도장. 왼쪽 면의 빈 자리에 찍습니다.
-            좁은 화면에는 찍지 않습니다 — 빈 자리가 없어 쿠폰 번호를 가립니다.
-            상태는 "사용 완료" 라벨과 낮춘 채도로 이미 전달됩니다. */}
-        {used && (
-          <span
-            className="pointer-events-none absolute right-10 bottom-7 hidden -rotate-12 rounded-md border-[3px] border-yh-good/40 px-3 py-1 text-[1.125rem] font-extrabold tracking-[0.18em] text-yh-good/40 sm:block"
-            aria-hidden
-          >
-            USED
-          </span>
-        )}
       </div>
 
       {/* 절취선. 쿠폰함 카드는 종이 면 위에만 놓이므로 노치가 제대로 뚫립니다. */}

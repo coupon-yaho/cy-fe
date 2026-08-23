@@ -33,7 +33,7 @@ export function StockGauge({
         : "bg-yh-warn"
       : onDark
         ? "bg-white"
-        : "bg-yh-navy";
+        : "bg-yh-solid";
 
   return (
     <div>

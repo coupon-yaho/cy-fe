@@ -67,7 +67,7 @@ export function QueueDialog({
               aria-label="대기 진행률"
             >
               <span
-                className="block h-full bg-yh-navy transition-[width] duration-700 ease-out"
+                className="block h-full bg-yh-solid transition-[width] duration-700 ease-out"
                 style={{ width: `${Math.max(2, progress * 100)}%` }}
               />
             </div>

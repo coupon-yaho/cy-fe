@@ -192,7 +192,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
               aria-pressed={mineOnly}
               className={`yh-body rounded-full border px-3.5 py-1.5 font-bold transition-colors ${
                 mineOnly
-                  ? "border-yh-navy bg-yh-navy text-white"
+                  ? "border-yh-navy bg-yh-solid text-yh-on-solid"
                   : "border-yh-rule bg-yh-surface text-yh-ink-2 hover:text-yh-navy"
               }`}
             >

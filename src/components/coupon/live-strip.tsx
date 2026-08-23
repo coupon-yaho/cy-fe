@@ -76,7 +76,7 @@ export function LiveStrip() {
 
   return (
     <div
-      className={`overflow-hidden bg-yh-navy text-white transition-[max-height,opacity] duration-300 ease-out ${
+      className={`overflow-hidden bg-yh-band text-white transition-[max-height,opacity] duration-300 ease-out ${
         collapsed ? "max-h-0 opacity-0" : "max-h-12 opacity-100"
       }`}
       aria-hidden={collapsed}
@@ -148,7 +148,9 @@ function Live({
       <Link
         to="/events/$couponRoundId"
         params={{ couponRoundId: String(round.id) }}
-        className="yh-btn-sm shrink-0 bg-white text-yh-navy shadow-none hover:bg-white/85"
+        /* 띠는 라이트·다크 모두 어두운 면입니다. text-yh-navy 는 다크에서 밝아져
+           흰 배경 위 흰 글자가 됩니다 — 띠 색을 글자에 씁니다. */
+        className="yh-btn-sm shrink-0 bg-white text-yh-band shadow-none hover:bg-white/85"
       >
         발급받기
       </Link>

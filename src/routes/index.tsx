@@ -406,7 +406,7 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
                     <div className="flex items-center justify-between gap-2">
                       <GradeChip grade={g} />
                       {mine && (
-                        <span className="yh-small rounded-full bg-yh-navy px-2.5 py-1 font-bold text-white">
+                        <span className="yh-small rounded-full bg-yh-solid px-2.5 py-1 font-bold text-yh-on-solid">
                           내 등급
                         </span>
                       )}

@@ -136,7 +136,7 @@ function Schedule() {
                 aria-pressed={filter === f.key}
                 className={`yh-body rounded-[3px] px-3.5 py-1.5 font-semibold transition-colors ${
                   filter === f.key
-                    ? "bg-yh-navy text-yh-paper"
+                    ? "bg-yh-solid text-yh-on-solid"
                     : "text-yh-ink-2 hover:bg-yh-paper-2 hover:text-yh-navy"
                 }`}
               >

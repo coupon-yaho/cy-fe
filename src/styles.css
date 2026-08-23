@@ -582,7 +582,10 @@
   --yh-navy-400: #6d8cba;
 
   --yh-ink-2: #4a6288;
-  --yh-ink-3: #8ba0be;
+  /* 보조 글자색. #8ba0be 는 지면(#f6f9fd)에서 2.53:1 이라 작은 글씨 기준(4.5:1)에
+     한참 못 미쳤습니다 — 라벨·설명 22곳이 그 색이었습니다.
+     지면 4.61:1 · 카드 4.87:1 이 나오는 값으로 낮춥니다. */
+  --yh-ink-3: #617387;
   --yh-rule: #dbe5f2;
 
   --yh-paper: #f6f9fd;
@@ -613,14 +616,112 @@
   --yh-shadow: 0 2px 4px rgb(22 48 92 / 0.06), 0 8px 22px rgb(22 48 92 / 0.09);
   --yh-shadow-lg: 0 4px 10px rgb(22 48 92 / 0.08), 0 18px 44px rgb(22 48 92 / 0.14);
 
+  /* ── 채움 컨트롤 ──────────────────────────────────
+     --yh-navy 는 글자색이자 브랜드색입니다. 버튼 배경으로도 쓰면 다크에서 막힙니다 —
+     글자는 밝아져야 하고 버튼 배경도 밝아지면 그 위 흰 글자가 사라집니다.
+     그래서 "채워진 면과 그 위 글자" 는 짝으로 따로 둡니다. */
+  --yh-solid: var(--yh-navy);
+  --yh-solid-hover: var(--yh-navy-600);
+  --yh-on-solid: #ffffff;
+
+  /* 어두운 띠(히어로 · 라이브 바 · 마무리)의 바탕과 광 */
+  --yh-band: #0d2244;
+  --yh-band-glow: #24497f;
+
+  /* 발급 중 표시 — 배경과 글자를 짝으로 */
+  --yh-live-bg: var(--yh-accent-soft);
+  --yh-live-fg: var(--yh-accent-dark);
+
+  --yh-card-border: rgb(22 48 92 / 0.07);
+
   --yh-font:
     "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     system-ui, sans-serif;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   다크 모드 — 고객 화면만
+   ══════════════════════════════════════════════════════════════════
+
+   관제(D2)는 DESIGN.md 토큰(--hig-*)을 쓰므로 여기 값이 닿지 않습니다.
+   OS 설정을 따릅니다 — 사이트가 임의로 한쪽을 강요하지 않습니다.
+
+   순검정(#000)과 순백(#fff)은 쓰지 않습니다. 순값은 깊이를 죽입니다.
+   지면은 네이비를 아주 옅게 섞은 어두운 색이라, 밝은 모드와 같은 계열로 읽힙니다. */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --yh-paper: #0e131b;
+    --yh-paper-2: #161d27;
+    --yh-surface: #1b2432;
+
+    /* 잉크가 뒤집힙니다 — 이제 밝은 쪽이 글자입니다 */
+    --yh-navy: #e6edf7;
+    --yh-navy-600: #c7d6ec;
+    --yh-navy-400: #6f88ad;
+    --yh-ink-2: #a6b6cc;
+    /* 다크에서도 카드 면(#1b2432) 기준 4.10:1 로 미달이었습니다. 지면 6.02 · 카드 5.05 */
+    --yh-ink-3: #8394ab;
+    --yh-rule: #2b3648;
+
+    /* 채워진 면은 밝고 그 위 글자는 어둡습니다 */
+    --yh-solid: #e6edf7;
+    --yh-solid-hover: #ffffff;
+    --yh-on-solid: #0e131b;
+
+    /* 띠는 지면보다 더 어두워야 면으로 구분됩니다 */
+    --yh-navy-900: #070c13;
+    --yh-band: #070c13;
+    --yh-band-glow: #17253c;
+
+    /* 어두운 면 위에서는 같은 빨강이 탁해집니다 — 한 단계 밝게 */
+    --yh-accent: #ff5d66;
+    --yh-accent-dark: #ff7f86;
+    --yh-accent-soft: #351a1e;
+    --yh-accent-on-navy: #ff8a90;
+    --yh-live-bg: #351a1e;
+    --yh-live-fg: #ff9198;
+
+    --yh-warn: #f2b544;
+    --yh-warn-on-navy: #ffc95c;
+    --yh-good: #4ade80;
+
+    /* 파스텔은 그대로 쓰면 어두운 지면에서 형광처럼 튑니다.
+       같은 색상각을 유지한 채 명도만 크게 낮춥니다. */
+    --yh-t-yellow: #3a3218;
+    --yh-t-pink: #3b2228;
+    --yh-t-peri: #262a44;
+    --yh-t-sky: #182b3d;
+    --yh-t-mint: #17322b;
+
+    /* 어두운 면에서는 그림자가 거의 안 보입니다. 검정을 진하게 쓰고
+       카드 테두리를 밝은 쪽으로 돌려 형태를 유지합니다. */
+    --yh-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.3);
+    --yh-shadow: 0 2px 6px rgb(0 0 0 / 0.45), 0 10px 28px rgb(0 0 0 / 0.4);
+    --yh-shadow-lg: 0 4px 12px rgb(0 0 0 / 0.5), 0 20px 48px rgb(0 0 0 / 0.55);
+    --yh-card-border: rgb(255 255 255 / 0.08);
+  }
+
+  /* 로고는 워드마크가 네이비라 어두운 지면에서 묻힙니다.
+     밝기를 올리면 부채꼴 쿠폰이 하얗게 날아가므로, 이미 있는 흰 외곽선을
+     후광으로 연장해 원래 색을 지킨 채 바탕에서 떼어 냅니다.
+
+     클래스를 컴포넌트에 달지 않고 여기서 잡습니다 — BrandLogo 는 관리자 셸도
+     쓰기 때문에, 클래스를 달면 yh-* 가 관제 화면 마크업으로 새어 나갑니다.
+     (CSS 는 .yh 스코프라 실제 영향은 없지만, "관리자에 yh-* 0건" 가드가 무너집니다.) */
+  .yh header img,
+  .yh footer img {
+    filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.95))
+      drop-shadow(0 0 4px rgb(255 255 255 / 0.4));
+  }
+}
+
 @theme inline {
   --color-yh-navy-900: var(--yh-navy-900);
   --color-yh-navy: var(--yh-navy);
+  --color-yh-solid: var(--yh-solid);
+  --color-yh-on-solid: var(--yh-on-solid);
+  --color-yh-band: var(--yh-band);
   --color-yh-navy-600: var(--yh-navy-600);
   --color-yh-navy-400: var(--yh-navy-400);
   --color-yh-ink-2: var(--yh-ink-2);
@@ -644,6 +745,7 @@
 
 /* 고객 셸 */
 .yh {
+  color-scheme: light dark;
   font-family: var(--yh-font);
   background: var(--yh-paper);
   color: var(--yh-navy);
@@ -767,8 +869,8 @@
   height: 3rem;
   padding: 0 1.625rem;
   border-radius: 999px;
-  background: var(--yh-navy);
-  color: #fff;
+  background: var(--yh-solid);
+  color: var(--yh-on-solid);
   font-size: 0.9375rem;
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -783,7 +885,7 @@
     box-shadow 0.18s ease,
     transform 0.12s ease;
   &:hover {
-    background: var(--yh-navy-600);
+    background: var(--yh-solid-hover);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.2),
       var(--yh-shadow);
@@ -879,8 +981,8 @@
   height: 2.25rem;
   padding: 0 1rem;
   border-radius: 999px;
-  background: var(--yh-navy);
-  color: #fff;
+  background: var(--yh-solid);
+  color: var(--yh-on-solid);
   font-size: 0.8125rem;
   font-weight: 800;
   line-height: 1;
@@ -891,7 +993,7 @@
     background 0.18s ease,
     transform 0.12s ease;
   &:hover {
-    background: var(--yh-navy-600);
+    background: var(--yh-solid-hover);
   }
   &:active {
     transform: translateY(1px);
@@ -941,7 +1043,7 @@
   border-radius: 16px;
   /* 그림자만으로는 흰 카드가 밝은 지면 위에서 경계를 잃습니다.
      네이비를 아주 옅게 섞은 실선 한 겹이 형태를 또렷하게 만듭니다. */
-  border: 1px solid rgb(22 48 92 / 0.07);
+  border: 1px solid var(--yh-card-border);
   box-shadow: var(--yh-shadow-sm);
   transition:
     box-shadow 0.2s ease,
@@ -998,8 +1100,8 @@
   gap: 0.4375rem;
   padding: 0.25rem 0.625rem 0.25rem 0.5rem;
   border-radius: 999px;
-  background: var(--yh-accent-soft);
-  color: var(--yh-accent-dark);
+  background: var(--yh-live-bg);
+  color: var(--yh-live-fg);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.01em;
@@ -1168,8 +1270,9 @@
 @utility yh-deep {
   position: relative;
   background:
-    radial-gradient(110% 80% at 18% 0%, #24497f 0%, transparent 58%),
-    radial-gradient(90% 70% at 92% 100%, #1c3a6b 0%, transparent 55%), var(--yh-navy-900);
+    radial-gradient(110% 80% at 18% 0%, var(--yh-band-glow) 0%, transparent 58%),
+    radial-gradient(90% 70% at 92% 100%, var(--yh-band-glow) 0%, transparent 55%),
+    var(--yh-band);
   color: #fff;
   isolation: isolate;
 }
@@ -1195,7 +1298,7 @@
   position: relative;
   background: var(--yh-surface);
   border-radius: 18px;
-  border: 1px solid rgb(22 48 92 / 0.07);
+  border: 1px solid var(--yh-card-border);
   box-shadow:
     0 2px 6px rgb(22 48 92 / 0.06),
     0 12px 32px rgb(22 48 92 / 0.12);
