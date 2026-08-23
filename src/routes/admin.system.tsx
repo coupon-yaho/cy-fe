@@ -9,11 +9,25 @@ import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
 import {
   ENGINE_LABEL,
   GAP_LABEL,
+  KPI_TARGET,
+  TRAFFIC_LABEL,
   adminApi,
   type AdminMetricsResponse,
   type ErrorPanel,
+  type GapType,
+  type GapValue,
   type MetricsWindow,
+  type Percentiles,
+  type SourceValue,
+  type TrafficKey,
 } from "@/lib/admin";
+
+/** 범위 칩 문구 — 서버는 enum 만 줍니다 */
+const SCOPE_LABEL: Record<AdminMetricsResponse["scope"]["type"], string> = {
+  GLOBAL: "전체",
+  COUPON: "쿠폰",
+  BENCHMARK_RUN: "벤치마크",
+};
 
 export const Route = createFileRoute("/admin/system")({
   head: () => ({ meta: [{ title: "시스템 관제 — 쿠폰 야~호 관리자" }] }),
@@ -56,12 +70,28 @@ function SystemConsole() {
         meta={
           data && (
             <MetaChips
+              // 실행 메타(run·engine·instance)는 벤치마크 API 가 붙어야 옵니다.
+              // 없는 칩은 접습니다 — "-" 로 채우면 실행 중인 것처럼 읽힙니다.
               items={[
-                ["run", data.scope.runId],
-                ["engine", ENGINE_LABEL[data.scope.engine]],
-                ["queue", data.scope.queueMode],
-                ["instance", `${data.scope.instances}대 · ${data.scope.aggregation}`],
-                ["상태", data.scope.runState],
+                ["범위", SCOPE_LABEL[data.scope.type]],
+                ...(data.scope.runId ? ([["run", data.scope.runId]] as [string, string][]) : []),
+                ...(data.scope.engine
+                  ? ([["engine", ENGINE_LABEL[data.scope.engine]]] as [string, string][])
+                  : []),
+                ...(data.scope.queueMode
+                  ? ([["queue", data.scope.queueMode]] as [string, string][])
+                  : []),
+                ...(data.scope.instances
+                  ? ([
+                      [
+                        "instance",
+                        `${data.scope.instances}대 · ${data.scope.aggregation ?? "max"}`,
+                      ],
+                    ] as [string, string][])
+                  : []),
+                ...(data.scope.runState
+                  ? ([["상태", data.scope.runState]] as [string, string][])
+                  : []),
               ]}
             />
           )
@@ -118,19 +148,36 @@ function Delta({ value, unit }: { value: number; unit: string }) {
 }
 
 function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Signal) => void }) {
-  const k = data.kpi;
-  const p99 = k.issueP99Ms.value;
-  const rate = k.systemFailureRate.value;
+  // kpi 블록은 계약에서 없앴습니다 — 같은 값을 두 자리에 두면 어긋납니다.
+  // 6칸은 전부 다른 블록에서 읽습니다(백엔드 회신 2절). 화면이 다시 계산하는 건 없습니다.
+  const c = data.consistency;
+  const t = data.traffic;
+  const p99 = data.latency.success.value?.p99Millis ?? null;
+  const p99Source: SourceValue<number> = {
+    value: p99,
+    state: data.latency.success.state,
+    observedAt: data.latency.success.observedAt,
+  };
+  // 판정이 아니라 개수 세기입니다. severity 재판정(OBS-16)과 다른 이야기입니다.
+  const gaps = [c.luaGap, c.activeDbGap, c.dbCounterGap, c.persistGap];
+  const gapsValid = gaps.filter((g) => g.state === "VALID").length;
+  const gapsPending = gaps.filter((g) => g.state === "PENDING").length;
+  // 실패율은 errors 가 담당합니다. 서버 미구현이면 지어내지 않고 미구현으로 둡니다.
+  const failureClasses = data.errors?.classes.filter((k) => !k.excludedFromNumerator) ?? [];
+  const rateSource = systemFailureRate(failureClasses);
+  const rate = rateSource.value;
+  const lag = data.persistence;
+  const drainSeconds = lag.value?.drainEtaMillis ? Math.ceil(lag.value.drainEtaMillis / 1000) : 0;
 
   return (
     <div className="grid gap-4 md:grid-cols-3 2xl:grid-cols-6">
       <Tile
         label="초과 발급"
         onClick={() => onJump("C")}
-        alert={(k.overIssued.value ?? 0) > 0}
-        sub={`gap ${k.gapsValid} 확정 / ${k.gapsPending} 대기`}
+        alert={(c.overIssued.value ?? 0) > 0}
+        sub={`gap ${gapsValid} 확정 / ${gapsPending} 대기`}
       >
-        <StatedValue source={k.overIssued} render={(v) => v.toLocaleString("ko-KR")} />
+        <StatedValue source={c.overIssued} render={(v) => v.toLocaleString("ko-KR")} />
       </Tile>
 
       <Tile
@@ -139,93 +186,126 @@ function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Sign
         onClick={() => onJump("T")}
         sub={
           <>
-            성공 {k.attemptBreakdown.success.toLocaleString("ko-KR")} · 대기{" "}
-            {k.attemptBreakdown.queued.toLocaleString("ko-KR")} · 거절{" "}
-            {k.attemptBreakdown.reject.toLocaleString("ko-KR")}
+            성공 {rps(t.issueSuccessTps)} · 대기 {rps(t.queueAcceptedRps)} · 거절{" "}
+            {rps(t.policyRejectRps)}
           </>
         }
       >
-        <Value source={k.issueAttemptRps} render={(v) => v.toLocaleString("ko-KR")} />
+        <Value source={t.issueAttemptRps} render={(v) => Math.round(v).toLocaleString("ko-KR")} />
       </Tile>
 
       <Tile
         label="발급 p99"
-        hint="인스턴스 최댓값"
+        hint="성공 응답"
         onClick={() => onJump("L")}
-        alert={p99 !== null && p99 > k.issueP99TargetMs}
-        sub={
-          <>
-            목표 {k.issueP99TargetMs}ms · <Delta value={k.issueP99Delta} unit="ms" />
-          </>
-        }
+        alert={p99 !== null && p99 > KPI_TARGET.issueP99Ms}
+        sub={`목표 ${KPI_TARGET.issueP99Ms}ms`}
       >
-        <Value source={k.issueP99Ms} render={(v) => `${v.toLocaleString("ko-KR")}ms`} />
+        <Value source={p99Source} render={(v) => `${Math.round(v).toLocaleString("ko-KR")}ms`} />
       </Tile>
 
       <Tile
         label="시스템 실패율"
         onClick={() => onJump("E")}
-        alert={rate !== null && rate > k.systemFailureTargetPct}
-        sub={`목표 ${k.systemFailureTargetPct}% 이하`}
+        alert={rate !== null && rate > KPI_TARGET.systemFailurePct}
+        sub={`목표 ${KPI_TARGET.systemFailurePct}% 이하`}
       >
-        <StatedValue source={k.systemFailureRate} render={(v) => `${v.toFixed(3)}%`} />
+        <StatedValue source={rateSource} render={(v) => `${v.toFixed(3)}%`} />
       </Tile>
 
       <Tile
         label="persist lag"
         onClick={() => onJump("S")}
-        sub={
-          k.persistLagDrainSeconds
-            ? `소진 예상 ${k.persistLagDrainSeconds}초`
-            : "0에 도달해 최종 판정 가능"
-        }
+        sub={drainSeconds ? `소진 예상 ${drainSeconds}초` : "0에 도달해 최종 판정 가능"}
       >
-        <Value source={k.persistLag} render={(v) => v.toLocaleString("ko-KR")} />
+        <Value
+          source={{ ...lag, value: lag.value?.lagTotal ?? null }}
+          render={(v) => v.toLocaleString("ko-KR")}
+        />
       </Tile>
 
       <Tile
         label="Circuit Breaker"
-        hint={`임계 ${k.breakerThresholdPct}%`}
+        hint={`임계 ${KPI_TARGET.breakerPct}%`}
         onClick={() => onJump("E")}
       >
-        <ul className="space-y-0.5">
-          {k.breakers.map((b) => (
-            <li key={b.name} className="t-body-sm flex items-baseline gap-2 whitespace-nowrap">
-              <span className="num shrink-0 text-hig-secondary">{b.name}</span>
-              <span className="num ml-auto shrink-0 font-semibold">
-                <StatedValue source={b.failureRate} render={(v) => `${v}%`} />
-              </span>
-              <span className="t-caption w-14 shrink-0 text-right text-hig-muted">
-                {b.state ?? ""}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {data.circuitBreakers.length === 0 ? (
+          // 빈 배열은 "차단기 정상"이 아닙니다. Resilience4j 도입 전이라 원천이 없습니다.
+          <p className="t-body-sm text-hig-muted">차단기 미도입</p>
+        ) : (
+          <ul className="space-y-0.5">
+            {data.circuitBreakers.map((b) => (
+              <li key={b.name} className="t-body-sm flex items-baseline gap-2 whitespace-nowrap">
+                <span className="num shrink-0 text-hig-secondary">{b.name}</span>
+                <span className="t-caption ml-auto shrink-0 text-right text-hig-muted">
+                  {b.state}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Tile>
     </div>
   );
 }
 
-/* ── 신호 탭 ─────────────────────────────────────── */
+/**
+ * RPS 표기 — 서버는 rate() 결과라 double 을 줍니다. 초당 건수에서 소수점은 화면에
+ * 의미가 없어 반올림합니다. 값이 없으면 대시입니다(0 으로 채우지 않습니다).
+ */
+function rps(v: SourceValue<number>) {
+  return v.value === null || v.value === undefined
+    ? "—"
+    : Math.round(v.value).toLocaleString("ko-KR");
+}
+
+/**
+ * 시스템 실패율 — 분자는 분자 제외가 아닌 분류의 합입니다.
+ * 서버가 이미 퍼센트로 나눠 준 값을 더하기만 합니다. 화면이 분모로 나누지 않습니다.
+ */
+function systemFailureRate(classes: ErrorPanel["classes"]): SourceValue<number> {
+  if (classes.length === 0) {
+    return { value: null, state: "PENDING", observedAt: null, note: "서버 미구현 (OBS-13)" };
+  }
+  const usable = classes.filter((k) => k.rate.value !== null && k.rate.value !== undefined);
+  if (usable.length === 0) {
+    const first = classes[0]!.rate;
+    return {
+      value: null,
+      state: first.state,
+      observedAt: first.observedAt,
+      ...(first.note ? { note: first.note } : {}),
+    };
+  }
+  return {
+    value: usable.reduce((sum, k) => sum + (k.rate.value ?? 0), 0),
+    state: "VALID",
+    observedAt: usable[0]!.rate.observedAt,
+  };
+}
 
 function signalTone(data: AdminMetricsResponse, s: Signal): string {
-  if (s === "C") return data.consistency.verdict === null ? "bg-attention" : "bg-positive";
+  if (s === "C") return data.consistency.verdict == null ? "bg-attention" : "bg-positive";
   if (s === "L") {
-    const p99 = data.latency.success.p99.value;
-    return p99 !== null && p99 > data.latency.success.targetMs ? "bg-attention" : "bg-positive";
+    const p99 = data.latency.success.value?.p99Millis ?? null;
+    return p99 !== null && p99 > KPI_TARGET.issueP99Ms ? "bg-attention" : "bg-positive";
   }
   if (s === "T")
-    return data.kpi.issueAttemptRps.state === "NO_TRAFFIC" ? "bg-hig-muted" : "bg-positive";
+    return data.traffic.issueAttemptRps.state === "NO_TRAFFIC" ? "bg-hig-muted" : "bg-positive";
   if (s === "E") {
-    const rate = data.kpi.systemFailureRate.value;
-    return rate !== null && rate > data.kpi.systemFailureTargetPct
-      ? "bg-viz-critical"
-      : "bg-viz-good";
+    // errors 가 없으면 판정하지 않습니다 — 실패가 없다는 뜻이 아닙니다.
+    const classes = data.errors?.classes.filter((k) => !k.excludedFromNumerator) ?? [];
+    const rate = systemFailureRate(classes).value;
+    if (rate === null) return "bg-hig-muted";
+    return rate > KPI_TARGET.systemFailurePct ? "bg-viz-critical" : "bg-viz-good";
   }
-  const worst = Math.max(...data.saturation.resources.map((r) => r.utilization.value ?? 0));
-  return worst >= data.saturation.thresholds.critical
+  // saturation 은 서버 미구현입니다. 값이 없으면 회색 — 정상(초록)으로 칠하지 않습니다.
+  const sat = data.saturation;
+  if (!sat) return "bg-hig-muted";
+  const worst = Math.max(...sat.resources.map((r) => r.utilization.value ?? 0));
+  return worst >= sat.thresholds.critical
     ? "bg-live"
-    : worst >= data.saturation.thresholds.high
+    : worst >= sat.thresholds.high
       ? "bg-attention"
       : "bg-positive";
 }
@@ -272,7 +352,15 @@ const ZONE_LABEL: Record<"Admission" | "Persistence" | "Telemetry", string> = {
 
 function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
   const c = data.consistency;
-  const persistence = data.saturation.queues.find((q) => q.zone === "Persistence");
+  const lag = data.persistence;
+  const drainSeconds = lag.value?.drainEtaMillis ? Math.ceil(lag.value.drainEtaMillis / 1000) : 0;
+  // 서버가 gap 을 평탄한 필드로 내려줍니다. 화면 루프는 이 순서 그대로 4칸입니다.
+  const gaps: { type: GapType; value: GapValue }[] = [
+    { type: "LUA_GAP", value: c.luaGap },
+    { type: "ACTIVE_DB_GAP", value: c.activeDbGap },
+    { type: "PERSIST_GAP", value: c.persistGap },
+    { type: "DB_COUNTER_GAP", value: c.dbCounterGap },
+  ];
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1fr_1.2fr]">
@@ -284,10 +372,12 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
         <p className="t-hero num">
           <Value source={c.overIssued} render={(v) => v.toLocaleString("ko-KR")} />
         </p>
-        <p className="t-body-sm mt-3 text-hig-secondary">
-          ISSUED + USED <span className="num">{c.issuedPlusUsed.toLocaleString("ko-KR")}</span> /{" "}
-          <span className="num">{c.totalQuantity.toLocaleString("ko-KR")}</span>
-        </p>
+        {c.issuedPlusUsed !== undefined && c.totalQuantity !== undefined && (
+          <p className="t-body-sm mt-3 text-hig-secondary">
+            ISSUED + USED <span className="num">{c.issuedPlusUsed.toLocaleString("ko-KR")}</span> /{" "}
+            <span className="num">{c.totalQuantity.toLocaleString("ko-KR")}</span>
+          </p>
+        )}
         <p className="t-body-sm mt-4">
           판정{" "}
           <b className={c.verdict === "PASS" ? "text-positive" : "text-attention"}>
@@ -306,7 +396,7 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
             </tr>
           </thead>
           <tbody>
-            {c.gaps.map((g) => (
+            {gaps.map((g) => (
               <tr key={g.type}>
                 <td className="num font-medium">{GAP_LABEL[g.type]}</td>
                 <td className="text-hig-secondary">
@@ -323,30 +413,52 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
         </table>
       </TablePanel>
 
-      {persistence && (
-        <Panel
-          title="저장 대기"
-          hint="0이 되어야 최종 판정"
-          action={
-            <span className="num t-caption text-hig-muted">
-              {data.kpi.persistLagDrainSeconds
-                ? `${data.kpi.persistLagDrainSeconds}초 남음`
-                : "완료"}
-            </span>
-          }
-        >
-          <p className="t-tile num">
-            <Value source={data.kpi.persistLag} render={(v) => v.toLocaleString("ko-KR")} />
-          </p>
-          <div className="mt-3">
-            <SeriesChart
-              data={persistence.series}
-              series={[{ key: "lag", label: "persist lag", color: "var(--viz-2)" }]}
-              height={150}
-            />
+      <Panel
+        title="저장 대기"
+        hint="0이 되어야 최종 판정"
+        state={lag.state}
+        action={
+          <span className="num t-caption text-hig-muted">
+            {drainSeconds ? `${drainSeconds}초 남음` : "완료"}
+          </span>
+        }
+      >
+        <p className="t-tile num">
+          <Value
+            source={{ ...lag, value: lag.value?.lagTotal ?? null }}
+            render={(v) => v.toLocaleString("ko-KR")}
+          />
+        </p>
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
+          <div>
+            <dt className="t-caption text-hig-muted">유입/초</dt>
+            <dd className="num t-body-sm font-semibold">
+              <Value
+                source={{ ...lag, value: lag.value?.arrivalRate ?? null }}
+                render={(v) => Math.round(v).toLocaleString("ko-KR")}
+              />
+            </dd>
           </div>
-        </Panel>
-      )}
+          <div>
+            <dt className="t-caption text-hig-muted">처리/초</dt>
+            <dd className="num t-body-sm font-semibold">
+              <Value
+                source={{ ...lag, value: lag.value?.consumeRate ?? null }}
+                render={(v) => Math.round(v).toLocaleString("ko-KR")}
+              />
+            </dd>
+          </div>
+          <div>
+            <dt className="t-caption text-hig-muted">파티션 최대</dt>
+            <dd className="num t-body-sm font-semibold">
+              <Value
+                source={{ ...lag, value: lag.value?.partitionMax ?? null }}
+                render={(v) => v.toLocaleString("ko-KR")}
+              />
+            </dd>
+          </div>
+        </dl>
+      </Panel>
     </div>
   );
 }
@@ -361,91 +473,84 @@ const PCT_SERIES: SeriesSpec[] = [
 
 function LatencySignal({ data }: { data: AdminMetricsResponse }) {
   const l = data.latency;
-  const depSeries: SeriesSpec[] = [
-    { key: "redis", label: "Redis p99", color: "var(--viz-1)" },
-    { key: "hikari", label: "Hikari p99", color: "var(--viz-2)" },
-    { key: "kafka", label: "Kafka avg", color: "var(--viz-3)" },
-  ];
+  const d = data.dependencies;
+  // 백분위 3종은 한 원천에서 같이 나옵니다 — 상태도 하나입니다(admin-api-spec §6.1).
+  // 셋을 쪼개 다른 상태로 그리지 않습니다.
+  const pct = (
+    src: typeof l.success,
+    key: "p50Millis" | "p95Millis" | "p99Millis",
+  ): SourceValue<number> => ({
+    value: src.value?.[key] ?? null,
+    state: src.state,
+    observedAt: src.observedAt,
+  });
+  const depRow = (label: string, src: (typeof d)["redis"], key: "p99Millis" | "p95Millis") => (
+    <div key={label}>
+      <dt className="t-caption text-hig-muted">{label}</dt>
+      <dd className="num t-body-sm font-semibold">
+        <StatedValue
+          source={{ value: src.value?.[key] ?? null, state: src.state, observedAt: src.observedAt }}
+          render={(v) => `${v < 10 ? v.toFixed(1) : v.toLocaleString("ko-KR")}ms`}
+        />
+      </dd>
+    </div>
+  );
+  const pctRow = (label: string, src: typeof l.success) => (
+    <div className="flex flex-wrap gap-x-8 gap-y-2">
+      {(["p50Millis", "p95Millis", "p99Millis"] as const).map((k) => (
+        <div key={k}>
+          <p className="t-caption text-hig-muted">{k.replace("Millis", "")}</p>
+          <p className="t-tile num">
+            <StatedValue
+              source={pct(src, k)}
+              render={(v) => `${v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString("ko-KR")}ms`}
+            />
+          </p>
+        </div>
+      ))}
+      <span className="sr-only">{label}</span>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title="성공 응답시간" hint="/issue 201">
-          <SeriesLegend
-            series={PCT_SERIES}
-            values={{
-              p50: l.success.p50.value,
-              p95: l.success.p95.value,
-              p99: l.success.p99.value,
-            }}
-            unit="ms"
-          />
-          <div className="mt-3">
-            <SeriesChart
-              data={l.success.series}
-              series={PCT_SERIES}
-              unit="ms"
-              reference={{ y: l.success.targetMs, label: `목표 ${l.success.targetMs}ms` }}
-            />
-          </div>
+        <Panel title="성공 응답시간" hint="/issue 201" state={l.success.state}>
+          {pctRow("성공", l.success)}
+          <p className="t-caption mt-3 text-hig-muted">목표 p99 {KPI_TARGET.issueP99Ms}ms</p>
+          {l.successSeries && l.successSeries.length > 0 && (
+            <div className="mt-3">
+              <SeriesChart
+                data={l.successSeries}
+                series={PCT_SERIES}
+                unit="ms"
+                reference={{
+                  y: KPI_TARGET.issueP99Ms,
+                  label: `목표 ${KPI_TARGET.issueP99Ms}ms`,
+                }}
+              />
+            </div>
+          )}
         </Panel>
 
-        <Panel
-          title="실패 응답시간"
-          hint="정책 거절"
-          action={
-            <span className="t-caption text-hig-muted">
-              시스템 실패 p99{" "}
-              <b className="num font-semibold text-hig-secondary">
-                <Value
-                  source={l.failure.systemFailureP99Ms}
-                  render={(v) => `${v.toLocaleString("ko-KR")}ms`}
-                />
-              </b>
-            </span>
-          }
-        >
-          <SeriesLegend
-            series={PCT_SERIES}
-            values={{
-              p50: l.failure.p50.value,
-              p95: l.failure.p95.value,
-              p99: l.failure.p99.value,
-            }}
-            format={(v) => v.toFixed(1)}
-            unit="ms"
-          />
-          <div className="mt-3">
-            <SeriesChart
-              data={l.failure.series}
-              series={PCT_SERIES}
-              unit="ms"
-              format={(v) => v.toFixed(1)}
-            />
-          </div>
+        <Panel title="실패 응답시간" hint="정책 거절 · 시스템 실패는 축이 다릅니다">
+          <p className="t-caption text-hig-muted">정책 거절</p>
+          {pctRow("정책 거절", l.policyReject)}
+          <p className="t-caption mt-4 text-hig-muted">시스템 실패</p>
+          {pctRow("시스템 실패", l.systemFailure)}
+          <p className="t-caption mt-3 text-hig-muted">
+            둘 다 PENDING 이면 OBS-4 Timer 가 outcome 을 성공·실패로만 등록해 두 경로가 아직 갈리지
+            않은 것입니다.
+          </p>
         </Panel>
       </div>
 
-      <Panel title="의존성 지연" hint="계열별 최댓값 대비 %">
-        <SeriesLegend
-          series={depSeries}
-          values={{
-            redis: l.dependency.redisP99Ms.value,
-            hikari: l.dependency.hikariP99Ms.value,
-            kafka: l.dependency.kafkaAvgMs.value,
-          }}
-          format={(v) => (v < 10 ? v.toFixed(1) : v.toLocaleString("ko-KR"))}
-          unit="ms"
-        />
-        <div className="mt-3">
-          <SeriesChart
-            data={l.dependency.series}
-            series={depSeries}
-            unit="%"
-            yDomain={[0, 100]}
-            height={150}
-          />
-        </div>
+      <Panel title="의존성 지연" hint="통계 종류가 달라 한 축에 합치지 않습니다">
+        <dl className="flex flex-wrap gap-x-8 gap-y-3">
+          {depRow("Redis p99", d.redis, "p99Millis")}
+          {depRow("Hikari p99", d.hikari, "p99Millis")}
+          {depRow("Kafka p95", d.kafka, "p95Millis")}
+        </dl>
       </Panel>
     </div>
   );
@@ -461,22 +566,24 @@ function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
     { key: "policyRejectRps", label: "정책 거절", color: "var(--viz-2)" },
     { key: "systemFailureRps", label: "시스템 실패", color: "var(--viz-8)" },
   ];
-  const last = t.series[t.series.length - 1];
+  const last = t.series?.[t.series.length - 1];
 
-  // 거절 = RPS − TPS 는 폐기됐습니다. totalRps 에는 /entry·/queue 폴링과 조회가 섞여
-  // 있어 그 차이가 거절이 아닙니다. 분모는 issueAttemptRps 하나이고 totalRps 는 배경
-  // 참고용이므로, 6개를 평평하게 늘어놓지 않고 역할별로 끊어서 보여 줍니다.
-  const denominator = t.counters.filter((c) => c.key === "issueAttemptRps");
-  const outcomes = t.counters.filter((c) => c.key !== "issueAttemptRps" && c.key !== "totalRps");
-  const background = t.counters.filter((c) => c.key === "totalRps");
-  const counterRow = (c: (typeof t.counters)[number]) => (
-    <tr key={c.key}>
+  // 거절 = RPS − TPS 는 폐기됐습니다. totalRps 도 계약에서 빠졌습니다 — 폴링·조회가 섞여
+  // 있어 분모로도 배경으로도 못 씁니다. 분모는 issueAttemptRps 하나뿐이라 그것만 따로 세웁니다.
+  const outcomes: TrafficKey[] = [
+    "issueSuccessTps",
+    "queueAcceptedRps",
+    "policyRejectRps",
+    "systemFailureRps",
+  ];
+  const counterRow = (key: TrafficKey) => (
+    <tr key={key}>
       <td className="font-medium">
-        {c.label}
-        <span className="num t-caption ml-2 text-hig-muted">{c.key}</span>
+        {TRAFFIC_LABEL[key]}
+        <span className="num t-caption ml-2 text-hig-muted">{key}</span>
       </td>
       <td className="num text-right font-semibold">
-        <StatedValue source={c.value} render={(v) => v.toLocaleString("ko-KR")} />
+        <StatedValue source={t[key]} render={(v) => Math.round(v).toLocaleString("ko-KR")} />
       </td>
     </tr>
   );
@@ -495,11 +602,9 @@ function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
         <table className="ops-table">
           <tbody>
             {groupRow("기준 분모", "비율 계산은 전부 이 값이 분모입니다")}
-            {denominator.map(counterRow)}
+            {counterRow("issueAttemptRps")}
             {groupRow("결과 분류", "합이 아니라 위의 발급 시도가 분모입니다")}
             {outcomes.map(counterRow)}
-            {groupRow("배경 참고", "폴링·조회가 섞여 있어 분모로 쓰지 않습니다")}
-            {background.map(counterRow)}
           </tbody>
         </table>
       </TablePanel>
@@ -514,7 +619,19 @@ function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
           }
         />
         <div className="mt-3">
-          <SeriesChart data={t.series} series={series} markers={t.markers} height={240} />
+          {t.series && t.series.length > 0 ? (
+            <SeriesChart
+              data={t.series}
+              series={series}
+              {...(t.markers ? { markers: t.markers } : {})}
+              height={240}
+            />
+          ) : (
+            // 서버는 시계열을 주지 않습니다. 화면 폴링 누적은 별도 작업이라 지금은 비워 둡니다.
+            <p className="t-body-sm text-hig-muted">
+              추이는 폴링 누적으로 그립니다 — 누적 버퍼 작업 대기(계약 티켓).
+            </p>
+          )}
         </div>
       </Panel>
     </div>
@@ -537,8 +654,7 @@ function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
     );
   }
   // 분모는 서버가 denominator 로 알려줍니다. 화면에 문자열을 박으면 서버가 바꿔도 캡션이 거짓말합니다.
-  const denominatorLabel =
-    data.traffic.counters.find((c) => c.key === e.denominator)?.label ?? e.denominator;
+  const denominatorLabel = TRAFFIC_LABEL[e.denominator] ?? e.denominator;
   const series: SeriesSpec[] = [
     { key: "dependencyFailure", label: "의존성", color: "var(--viz-2)" },
     { key: "applicationFailure", label: "애플리케이션", color: "var(--viz-8)" },
@@ -628,7 +744,7 @@ function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
         <SeriesLegend series={series} />
         <div className="mt-3">
           <SeriesChart
-            data={e.series}
+            data={e.series ?? []}
             series={series}
             unit="%"
             format={(v) => v.toFixed(2)}
@@ -643,7 +759,18 @@ function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
 /* ── S ───────────────────────────────────────────── */
 
 function SaturationSignal({ data }: { data: AdminMetricsResponse }) {
+  // 자원 6종·in-flight·큐는 서버가 통째로 안 줍니다. 0 이나 빈 막대로 그리면
+  // "여유 있음"이라는 거짓 신호가 되므로 미구현이라 적습니다.
   const s = data.saturation;
+  if (!s) {
+    return (
+      <Panel title="자원 포화">
+        <p className="t-body-sm text-hig-muted">
+          서버가 자원·in-flight·큐 지표를 아직 내려주지 않습니다 — 백엔드 신규 티켓 대기.
+        </p>
+      </Panel>
+    );
+  }
 
   return (
     <div className="space-y-4">

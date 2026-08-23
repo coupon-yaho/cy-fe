@@ -102,7 +102,15 @@ import type { QueueMode } from "@/lib/runtime-config";
 
 export type { QueueMode };
 
+/** 요청 파라미터 — 축약형만 보냅니다 */
 export type MetricsWindow = "1m" | "5m" | "15m";
+/** 응답 표기 — 서버는 enum 이름으로 돌려줍니다 (admin-api-spec §6.1) */
+export type MetricsWindowName = "ONE_MINUTE" | "FIVE_MINUTES" | "FIFTEEN_MINUTES";
+export const WINDOW_NAME: Record<MetricsWindow, MetricsWindowName> = {
+  "1m": "ONE_MINUTE",
+  "5m": "FIVE_MINUTES",
+  "15m": "FIFTEEN_MINUTES",
+};
 export type EngineVersion = "v1" | "v2" | "v3";
 
 export const ENGINE_LABEL: Record<EngineVersion, string> = {
@@ -400,13 +408,21 @@ export interface BreakerRow {
 }
 
 export interface RunScope {
-  runId: string;
-  engine: EngineVersion;
-  queueMode: QueueMode;
-  campaign: string;
-  instances: number;
-  aggregation: "max" | "sum";
-  runState: "IDLE" | "RUNNING" | "DRAINING" | "DONE";
+  /** 서버가 주는 범위 구분 (admin-api-spec §6.1) */
+  type: "GLOBAL" | "COUPON" | "BENCHMARK_RUN";
+  couponId?: number;
+  benchmarkRunId?: number;
+  /**
+   * 실행 메타 — 벤치마크 API(7.x)가 붙어야 채워집니다. 관제 응답에는 없으므로 optional 입니다.
+   * 없으면 화면이 상단 칩을 접습니다. 0 이나 "-" 로 채우지 않습니다.
+   */
+  runId?: string;
+  engine?: EngineVersion;
+  queueMode?: QueueMode;
+  campaign?: string;
+  instances?: number;
+  aggregation?: "max" | "sum";
+  runState?: "IDLE" | "RUNNING" | "DRAINING" | "DONE";
 }
 
 export interface AdminMetricsKpi {
@@ -439,12 +455,16 @@ export interface ConsistencyPanel {
    * 어느 한쪽에서 파생시키지 않습니다. 평가 가능한 gap 이 없으면 null.
    */
   severity: Severity | null;
-  /** gap 배열 밖 독립 필드입니다 (G0-04). 배열에 넣으면 렌더 루프가 다섯 칸을 그립니다 */
+  /** gap 과 같은 층이 아닙니다 (G0-04). 배열에 넣으면 렌더 루프가 다섯 칸을 그립니다 */
   overIssued: GapValue;
-  issuedPlusUsed: number;
-  totalQuantity: number;
-  /** 정확히 4종 */
-  gaps: { type: GapType; value: GapValue }[];
+  /** gap 4종 — 서버가 평탄한 필드로 내려줍니다 (admin-api-spec §6.1) */
+  luaGap: GapValue;
+  activeDbGap: GapValue;
+  dbCounterGap: GapValue;
+  persistGap: GapValue;
+  /** 발급 원장 대사 — 원천(DB 조회)이 아직 없어 optional 입니다 */
+  issuedPlusUsed?: number;
+  totalQuantity?: number;
 }
 
 /**
@@ -459,50 +479,77 @@ export interface LatencyGroupStat {
   series: Point[];
 }
 
+/** 백분위 3종은 한 원천에서 같이 나옵니다. 상태도 하나입니다 (admin-api-spec §6.1) */
+export interface Percentiles {
+  p50Millis: number;
+  p95Millis: number;
+  p99Millis: number;
+}
+
 export interface LatencyPanel {
   /** 13 성공 응답시간 — 주 KPI */
-  success: {
-    p50: SourceValue<number>;
-    p95: SourceValue<number>;
-    p99: SourceValue<number>;
-    targetMs: number;
-    percentileMode: "instance-max" | "merged";
-    series: Point[];
-    /** 그룹별 분해 */
-    groups: LatencyGroupStat[];
-  };
+  success: SourceValue<Percentiles>;
   /** 14 실패 응답시간 — 정책 거절과 시스템 실패는 축이 다릅니다 */
-  failure: {
-    p50: SourceValue<number>;
-    p95: SourceValue<number>;
-    p99: SourceValue<number>;
-    systemFailureP99Ms: SourceValue<number>;
-    series: Point[];
-    /** 그룹별 분해 */
-    groups: LatencyGroupStat[];
-  };
-  /** 15 의존성 지연 — 통계 종류가 달라 한 축에 두지 않고 계열별로 정규화합니다 */
-  dependency: {
-    redisP99Ms: SourceValue<number>;
-    hikariP99Ms: SourceValue<number>;
-    kafkaAvgMs: SourceValue<number>;
-    series: Point[];
-  };
+  policyReject: SourceValue<Percentiles>;
+  systemFailure: SourceValue<Percentiles>;
+  /** 시계열·uri 그룹 분해는 아직 서버에 없습니다 (OBS-11) */
+  successSeries?: Point[];
+  groups?: LatencyGroupStat[];
+}
+
+/** 15 의존성 지연 — 최상위 블록입니다. 통계 종류가 달라 한 축에 합치지 않습니다 */
+export interface DependencyPanel {
+  redis: SourceValue<{ p95Millis?: number; p99Millis?: number; errorRate?: number }>;
+  hikari: SourceValue<{ p95Millis?: number; p99Millis?: number; errorRate?: number }>;
+  kafka: SourceValue<{ p95Millis?: number; p99Millis?: number; errorRate?: number }>;
+}
+
+/** 영속화 lag — 최상위 블록. 원천(Kafka consumer lag)이 아직 없어 PENDING 으로 옵니다 */
+export interface PersistenceLag {
+  lagTotal: number;
+  partitionMax: number;
+  arrivalRate: number;
+  consumeRate: number;
+  netDrainRate: number;
+  drainEtaMillis: number | null;
+}
+
+/** 회로 차단기 — 최상위 배열. Resilience4j 도입 전이라 지금은 항상 빈 배열입니다 */
+export interface CircuitBreakerRow {
+  name: string;
+  state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  openedAt?: string;
 }
 
 export type TrafficKey =
-  | "totalRps"
   | "issueAttemptRps"
   | "issueSuccessTps"
   | "queueAcceptedRps"
   | "policyRejectRps"
   | "systemFailureRps";
 
+/** 결과 분류 라벨 — 서버는 키만 주고 화면 문구는 프론트 상수입니다 */
+export const TRAFFIC_LABEL: Record<TrafficKey, string> = {
+  issueAttemptRps: "발급 시도",
+  issueSuccessTps: "발급 성공",
+  queueAcceptedRps: "대기 진입",
+  policyRejectRps: "정책 거절",
+  systemFailureRps: "시스템 실패",
+};
+
 export interface TrafficPanel {
-  /** 16 결과 분류 처리량 — 차감식 금지, 전용 Counter 6종 */
-  counters: { key: TrafficKey; label: string; value: SourceValue<number> }[];
-  series: Point[];
-  markers: { t: number; label: string }[];
+  /**
+   * 16 결과 분류 처리량 — 차감식 금지, 전용 Counter 5종.
+   * totalRps 는 폐기됐습니다. 폴링·조회가 섞여 있어 분모로도 배경으로도 쓰지 않습니다.
+   */
+  issueAttemptRps: SourceValue<number>;
+  issueSuccessTps: SourceValue<number>;
+  queueAcceptedRps: SourceValue<number>;
+  policyRejectRps: SourceValue<number>;
+  systemFailureRps: SourceValue<number>;
+  /** 시계열은 서버가 주지 않습니다 — 화면이 폴링으로 누적합니다. 목에서만 채워집니다 */
+  series?: Point[];
+  markers?: { t: number; label: string }[];
 }
 
 export interface ErrorPanel {
@@ -515,7 +562,8 @@ export interface ErrorPanel {
     excludedFromNumerator: boolean;
     rate: SourceValue<number>;
   }[];
-  series: Point[];
+  /** 시계열은 서버가 주지 않습니다 — 화면 누적. 목에서만 채워집니다 */
+  series?: Point[];
   /** 18 실패 원인 Top N — 저카디널리티 화이트리스트만 */
   topReasons: { httpStatus: number | string; reasonCode: string; count: number }[];
 }
@@ -551,17 +599,32 @@ export interface SaturationPanel {
   thresholds: { warn: number; high: number; critical: number };
 }
 
+/**
+ * 관제 응답 — admin-api-spec.md §6.1 이 정본입니다.
+ *
+ * kpi 블록은 없습니다. KPI 6칸에 필요한 값이 이미 다른 블록에 있어서, 같은 값을 두 자리에
+ * 두지 않기로 했습니다(백엔드 회신). 화면이 consistency·traffic·latency 에서 읽습니다.
+ * errors · saturation 은 서버 미구현이라 optional 입니다 — 없으면 화면이 미구현이라 적습니다.
+ */
 export interface AdminMetricsResponse {
   meta: ResponseMeta;
-  window: MetricsWindow;
+  window: MetricsWindowName;
   scope: RunScope;
-  kpi: AdminMetricsKpi;
+  snapshotAt: string;
   consistency: ConsistencyPanel;
-  latency: LatencyPanel;
   traffic: TrafficPanel;
-  errors: ErrorPanel;
-  saturation: SaturationPanel;
+  latency: LatencyPanel;
+  dependencies: DependencyPanel;
+  persistence: SourceValue<PersistenceLag>;
+  circuitBreakers: CircuitBreakerRow[];
+  /** 17·18 — 백엔드 OBS-13 대기 */
+  errors?: ErrorPanel;
+  /** 19·20·21 — 백엔드 신규 티켓 대기 */
+  saturation?: SaturationPanel;
 }
+
+/** KPI 6칸의 프론트 상수 — 서버가 매 폴링마다 실어 보낼 이유가 없는 값들입니다 */
+export const KPI_TARGET = { issueP99Ms: 100, systemFailurePct: 0.1, breakerPct: 50 } as const;
 
 /* ══ D3 분석·비교 (OBS-14b) ════════════════════════ */
 
