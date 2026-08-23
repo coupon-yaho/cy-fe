@@ -9,10 +9,10 @@ import { BrandLogo } from "@/components/brand-logo";
 export function SiteFooter() {
   return (
     <footer className="mt-28 border-t border-yh-rule bg-yh-paper-2">
-      <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-14 sm:grid-cols-[1fr_auto]">
+      <div className="mx-auto grid w-full max-w-6xl gap-8 px-5 py-10 sm:grid-cols-[1fr_auto]">
         <div>
-          <BrandLogo variant="key" className="h-20" />
-          <p className="yh-body mt-5 max-w-[42ch] text-yh-ink-2">
+          <BrandLogo variant="key" className="h-16" />
+          <p className="yh-small mt-4 max-w-[42ch] text-yh-ink-2">
             매월 열리는 12개 브랜드 데이. 정해진 수량을 선착순으로 나눠 드립니다.
           </p>
         </div>
@@ -29,7 +29,7 @@ export function SiteFooter() {
         </nav>
       </div>
       <div className="border-t border-yh-rule">
-        <p className="yh-small mx-auto w-full max-w-6xl px-5 py-6 text-yh-ink-3">
+        <p className="yh-small mx-auto w-full max-w-6xl px-5 py-4 text-yh-ink-3">
           로그인과 알림은 데모용입니다.
         </p>
       </div>

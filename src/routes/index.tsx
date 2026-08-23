@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { BRANDS } from "@/lib/coupon";
+import { Reveal, useCountUp } from "@/components/coupon/reveal";
 import { SectionHead } from "@/components/coupon/section-head";
 import { GradeChip } from "@/components/coupon/grade-chip";
 import { RoundRow } from "@/components/coupon/round-card";
@@ -61,7 +62,7 @@ function Landing() {
     .sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
 
   const headline = live[0] ?? upcoming[0];
-  const board = [...live, ...upcoming].slice(0, 6);
+  const board = [...live, ...upcoming].slice(0, 4);
 
   return (
     <div>
@@ -69,7 +70,9 @@ function Landing() {
 
       <LiveNow round={headline} loading={isLoading} grade={session?.grade ?? null} />
 
-      <section className="mx-auto w-full max-w-6xl px-5 py-20">
+      <section className="mx-auto w-full max-w-6xl px-5 py-14">
+        {/* 제목은 연출로 감싸지 않습니다 — 스크롤이 닿기 전에 섹션이 통째로
+            비어 보이면 고장으로 읽힙니다. 목록만 올라오게 둡니다. */}
         <SectionHead
           eyebrow="다가오는 일정"
           title="열리는 순서대로"
@@ -81,19 +84,18 @@ function Landing() {
           }
         />
 
-        <div className="yh-card mt-10 overflow-hidden px-6 sm:px-8">
+        <Reveal className="yh-card mt-8 overflow-hidden px-6 sm:px-8">
           {isLoading
-            ? Array.from({ length: 5 }, (_, i) => (
+            ? Array.from({ length: 4 }, (_, i) => (
                 <Skeleton key={i} className="my-4 h-16 rounded-xl" />
               ))
             : board.map((r) => <RoundRow key={r.id} round={r} grade={session?.grade ?? null} />)}
-        </div>
+        </Reveal>
       </section>
 
       <BrandGrid />
       <Grades rounds={rounds} grade={session?.grade ?? null} />
-      <HowItWorks />
-      <Rules />
+      <Closing />
     </div>
   );
 }
@@ -111,32 +113,32 @@ function Landing() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-yh-paper-2">
-      {/* 캐릭터 뒤로 은은한 빛 — 아트워크의 글로우를 지면으로 이어 줍니다 */}
+    <section className="yh-hero-band yh-deep yh-grain relative overflow-hidden pb-16">
+      {/* 캐릭터 뒤 광 — 어두운 면 위에서 아트워크의 흰 외곽선이 살아납니다 */}
       <div
-        className="pointer-events-none absolute -top-40 -left-32 size-[42rem] rounded-full opacity-70 blur-3xl"
-        style={{ background: "radial-gradient(circle, #ffffff 0%, transparent 68%)" }}
+        className="pointer-events-none absolute top-0 left-0 size-[46rem] rounded-full opacity-45 blur-3xl"
+        style={{ background: "radial-gradient(circle, #4d7ec4 0%, transparent 66%)" }}
         aria-hidden
       />
 
-      <div className="relative mx-auto grid w-full max-w-6xl items-center gap-6 px-5 py-12 lg:grid-cols-[minmax(0,52%)_minmax(0,1fr)] lg:py-16">
+      <div className="relative z-[1] mx-auto grid w-full max-w-6xl items-center gap-6 px-5 pt-8 pb-2 lg:grid-cols-[minmax(0,46%)_minmax(0,1fr)] lg:pt-10">
         <div className="order-2 lg:order-1">
           <img
             src="/hero-character.png"
             alt="쿠폰을 펼쳐 든 쿠폰 야~호 안내 캐릭터"
             width={844}
             height={595}
-            className="mx-auto w-full max-w-sm drop-shadow-[0_20px_44px_rgba(22,48,92,0.18)] sm:max-w-md lg:max-w-none"
+            className="yh-hero-art mx-auto w-full max-w-[11rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:max-w-[15rem] lg:max-w-[28rem]"
           />
         </div>
 
         <div className="order-1 lg:order-2">
           {/* 로고 리본에 적힌 문구를 그대로 씁니다 — 브랜드가 이미 정해 둔 말입니다 */}
-          <p className="yh-label inline-flex rounded-full bg-yh-navy px-3.5 py-1.5 text-white">
+          <p className="yh-label inline-flex rounded-full bg-white/14 px-3.5 py-1.5 text-white/80 ring-1 ring-white/20">
             할인 생활의 즐거움
           </p>
 
-          <h1 className="yh-hero mt-5">
+          <h1 className="yh-hero mt-4 text-white">
             매달 12개 브랜드가
             <br />
             하루씩 문을 엽니다
@@ -147,14 +149,10 @@ function Hero() {
             시각을 미리 확인해 두세요.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link to="/events" className="yh-btn">
-              브랜드 데이 보기
-            </Link>
-            <Link to="/my/coupons" className="yh-btn-ghost">
-              내 쿠폰함
-            </Link>
-          </div>
+          {/* 히어로에는 버튼을 두지 않습니다.
+              "브랜드 데이 보기" 는 바로 아래 쿠폰 카드의 "전체 일정 보기" 와 같은 곳(/events)이고
+              "내 쿠폰함" 은 헤더 네비에 있습니다. 카드를 위로 겹치면서 이 두 버튼이 카드 뒤에
+              깔려 있었는데, 중복이라 아무도 못 눌러도 티가 안 났습니다. 액션은 카드 한 곳에 모읍니다. */}
         </div>
       </div>
     </section>
@@ -174,7 +172,8 @@ function LiveNow({
   grade: MembershipGrade | null;
 }) {
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 pt-16">
+    /* 히어로 아래 끝에 걸치게 두면 두 면이 한 덩어리로 읽힙니다 */
+    <section className="relative z-[2] mx-auto -mt-20 w-full max-w-6xl px-5">
       {loading || !round ? (
         <HeroSkeleton />
       ) : round.status === "OPEN" ? (
@@ -207,11 +206,13 @@ function Figure({
 function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipGrade | null }) {
   const brand = brandOf(round.brandId);
   const remaining = remainingStock(round);
+  // 할인율은 "얼마나 큰가"가 메시지라 한 번 세어 올립니다. 시계에는 쓰지 않습니다.
+  const rate = useCountUp(round.discountRate ?? 0, 800);
   const eligible = !grade || round.eligibleGrades.includes(grade);
   const urgent = remaining > 0 && remaining / round.totalQuantity <= 0.1;
 
   return (
-    <div className="yh-rise yh-ticket grid gap-8 p-7 sm:p-9 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-14">
+    <div className="yh-rise yh-coupon grid gap-6 p-6 sm:p-7 lg:grid-cols-[1fr_auto_18rem] lg:items-stretch lg:gap-0">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-3">
           <span className="yh-live">
@@ -229,7 +230,12 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
         <h1 className="yh-hero mt-5">{round.name}</h1>
 
         <div className="mt-7 flex flex-wrap items-end gap-x-12 gap-y-6">
-          <Figure label="할인">{discountHeadline(round)}</Figure>
+          <div>
+            <p className="yh-label">할인</p>
+            <p className="yh-figure-xl mt-1 text-yh-navy">
+              {round.policyType === "PERCENT_CAPPED" ? `${rate}%` : discountHeadline(round)}
+            </p>
+          </div>
           <Figure label="마감까지" accent={urgent}>
             <Countdown target={Date.parse(round.closeAt)} />
           </Figure>
@@ -246,10 +252,15 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
         </p>
       </div>
 
-      {/* 절취선 오른쪽이 실제로 뜯어 가는 쪽 — 수량과 버튼을 여기 모읍니다 */}
-      <div className="yh-perf w-full pt-7 lg:w-72 lg:border-t-0 lg:border-l-2 lg:border-dashed lg:border-yh-rule lg:pt-0 lg:pl-10">
+      {/* 절취선 오른쪽이 실제로 뜯어 가는 쪽 — 수량과 버튼을 여기 모읍니다.
+          이 카드는 네이비와 종이 두 면에 걸쳐 있어 노치(반원)를 못 씁니다 —
+          한 색으로는 배경을 뚫을 수 없어 카드 위에 원이 떠 보입니다. 점선만 씁니다. */}
+      <div className="yh-tear-plain my-1 lg:hidden" />
+      <div className="yh-tear-y-plain hidden lg:mx-10 lg:block" />
+
+      <div className="flex w-full flex-col justify-center lg:w-auto">
         <StockGauge remaining={remaining} total={round.totalQuantity} />
-        <div className="mt-7 flex flex-col gap-2.5">
+        <div className="mt-5 flex flex-row gap-2.5 lg:mt-7 lg:flex-col">
           <Link
             to="/events/$couponRoundId"
             params={{ couponRoundId: String(round.id) }}
@@ -323,7 +334,7 @@ function HeroNext({ round, grade }: { round: CouponRoundView; grade: MembershipG
 
 function HeroSkeleton() {
   return (
-    <div className="yh-ticket flex flex-col gap-5 p-7 sm:p-9">
+    <div className="yh-coupon flex flex-col gap-5 p-6 sm:p-7">
       <Skeleton className="h-6 w-32 rounded-full" />
       <Skeleton className="h-11 w-72 max-w-full rounded-xl" />
       <div className="mt-2 grid gap-5 sm:grid-cols-2">
@@ -353,7 +364,7 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
 
   return (
     <section className="bg-yh-paper-2">
-      <div className="mx-auto w-full max-w-6xl px-5 py-20">
+      <div className="mx-auto w-full max-w-6xl px-5 py-14">
         <SectionHead
           eyebrow="참여 조건"
           title={
@@ -364,33 +375,33 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
           note="회차마다 참여할 수 있는 등급이 정해져 있습니다."
         />
 
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {GRADES.map((g) => {
+        <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {GRADES.map((g, i) => {
             const mine = grade === g;
             return (
-              <li
-                key={g}
-                className={`yh-card overflow-hidden ${mine ? "ring-2 ring-yh-navy" : ""}`}
-              >
-                <div className={`h-2 w-full ${GRADE_TINT[g]}`} aria-hidden />
-                <div className="p-6">
-                  <div className="flex items-center justify-between gap-2">
-                    <GradeChip grade={g} />
-                    {mine && (
-                      <span className="yh-small rounded-full bg-yh-navy px-2.5 py-1 font-bold text-white">
-                        내 등급
+              <Reveal key={g} delay={i * 60}>
+                <li
+                  className={`yh-tile h-full ${GRADE_TINT[g]} ${mine ? "ring-2 ring-yh-navy" : ""}`}
+                >
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-2">
+                      <GradeChip grade={g} />
+                      {mine && (
+                        <span className="yh-small rounded-full bg-yh-navy px-2.5 py-1 font-bold text-white">
+                          내 등급
+                        </span>
+                      )}
+                    </div>
+                    <p className="yh-figure-sm mt-5 text-[2.5rem] leading-none">
+                      {openCount(g)}
+                      <span className="yh-small ml-1.5 align-middle font-medium text-yh-ink-3">
+                        개 회차
                       </span>
-                    )}
+                    </p>
+                    <p className="yh-small mt-1.5 text-yh-ink-3">지금 참여 가능</p>
                   </div>
-                  <p className="yh-figure-sm mt-5 text-[2.5rem] leading-none">
-                    {openCount(g)}
-                    <span className="yh-small ml-1.5 align-middle font-medium text-yh-ink-3">
-                      개 회차
-                    </span>
-                  </p>
-                  <p className="yh-small mt-1.5 text-yh-ink-3">지금 참여 가능</p>
-                </div>
-              </li>
+                </li>
+              </Reveal>
             );
           })}
         </ul>
@@ -405,21 +416,27 @@ function Grades({ rounds, grade }: { rounds: CouponRoundView[]; grade: Membershi
 
 function BrandGrid() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 py-20">
+    <section className="mx-auto w-full max-w-6xl px-5 py-14">
       <SectionHead
         eyebrow="참여 브랜드"
         title="12개 브랜드가 돌아가며 열립니다"
         note="브랜드마다 정해진 주와 요일이 있습니다. 한 달에 한 번씩 순서대로 돌아옵니다."
       />
-      <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {BRANDS.map((b) => (
-          <li key={b.brandId} className="yh-card flex flex-col items-center gap-3 px-3 py-6">
-            <BrandPlate brandId={b.brandId} size="lg" />
-            <div className="text-center">
-              <p className="yh-body font-bold">{b.name}</p>
-              <p className="yh-small text-yh-ink-3">{b.category}</p>
-            </div>
-          </li>
+      {/* 흰 카드 12장은 전부 같아 보입니다. 고유색을 옅게 깔면 타일마다 다른 면이 됩니다. */}
+      <ul className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-12">
+        {BRANDS.map((b, i) => (
+          <Reveal key={b.brandId} delay={i * 35}>
+            <li
+              className="yh-tile flex h-full flex-col items-center gap-1.5 px-1.5 py-4"
+              style={{ background: `color-mix(in oklab, ${b.hue} 13%, #fff)` }}
+            >
+              <BrandPlate brandId={b.brandId} size="sm" />
+              <div className="text-center">
+                <p className="yh-body font-bold">{b.name}</p>
+                <p className="yh-small text-yh-ink-2">{b.category}</p>
+              </div>
+            </li>
+          </Reveal>
         ))}
       </ul>
     </section>
@@ -451,28 +468,7 @@ const STEPS = [
   },
 ];
 
-function HowItWorks() {
-  return (
-    <section className="mx-auto w-full max-w-6xl px-5 py-20">
-      <SectionHead eyebrow="발급 절차" title="이렇게 받습니다" />
-      <ol className="mt-10 grid gap-4 md:grid-cols-3">
-        {STEPS.map((s) => (
-          <li key={s.n} className="yh-card p-6">
-            <span
-              className={`yh-num yh-figure-sm inline-flex rounded-full px-3 py-1 text-[0.9375rem] ${s.tint}`}
-            >
-              {s.n}
-            </span>
-            <p className="yh-sub mt-4">{s.head}</p>
-            <p className="yh-body mt-2 text-yh-ink-2">{s.body}</p>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-/* ── 발급 규칙 ─────────────────────────────────────── */
+/* ── 절차·규칙 문구 ─────────────────────────────────── */
 
 const RULES = [
   {
@@ -492,24 +488,57 @@ const RULES = [
   },
 ];
 
-function Rules() {
+/* ── 페이지 마무리 ───────────────────────────────────
+   절차와 규칙은 둘 다 "읽고 끝내는" 정보라 한 덩어리로 묶었습니다.
+   밝은 면이 여섯 번 이어지면 어느 섹션도 끝처럼 안 보입니다. 어두운 면으로 닫습니다. */
+
+function Closing() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 py-20">
-      <SectionHead eyebrow="발급 규칙" title="선착순은 이렇게 지켜집니다" />
-      <dl className="mt-10 grid gap-4 md:grid-cols-3">
-        {RULES.map((r, i) => (
-          <div key={r.head} className="yh-card p-6">
-            <span
-              className={`yh-num yh-figure-sm grid size-10 place-items-center rounded-full text-[1.0625rem] ${r.tint}`}
-              aria-hidden
-            >
-              {i + 1}
-            </span>
-            <dt className="yh-sub mt-4">{r.head}</dt>
-            <dd className="yh-body mt-2 text-yh-ink-2">{r.body}</dd>
+    <section className="yh-deep yh-grain relative overflow-hidden">
+      <div className="relative z-[1] mx-auto w-full max-w-6xl px-5 py-16">
+        <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
+          <div>
+            <p className="yh-label text-white/50">발급 절차</p>
+            <h2 className="yh-title mt-3 text-white">이렇게 받습니다</h2>
+
+            <ol className="mt-7 space-y-5">
+              {STEPS.map((s, i) => (
+                <Reveal key={s.n} delay={i * 90}>
+                  <li className="flex gap-4 border-t border-white/20 pt-4">
+                    {/* shrink-0 이 없으면 flex 가 이 배지를 찌그러뜨리고
+                        그 안에서 "01" 이 두 줄로 접힙니다. */}
+                    <span
+                      className={`yh-num yh-figure-sm mt-0.5 grid size-9 shrink-0 place-items-center rounded-full text-[0.8125rem] text-yh-navy ${s.tint}`}
+                    >
+                      {s.n}
+                    </span>
+                    {/* 두 문단은 한 덩어리로 묶습니다 — flex 직계로 두면
+                        각각이 줄어들면서 "입장" 이 한 글자씩 쪼개집니다. */}
+                    <div className="min-w-0">
+                      <p className="yh-sub text-white">{s.head}</p>
+                      <p className="yh-body mt-1 text-white/65">{s.body}</p>
+                    </div>
+                  </li>
+                </Reveal>
+              ))}
+            </ol>
           </div>
-        ))}
-      </dl>
+
+          <div>
+            <p className="yh-label text-white/50">발급 규칙</p>
+            <h2 className="yh-title mt-3 text-white">선착순은 이렇게 지켜집니다</h2>
+
+            <dl className="mt-7 space-y-5">
+              {RULES.map((r) => (
+                <div key={r.head} className="border-t border-white/20 pt-4">
+                  <dt className="yh-sub text-white">{r.head}</dt>
+                  <dd className="yh-body mt-1 text-white/65">{r.body}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

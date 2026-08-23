@@ -646,7 +646,7 @@
    얇은 획으로 가면 로고만 혼자 굵어 보입니다. */
 
 @utility yh-hero {
-  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-size: clamp(1.875rem, 4.2vw, 3rem);
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -1094,4 +1094,178 @@
 
 @utility yh-rule-bottom {
   border-bottom: 1px solid var(--yh-rule);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   질감과 깊이 (v2.1)
+   ══════════════════════════════════════════════════════════════════
+
+   앞선 시안의 문제는 색이 아니라 **평평함**이었습니다. 흰 카드 격자가 다섯 번
+   연속으로 반복되니 어느 섹션도 주인공이 아니고, 아트워크만 혼자 쨍했습니다.
+
+   여기서는 세 가지를 더합니다 — 면의 명암 대비, 실제 쿠폰 형태(노치·절취선),
+   그리고 아주 옅은 종이 결. 장식을 늘리는 게 아니라 **면끼리 구별되게** 하는 것이
+   목적입니다. */
+
+/* 몰입형 네이비 면 — 히어로와 페이지 마무리에 씁니다.
+   단색으로 두면 큰 면적에서 벽처럼 보여서 미묘한 방사형 광을 얹습니다. */
+@utility yh-deep {
+  position: relative;
+  background:
+    radial-gradient(110% 80% at 18% 0%, #24497f 0%, transparent 58%),
+    radial-gradient(90% 70% at 92% 100%, #1c3a6b 0%, transparent 55%), var(--yh-navy-900);
+  color: #fff;
+  isolation: isolate;
+}
+
+/* 종이 결 — 큰 단색 면이 디지털하게 죽는 걸 막습니다. 아주 옅게. */
+@utility yh-grain {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index: 0;
+  }
+}
+
+/* ── 진짜 쿠폰 형태 ────────────────────────────────
+   좌우에 반원을 파고 그 사이를 점선으로 잇습니다. 노치는 뒤 배경색으로 칠해야
+   뚫린 것처럼 보이므로 --yh-notch 로 받습니다. */
+
+@utility yh-coupon {
+  position: relative;
+  background: var(--yh-surface);
+  border-radius: 18px;
+  box-shadow:
+    0 2px 6px rgb(22 48 92 / 0.06),
+    0 12px 32px rgb(22 48 92 / 0.12);
+}
+
+/** 절취선 한 줄 + 좌우 노치. 자식 요소로 넣습니다. */
+@utility yh-tear {
+  position: relative;
+  height: 0;
+  border-top: 2px dashed var(--yh-rule);
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: -13px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--yh-notch, var(--yh-paper));
+  }
+  &::before {
+    left: -13px;
+  }
+  &::after {
+    right: -13px;
+  }
+}
+
+/* 노치 없는 절취선.
+   노치(반원)는 **뒤 배경색으로 칠해야** 뚫린 것처럼 보입니다. 카드가 두 배경에
+   걸쳐 있으면 한 색으로는 못 뚫고, 카드 위에 연한 원이 떠 있는 꼴이 됩니다.
+   그런 자리에는 점선만 씁니다 — 점선만으로도 "여기서 뜯는다"는 읽힙니다. */
+@utility yh-tear-plain {
+  height: 0;
+  border-top: 2px dashed var(--yh-rule);
+}
+
+@utility yh-tear-y-plain {
+  width: 0;
+  border-left: 2px dashed var(--yh-rule);
+}
+
+/* 세로 절취선 — 가로로 긴 티켓의 오른쪽 조각을 뜯는 형태 */
+@utility yh-tear-y {
+  position: relative;
+  width: 0;
+  border-left: 2px dashed var(--yh-rule);
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    left: -13px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--yh-notch, var(--yh-surface));
+  }
+  &::before {
+    top: -13px;
+  }
+  &::after {
+    bottom: -13px;
+  }
+}
+
+/* ── 브랜드 색 타일 ────────────────────────────────
+   브랜드 12개를 흰 카드로 두면 12장이 전부 같아 보입니다.
+   고유색을 아주 옅게 깔아 타일마다 다른 면이 되게 합니다. */
+@utility yh-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--yh-shadow);
+  }
+}
+
+/* 큰 수치를 더 크게 — 발급 중 카드의 할인율은 이 화면의 주인공입니다 */
+@utility yh-figure-xl {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-size: clamp(2.75rem, 6vw, 4rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+}
+
+/* ── 첫 화면 보장 ──────────────────────────────────
+   로고와 "지금 발급 중" 쿠폰은 스크롤 없이 같이 보여야 합니다. 그게 이 서비스가
+   처음 방문자에게 해야 할 말의 전부이기 때문입니다.
+
+   그런데 히어로 높이를 고정값으로 잡으면 짧은 화면에서 쿠폰이 접힙니다.
+   그래서 **화면 높이에 반응**시킵니다 — 세로가 좁을수록 여백과 이미지를 줄입니다.
+   글자 크기는 건드리지 않습니다. 읽기 어려워지면 공간을 아낀 의미가 없습니다. */
+
+@media (max-height: 800px) {
+  .yh-hero-band {
+    padding-top: 1.25rem;
+    padding-bottom: 2.5rem;
+  }
+  .yh-hero-band .yh-hero-art {
+    max-width: 22rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .yh-hero-band {
+    padding-top: 0.75rem;
+    padding-bottom: 1.75rem;
+  }
+  .yh-hero-band .yh-hero-art {
+    max-width: 15rem;
+  }
+  .yh-hero-band .yh-hero-lede {
+    display: none;
+  }
+}
+
+/* 좁은 화면에서는 히어로의 캐릭터를 접습니다. 헤더 로고에 같은 캐릭터가 이미
+   있으므로 브랜드가 사라지지 않고, 그 자리를 쿠폰이 가져갑니다. */
+@media (max-width: 639px) {
+  .yh-hero-band .yh-hero-art {
+    display: none;
+  }
 }

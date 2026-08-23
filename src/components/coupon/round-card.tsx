@@ -142,14 +142,13 @@ export function RoundRow({
     <Link
       to="/events/$couponRoundId"
       params={{ couponRoundId: String(round.id) }}
-      className="group -mx-3 grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-5 gap-y-1 rounded-xl border-b border-yh-rule px-3 py-5 transition-colors last:border-b-0 hover:bg-yh-paper sm:grid-cols-[104px_auto_1fr_auto_136px_auto]"
+      className="group -mx-3 grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 rounded-xl border-b border-yh-rule px-3 py-4 transition-colors last:border-b-0 hover:bg-yh-paper sm:grid-cols-[104px_auto_1fr_auto_136px_auto] sm:gap-x-5 sm:py-5"
     >
-      <span className="yh-num yh-small font-semibold text-yh-ink-2">
+      {/* 좁은 화면에서는 시각을 별도 칸으로 두지 않습니다 — 네 칸이 들어가면
+          회차 이름이 두세 글자만 남습니다. 이름 아래 줄로 내립니다. */}
+      <span className="yh-num yh-small hidden font-semibold text-yh-ink-2 sm:block">
         {formatClock(round.openAt)}
-        <span className="hidden font-normal text-yh-ink-3 sm:inline">
-          {" "}
-          – {formatClock(round.closeAt)}
-        </span>
+        <span className="font-normal text-yh-ink-3"> – {formatClock(round.closeAt)}</span>
       </span>
 
       <BrandPlate brandId={round.brandId} size="sm" />
@@ -157,6 +156,7 @@ export function RoundRow({
       <span className="min-w-0">
         <span className="yh-sub block truncate">{round.name}</span>
         <span className="yh-small block truncate text-yh-ink-3">
+          <span className="yh-num sm:hidden">{formatClock(round.openAt)} · </span>
           {brand.name} ·{" "}
           {eligible
             ? gradesLabel(round.eligibleGrades)
@@ -178,7 +178,7 @@ export function RoundRow({
         )}
       </span>
 
-      <span className="justify-self-end">
+      <span className="col-start-2 -col-end-1 justify-self-start sm:col-auto sm:justify-self-end">
         {round.status === "OPEN" ? (
           <span className="flex items-center gap-2.5">
             <LiveLabel />

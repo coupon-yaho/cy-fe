@@ -255,10 +255,16 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
                     <span className="yh-small shrink-0 text-yh-ink-3">
                       {WEEKDAYS[mondayIndex(new Date(key))]}
                     </span>
-                    <span className="ml-auto flex -space-x-1.5">
-                      {list.map((e) => (
+                    {/* 좁은 행이라 4개까지만. 6개를 다 그리면 카드 밖으로 넘칩니다. */}
+                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                      {list.slice(0, 4).map((e) => (
                         <BrandPlate key={e.templateId} brandId={e.brandId} size="sm" />
                       ))}
+                      {list.length > 4 && (
+                        <span className="yh-num yh-small font-extrabold text-yh-ink-3">
+                          +{list.length - 4}
+                        </span>
+                      )}
                     </span>
                   </button>
                 </li>

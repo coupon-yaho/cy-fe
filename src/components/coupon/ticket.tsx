@@ -109,6 +109,13 @@ export function CouponTicket({
           <p className="yh-num yh-body mt-5 font-semibold tracking-[0.16em] text-yh-ink-2">
             {groupCode(coupon.code)}
           </p>
+
+          {/* 실물 쿠폰의 절취선. 쿠폰함 카드는 종이 면 위에만 놓이므로 노치가
+              제대로 뚫립니다 — 배경이 둘인 자리에서는 점선만 씁니다. */}
+          <div
+            className="yh-tear mt-6 mr-[-1.5rem] ml-[-2rem] sm:hidden"
+            style={{ ["--yh-notch" as string]: dimmed ? "var(--yh-paper-2)" : "var(--yh-paper)" }}
+          />
         </div>
 
         <div className="flex shrink-0 flex-col gap-4 sm:items-end sm:text-right">

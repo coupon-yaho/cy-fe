@@ -1,5 +1,6 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Countdown, useNow } from "@/components/coupon/timer";
 import {
@@ -16,11 +17,47 @@ import {
  * 지금 열려 있는 회차 하나를 헤더 아래 계속 띄웁니다. 여러 개가 동시에 열려 있으면
  * **가장 먼저 마감되는** 회차를 올립니다 — 놓치면 안 되는 게 그것이기 때문입니다.
  *
- * 신문 1면의 속보 띠를 참고했습니다. 어두운 잉크 면 위에서 숫자만 흰색으로 두어
- * 시선이 수치에 먼저 닿게 합니다.
+ * 어두운 면 위에서 숫자만 흰색으로 두어 시선이 수치에 먼저 닿게 합니다.
+ *
+ * ── 언제 보이는가 ──
+ * 홈 첫 화면에는 같은 회차를 크게 보여 주는 쿠폰 카드가 있습니다. 그 위에 이 띠까지
+ * 띄우면 같은 말을 두 번 하면서 48px 를 먹습니다 — 그만큼 쿠폰이 접혔습니다.
+ *
+ * 그래서 **쿠폰 카드가 화면에 보이는 동안에는 접어 둡니다.** 스크롤해서 카드가
+ * 시야를 벗어나면 그때 내려옵니다. 카드가 없는 화면(일정·쿠폰함 등)에서는 늘 보입니다.
  */
+
+/**
+ * 접어 둘 것인가.
+ *
+ * 쿠폰 카드를 관찰해서 판단하면 순환합니다 — 띠가 보이니 카드가 아래로 밀리고,
+ * 카드가 안 보이니 띠가 계속 보입니다. 그래서 **스크롤 위치**로 정합니다.
+ * 위치는 레이아웃의 결과가 아니라 원인이라 순환하지 않습니다.
+ */
+const FOLD = 260;
+
+function useCollapsed(enabled: boolean) {
+  const [collapsed, setCollapsed] = useState(enabled);
+
+  useEffect(() => {
+    if (!enabled) {
+      setCollapsed(false);
+      return;
+    }
+    const read = () => setCollapsed(window.scrollY < FOLD);
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+    return () => window.removeEventListener("scroll", read);
+  }, [enabled]);
+
+  return collapsed;
+}
 export function LiveStrip() {
   const now = useNow(1000);
+  // 쿠폰 카드가 있는 화면은 홈뿐입니다. DOM 존재로 판단하면 로딩 스켈레톤 때문에
+  // 효과 실행 시점에 아직 없어서 빗나갑니다 — 경로로 정합니다.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const collapsed = useCollapsed(pathname === "/");
   const { data } = useQuery({
     queryKey: ["rounds"],
     queryFn: () => couponApi.listRounds(),
@@ -38,7 +75,12 @@ export function LiveStrip() {
   const headline = live[0] ?? next;
 
   return (
-    <div className="bg-yh-navy text-white">
+    <div
+      className={`overflow-hidden bg-yh-navy text-white transition-[max-height,opacity] duration-300 ease-out ${
+        collapsed ? "max-h-0 opacity-0" : "max-h-12 opacity-100"
+      }`}
+      aria-hidden={collapsed}
+    >
       <div className="mx-auto flex h-12 w-full max-w-6xl items-center gap-4 px-5">
         {!headline ? (
           <span className="yh-small text-white/40">일정 불러오는 중</span>
