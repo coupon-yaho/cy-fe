@@ -70,9 +70,6 @@ function buildWeeks(year: number, month: number): Date[][] {
   return weeks;
 }
 
-/** 주마다 다른 틴트 — 다가올수록 붉어지는 게 아니라 주를 구분하는 용도입니다 */
-const WEEK_TINT = ["#f1f7f3", "#edf3fa", "#fbf1f3", "#f6f2fa", "#f2f6f1", "#f8f4ee"];
-
 export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
   const today = useMemo(() => new Date(), []);
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -209,26 +206,29 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
         <Skeleton className="mt-6 h-[26rem] rounded-2xl" />
       ) : (
         <>
-          {/* 데스크탑 — 주가 한 행 */}
-          <div className="mt-6 hidden sm:block">
-            <div className="grid grid-cols-7 gap-px">
+          {/* 데스크탑 — 달력 한 장. 주마다 색 띠를 깔던 앞선 시안은 회차가 하나뿐인
+              주에도 한 줄 전체가 물들어 색이 무엇을 뜻하는지 알 수 없었고, 회차가 없는
+              주는 빈 색 띠만 남았습니다. 색 대신 괘선으로 주를 나눕니다. */}
+          <div className="yh-card mt-6 hidden overflow-hidden sm:block">
+            <div className="grid grid-cols-7 border-b border-yh-rule bg-yh-paper">
               {WEEKDAYS.map((d, i) => (
-                <p key={d} className={`yh-label pb-2 text-center ${i >= 5 ? "text-yh-ink-3" : ""}`}>
+                <p
+                  key={d}
+                  className={`yh-label py-2.5 text-center ${i >= 5 ? "text-yh-ink-3/70" : ""}`}
+                >
                   {d}
                 </p>
               ))}
             </div>
 
-            <div className="space-y-2">
-              {weeks.map((row, wi) => (
+            <div>
+              {weeks.map((row) => (
                 <WeekRow
                   key={row[0]!.getTime()}
                   row={row}
                   month={month}
                   today={today}
                   byDay={byDay}
-                  grade={grade}
-                  tint={WEEK_TINT[wi % WEEK_TINT.length]!}
                   selected={selected}
                   onPick={setPicked}
                 />
@@ -295,8 +295,6 @@ function WeekRow({
   month,
   today,
   byDay,
-  grade,
-  tint,
   selected,
   onPick,
 }: {
@@ -304,100 +302,85 @@ function WeekRow({
   month: number;
   today: Date;
   byDay: Map<string, CalendarEntry[]>;
-  grade: MembershipGrade | null;
-  tint: string;
   selected: string | null;
   onPick: (key: string) => void;
 }) {
-  const hasAny = row.some((d) => byDay.has(ymd(d)));
-
   return (
-    <div
-      className="relative rounded-xl px-1.5 py-3"
-      style={{ background: hasAny ? tint : "transparent" }}
-    >
-      {/* 주를 관통하는 선 — 솟은 칸이 이 선 위에 얹힌 것처럼 보입니다 */}
-      {hasAny && (
-        <span
-          className="pointer-events-none absolute inset-x-4 top-[62%] h-px bg-yh-navy/15"
-          aria-hidden
-        />
-      )}
+    <div className="grid grid-cols-7 border-b border-yh-rule last:border-b-0">
+      {row.map((d) => {
+        const key = ymd(d);
+        const list = byDay.get(key) ?? [];
+        const outside = d.getMonth() !== month;
+        const past = d < today && !sameDate(d, today);
+        const isToday = sameDate(d, today);
+        const live = list.some((e) => e.status === "OPEN");
+        const chosen = selected === key;
 
-      <div className="relative grid grid-cols-7 gap-1.5">
-        {row.map((d) => {
-          const key = ymd(d);
-          const list = byDay.get(key) ?? [];
-          const outside = d.getMonth() !== month;
-          const past = d < today && !sameDate(d, today);
-          const isToday = sameDate(d, today);
-          const live = list.some((e) => e.status === "OPEN");
-          const chosen = selected === key;
-
-          if (list.length === 0) {
-            return (
-              <div
-                key={key}
-                className={`min-h-[4.5rem] rounded-lg px-2 py-2 ${
-                  outside ? "opacity-30" : past ? "opacity-45" : ""
-                }`}
-              >
-                <span
-                  className={`yh-num yh-small ${isToday ? "font-extrabold text-yh-accent" : "text-yh-ink-3"}`}
-                >
-                  {d.getDate()}
-                </span>
-              </div>
-            );
-          }
-
+        if (list.length === 0) {
           return (
-            <button
+            <div
               key={key}
-              type="button"
-              onClick={() => onPick(key)}
-              aria-pressed={chosen}
-              aria-label={`${d.getMonth() + 1}월 ${d.getDate()}일 회차 ${list.length}개`}
-              className={`relative z-[2] -my-3.5 min-h-[5.5rem] rounded-xl bg-yh-surface px-2 py-2.5 text-left transition-[box-shadow,transform] ${
-                chosen
-                  ? "shadow-[0_6px_20px_rgba(22,48,92,0.18)] ring-2 ring-yh-navy"
-                  : "shadow-[0_2px_8px_rgba(22,48,92,0.10)] hover:-translate-y-0.5"
-              } ${outside ? "opacity-40" : past ? "opacity-55 saturate-[0.25]" : ""} ${
-                live && !chosen ? "ring-2 ring-yh-accent/60" : ""
+              className={`min-h-[5.25rem] border-r border-yh-rule px-2.5 py-2 last:border-r-0 ${
+                outside ? "bg-yh-paper/60" : ""
               }`}
             >
-              <span className="flex items-center justify-between">
-                <span
-                  className={`yh-num yh-small font-extrabold ${
-                    isToday ? "text-yh-accent" : "text-yh-navy"
-                  }`}
-                >
-                  {d.getDate()}
-                </span>
-                {live && <span className="live-dot text-yh-accent" aria-hidden />}
+              <span
+                className={`yh-num yh-small ${
+                  isToday
+                    ? "font-extrabold text-yh-accent"
+                    : outside || past
+                      ? "text-yh-ink-3/60"
+                      : "text-yh-ink-3"
+                }`}
+              >
+                {d.getDate()}
               </span>
+            </div>
+          );
+        }
 
-              <span className="mt-1.5 flex flex-wrap items-center gap-1">
-                {list.slice(0, 3).map((e) => (
-                  <BrandPlate key={e.templateId} brandId={e.brandId} size="sm" />
-                ))}
-                {/* 칸이 좁아 3개까지만 보입니다 — 나머지를 숨기면 그날 회차 수를 오해합니다 */}
-                {list.length > 3 && (
-                  <span className="yh-num yh-small font-extrabold text-yh-ink-3">
-                    +{list.length - 3}
-                  </span>
-                )}
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onPick(key)}
+            aria-pressed={chosen}
+            aria-label={`${d.getMonth() + 1}월 ${d.getDate()}일 회차 ${list.length}개`}
+            className={`relative min-h-[5.25rem] border-r border-yh-rule px-2.5 py-2 text-left transition-colors last:border-r-0 ${
+              chosen ? "bg-yh-navy/[0.06] inset-ring-2 inset-ring-yh-navy" : "hover:bg-yh-paper-2"
+            } ${outside || past ? "saturate-[0.35]" : ""}`}
+          >
+            <span className="flex items-center justify-between">
+              <span
+                className={`yh-num yh-small font-extrabold ${
+                  isToday ? "text-yh-accent" : "text-yh-navy"
+                }`}
+              >
+                {d.getDate()}
               </span>
+              {live && <span className="live-dot text-yh-accent" aria-hidden />}
+            </span>
 
-              {!past && !live && (
-                <span className="yh-num yh-small mt-1.5 block text-yh-ink-3">
-                  D-{Math.max(0, Math.ceil((d.getTime() - today.getTime()) / 86400000))}
+            <span className="mt-1.5 flex flex-wrap items-center gap-1">
+              {list.slice(0, 3).map((e) => (
+                <BrandPlate key={e.templateId} brandId={e.brandId} size="sm" />
+              ))}
+              {/* 칸이 좁아 3개까지만 보입니다 — 나머지를 숨기면 그날 회차 수를 오해합니다 */}
+              {list.length > 3 && (
+                <span className="yh-num yh-small font-extrabold text-yh-ink-3">
+                  +{list.length - 3}
                 </span>
               )}
-            </button>
-          );
-        })}
-      </div>
+            </span>
+
+            {!past && !live && (
+              <span className="yh-num yh-small mt-1 block text-yh-ink-3">
+                D-{Math.max(0, Math.ceil((d.getTime() - today.getTime()) / 86400000))}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -455,10 +438,14 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
         </span>
       </div>
 
-      <p className="yh-figure-sm mt-5 text-[1.75rem] leading-none">{discountHeadline(entry)}</p>
-      <p className="yh-small mt-1.5 text-yh-ink-2">{discountDetail(entry)}</p>
+      <p className="yh-figure-sm mt-5 text-[1.75rem] leading-none">
+        {discountHeadline(entry)}
+        <span className="yh-small ml-2.5 align-middle font-normal text-yh-ink-2">
+          {discountDetail(entry)}
+        </span>
+      </p>
 
-      <div className="mt-5">
+      <div className="mt-4">
         {hasStock ? (
           <StockGauge
             remaining={Math.max(0, entry.totalQuantity! - entry.activeCount!)}
@@ -474,7 +461,7 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
         )}
       </div>
 
-      <p className="yh-small mt-5 flex items-center gap-1.5 border-t border-yh-rule pt-4 text-yh-ink-3">
+      <p className="yh-small mt-4 flex items-center gap-1.5 text-yh-ink-3">
         {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />}
         {eligible ? gradesLabel(entry.eligibleGrades) : `${gradesLabel(entry.eligibleGrades)} 전용`}
       </p>
