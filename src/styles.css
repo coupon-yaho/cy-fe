@@ -1130,6 +1130,24 @@
 
 /* ── 진입 연출 ───────────────────────────────────── */
 
+/* 값이 막 바뀐 수치.
+   색을 바꾸지 않고 위치와 농도만 건드립니다 — 색으로 알리면 색을 못 보는 사람에게는
+   아무 일도 안 일어난 화면이고, 이 화면의 accent 는 이미 "마감 임박" 을 뜻합니다.
+   움직임을 줄이는 설정에서는 전역 규칙이 지속 시간을 0 으로 만듭니다. */
+@utility yh-tick {
+  animation: yh-tick 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes yh-tick {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0.45;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 @utility yh-rise {
   animation: yh-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }

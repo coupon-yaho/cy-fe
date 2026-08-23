@@ -111,3 +111,26 @@ export function useCountUp(target: number, ms = 900): number {
 
   return n;
 }
+
+/**
+ * 값이 **줄어들 때만** 한 번 반응합니다.
+ *
+ * 선착순 서비스에서 재고가 줄었다는 건 사용자가 알아야 할 상태 변화입니다.
+ * 15초마다 숫자만 조용히 갈리면 화면이 갱신된 줄 모르고, "지금 벌어지고 있다" 는
+ * 이 서비스의 전제가 화면에서 사라집니다.
+ *
+ * 늘어날 때는 반응하지 않습니다 — 취소로 재고가 돌아오는 건 서두를 일이 아닙니다.
+ * 반환값은 애니메이션을 다시 시작시키기 위한 key 입니다(같은 class 를 다시 붙여도
+ * 브라우저는 재생하지 않습니다).
+ */
+export function useDropPulse(value: number): number {
+  const prev = useRef(value);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (value < prev.current) setTick((t) => t + 1);
+    prev.current = value;
+  }, [value]);
+
+  return tick;
+}

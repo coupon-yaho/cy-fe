@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Countdown, useNow } from "@/components/coupon/timer";
+import { useDropPulse } from "@/components/coupon/reveal";
 import {
   brandOf,
   couponApi,
@@ -122,6 +123,7 @@ function Live({
   now: number | null;
 }) {
   const remaining = remainingStock(round);
+  const pulse = useDropPulse(remaining);
   const closeAt = Date.parse(round.closeAt);
   const urgent = remaining > 0 && remaining / round.totalQuantity <= 0.1;
 
@@ -149,7 +151,12 @@ function Live({
 
       <span className="yh-small hidden shrink-0 text-white/55 sm:block">
         남은{" "}
-        <span className={`yh-num font-bold ${urgent ? "text-yh-accent-on-navy" : "text-white"}`}>
+        <span
+          key={pulse}
+          className={`yh-num font-bold ${pulse ? "yh-tick" : ""} ${
+            urgent ? "text-yh-accent-on-navy" : "text-white"
+          }`}
+        >
           {remaining.toLocaleString("ko-KR")}
         </span>
       </span>

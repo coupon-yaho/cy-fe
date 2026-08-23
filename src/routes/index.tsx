@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
-import { Reveal, useCountUp } from "@/components/coupon/reveal";
+import { Reveal, useCountUp, useDropPulse } from "@/components/coupon/reveal";
 import { SectionHead } from "@/components/coupon/section-head";
 import { GradeChip } from "@/components/coupon/grade-chip";
 import { RoundRow } from "@/components/coupon/round-card";
@@ -66,7 +66,10 @@ function Landing() {
     .sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
 
   const headline = live[0] ?? upcoming[0];
-  const board = [...live, ...upcoming].slice(0, 4);
+  /* 바로 위 쿠폰 카드가 이미 크게 보여 준 회차입니다. 목록 첫 줄에 또 넣으면
+     200px 안에서 같은 회차를 두 번 읽게 됩니다 — "다가오는 일정" 이라는 제목과도
+     어긋납니다. 그 회차를 빼고 다음 것부터 셉니다. */
+  const board = [...live, ...upcoming].filter((r) => r.id !== headline?.id).slice(0, 4);
 
   return (
     <div>
@@ -216,6 +219,8 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
   const urgent = remaining > 0 && remaining / round.totalQuantity <= 0.1;
   // 할인율은 "얼마나 큰가" 가 메시지라 한 번 세어 올립니다. 시계에는 쓰지 않습니다.
   const rate = useCountUp(round.discountRate ?? 0, 800);
+  // 재고가 줄면 그 자리에서 한 번 반응합니다 — 안 그러면 15초마다 숫자만 조용히 갈립니다
+  const pulse = useDropPulse(remaining);
 
   return (
     /* 실물 쿠폰의 구조 — 왼쪽은 읽는 면, 절취선 오른쪽은 뜯어 가는 면.
@@ -281,7 +286,8 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
             <StockGauge remaining={remaining} total={round.totalQuantity} label={false} />
           </span>
           <span
-            className={`yh-num order-2 shrink-0 font-bold sm:order-3 ${
+            key={pulse}
+            className={`yh-num order-2 shrink-0 font-bold sm:order-3 ${pulse ? "yh-tick" : ""} ${
               urgent ? "text-yh-accent" : "text-yh-navy"
             }`}
           >
