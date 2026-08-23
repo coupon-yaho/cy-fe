@@ -44,10 +44,28 @@ function useCollapsed(enabled: boolean) {
       setCollapsed(false);
       return;
     }
-    const read = () => setCollapsed(window.scrollY < FOLD);
-    read();
-    window.addEventListener("scroll", read, { passive: true });
-    return () => window.removeEventListener("scroll", read);
+
+    /* scroll 이벤트로 읽으면 **매 프레임 리액트 상태를 씁니다.** 값이 바뀌는 건
+       스크롤 한 번에 두 번(경계를 지날 때)뿐인데 초당 수십 번 리렌더가 납니다.
+
+       대신 문서 y=260 에 눈에 안 보이는 표식을 하나 박고 그것이 화면에 걸치는지를
+       봅니다. body 가 static 이라 absolute 는 문서 원점 기준으로 잡히므로, 이 표식은
+       띠의 높이와 무관하게 제자리에 있습니다 — 쿠폰 카드를 관찰할 때 생기던
+       순환(띠가 보이니 카드가 밀리고, 카드가 안 보이니 띠가 남는)이 없습니다.
+       표식이 보인다 = 스크롤이 260 아래 = 접어 둔다. 조건은 전과 같고,
+       리렌더는 경계를 지날 때 한 번씩입니다. */
+    const mark = document.createElement("div");
+    mark.setAttribute("aria-hidden", "true");
+    mark.style.cssText = `position:absolute;top:${FOLD}px;left:0;width:1px;height:1px;pointer-events:none;visibility:hidden`;
+    document.body.appendChild(mark);
+
+    const io = new IntersectionObserver(([entry]) => setCollapsed(!!entry?.isIntersecting));
+    io.observe(mark);
+
+    return () => {
+      io.disconnect();
+      mark.remove();
+    };
   }, [enabled]);
 
   return collapsed;

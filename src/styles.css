@@ -249,7 +249,9 @@
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 3px;
-    border-radius: 4px;
+    /* 여기서 반경을 정하지 않습니다. 외곽선은 요소의 원래 반경을 따라가는데,
+       반경을 못 박으면 **포커스를 받는 순간 요소 모양이 바뀝니다** —
+       반경 12px 인 입력칸이 눌리면 4px 각진 상자가 됐습니다(실측). */
   }
 }
 
@@ -1012,7 +1014,17 @@
 }
 
 /* ── 면 ────────────────────────────────────────────
-   아트워크의 쿠폰이 둥근 모서리 + 절취선 + 노치입니다. 카드를 그 형태로 둡니다. */
+   아트워크의 쿠폰이 둥근 모서리 + 절취선 + 노치입니다. 카드를 그 형태로 둡니다.
+
+   ── 모서리 반경은 네 단계뿐입니다 ──
+     999px  누를 수 있는 것 — 버튼, 배지, 아이콘 버튼
+      16px  카드·패널 — yh-card / yh-ticket / yh-coupon / yh-tile
+      12px  카드 **안**의 상자 — 입력칸, 코드 칸, 목록 행, 스켈레톤
+       8px  떠 있는 판의 항목 — 드롭다운 메뉴 줄
+   예외는 BrandPlate 하나입니다. 아이콘 크기(28·40·56px)에 비례해 5·6·8px 을 쓰는데,
+   판이 28px 인데 16px 을 주면 원이 되어 브랜드 판이 아니라 아바타로 읽힙니다.
+
+   섞이면 알약 버튼 옆에 각진 카드가 놓여 어느 쪽이 규칙인지 알 수 없게 됩니다. */
 
 @utility yh-card {
   position: relative;
@@ -1182,10 +1194,13 @@
   }
 }
 
+/* 포커스 표시.
+   border-radius 를 여기서 손대면 **포커스를 받는 순간 요소 모양이 바뀝니다** —
+   반경 12px 인 입력칸이 눌리면 4px 각진 상자가 됐습니다(실측). 외곽선은 요소의
+   원래 반경을 따라가므로 여기서 모양을 정할 일이 없습니다. */
 .yh :focus-visible {
   outline: 2px solid var(--yh-navy);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .yh {
@@ -1273,7 +1288,7 @@
 @utility yh-coupon {
   position: relative;
   background: var(--yh-surface);
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid var(--yh-card-border);
   box-shadow:
     0 2px 6px rgb(22 48 92 / 0.06),

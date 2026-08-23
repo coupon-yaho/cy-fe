@@ -83,7 +83,7 @@ export function SiteHeader() {
 
             <DropdownMenu onOpenChange={(o) => o && markAllRead()}>
               <DropdownMenuTrigger
-                className="relative grid size-9 place-items-center rounded text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
+                className="relative grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
                 aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
               >
                 <Bell className="size-[18px]" strokeWidth={1.8} aria-hidden />
@@ -96,7 +96,7 @@ export function SiteHeader() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="yh w-80 rounded border-yh-rule bg-yh-surface p-0"
+                className="yh w-80 rounded-xl border-yh-rule bg-yh-surface p-0"
               >
                 <p className="yh-label border-b border-yh-rule px-4 py-3">알림</p>
                 {items.length === 0 ? (
@@ -117,13 +117,13 @@ export function SiteHeader() {
 
             {session ? (
               <DropdownMenu>
-                <DropdownMenuTrigger className="yh-body flex items-center gap-2 rounded px-2 py-2 font-semibold transition-colors hover:bg-yh-paper-2">
+                <DropdownMenuTrigger className="yh-body flex items-center gap-2 rounded-full px-3 py-2 font-semibold transition-colors hover:bg-yh-paper-2">
                   <GradeChip grade={session.grade} size="sm" />
                   <span className="hidden text-yh-navy sm:inline">{session.nickname}</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="yh w-64 rounded border-yh-rule bg-yh-surface p-0"
+                  className="yh w-64 rounded-xl border-yh-rule bg-yh-surface p-0"
                 >
                   <div className="border-b border-yh-rule px-4 py-3">
                     <p className="yh-body font-bold">{session.nickname}</p>
@@ -135,15 +135,15 @@ export function SiteHeader() {
                     </p>
                   </div>
                   <div className="p-1">
-                    <DropdownMenuItem asChild className="yh-body rounded font-medium">
+                    <DropdownMenuItem asChild className="yh-body rounded-lg font-medium">
                       <Link to="/my/coupons">내 쿠폰함</Link>
                     </DropdownMenuItem>
                     {session.role === "ADMIN" && (
-                      <DropdownMenuItem asChild className="yh-body rounded font-medium">
+                      <DropdownMenuItem asChild className="yh-body rounded-lg font-medium">
                         <Link to="/admin">관리자</Link>
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onSelect={logout} className="yh-body rounded font-medium">
+                    <DropdownMenuItem onSelect={logout} className="yh-body rounded-lg font-medium">
                       로그아웃
                     </DropdownMenuItem>
                   </div>
@@ -157,7 +157,7 @@ export function SiteHeader() {
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger
-                className="grid size-9 place-items-center rounded text-yh-ink-2 transition-colors hover:bg-yh-paper-2 md:hidden"
+                className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 md:hidden"
                 aria-label="메뉴"
               >
                 <Menu className="size-5" strokeWidth={1.8} aria-hidden />

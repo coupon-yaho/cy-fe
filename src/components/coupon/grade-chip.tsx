@@ -18,12 +18,14 @@ const TONE: Record<MembershipGrade, string> = {
  */
 export function GradeChip({ grade, size = "md" }: { grade: MembershipGrade; size?: "sm" | "md" }) {
   return (
+    /* 이름 앞에 색 네모를 하나 찍어 두었었습니다. 그런데 그 네모의 색이 곧 글자
+       색이라 같은 말을 두 번 하는 것이었고, 배지·목록·카드 어디에나 붙다 보니
+       화면 전체에 정체불명의 점이 뿌려졌습니다. 색은 글자가 이미 갖고 있습니다. */
     <span
-      className={`inline-flex items-center gap-1.5 font-bold ${TONE[grade]} ${
+      className={`inline-flex items-center font-bold ${TONE[grade]} ${
         size === "sm" ? "yh-small" : "yh-body"
       }`}
     >
-      <span className="size-1.5 rounded-[1px] bg-current" aria-hidden />
       {GRADE_LABEL[grade]}
     </span>
   );

@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "쿠폰 야~호 — 브랜드 데이 선착순 쿠폰" },
+      { title: "쿠폰 야~호 · 브랜드 데이 선착순 쿠폰" },
       {
         name: "description",
         content: "매월 열리는 12개 브랜드 데이. 한정 수량 쿠폰을 선착순으로 발급받으세요.",

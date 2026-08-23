@@ -8,13 +8,13 @@ import type { Role } from "@/lib/auth-storage";
 import { GRADES, type MembershipGrade } from "@/lib/coupon";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "로그인 — 쿠폰 야~호" }] }),
+  head: () => ({ meta: [{ title: "로그인 · 쿠폰 야~호" }] }),
   component: LoginPage,
 });
 
 const DESTINATIONS: { key: Role; label: string; desc: string }[] = [
-  { key: "USER", label: "고객", desc: "브랜드 데이 · 발급 · 쿠폰함" },
-  { key: "ADMIN", label: "관리자", desc: "운영 현황 · 시스템" },
+  { key: "USER", label: "고객", desc: "브랜드 데이를 보고 쿠폰을 받습니다" },
+  { key: "ADMIN", label: "관리자", desc: "운영 현황과 시스템 상태" },
 ];
 
 function LoginPage() {

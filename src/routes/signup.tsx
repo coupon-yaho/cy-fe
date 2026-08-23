@@ -8,7 +8,7 @@ import { memberIdFor } from "@/lib/auth-storage";
 import { GRADES, type MembershipGrade } from "@/lib/coupon";
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "회원가입 — 쿠폰 야~호" }] }),
+  head: () => ({ meta: [{ title: "회원가입 · 쿠폰 야~호" }] }),
   component: SignupPage,
 });
 

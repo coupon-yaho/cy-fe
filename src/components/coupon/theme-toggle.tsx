@@ -30,18 +30,21 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={`grid size-9 place-items-center rounded text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy ${className}`}
-        aria-label={`화면 밝기 — 현재 ${current.label}`}
+        className={`grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy ${className}`}
+        aria-label={`화면 밝기, 현재 ${current.label}`}
       >
         <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="yh w-44 rounded border-yh-rule bg-yh-surface p-1">
+      <DropdownMenuContent
+        align="end"
+        className="yh w-44 rounded-xl border-yh-rule bg-yh-surface p-1"
+      >
         {OPTIONS.map(({ key, label, Icon: OptIcon }) => (
           <DropdownMenuItem
             key={key}
             onSelect={() => choose(key)}
-            className={`yh-body flex items-center gap-2.5 rounded font-medium ${
+            className={`yh-body flex items-center gap-2.5 rounded-lg font-medium ${
               pref === key ? "text-yh-navy" : "text-yh-ink-2"
             }`}
           >

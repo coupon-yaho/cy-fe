@@ -11,7 +11,7 @@ import { GRADE_LABEL, couponApi, type CouponRoundStatus, type CouponRoundView } 
 export const Route = createFileRoute("/events/")({
   head: () => ({
     meta: [
-      { title: "브랜드 데이 일정 — 쿠폰 야~호" },
+      { title: "브랜드 데이 일정 · 쿠폰 야~호" },
       {
         name: "description",
         content: "브랜드 데이 일정. 발급 중인 회차와 오픈 예정 회차를 한눈에 봅니다.",

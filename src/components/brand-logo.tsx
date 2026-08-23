@@ -46,7 +46,7 @@ export function BrandLogo({
             — 얼굴만 남아도 브랜드는 알아보고, 링크 이름은 aria-label 이 갖고 있습니다. */}
         <img
           src="/logo-yaho-lockup.png"
-          alt="쿠폰 야~호 — 할인 생활의 즐거움"
+          alt="쿠폰 야~호, 할인 생활의 즐거움"
           className="h-[56%] w-auto object-contain max-[359px]:hidden"
         />
       </span>
@@ -57,7 +57,7 @@ export function BrandLogo({
     return (
       <img
         src="/logo-yaho-lockup.png"
-        alt="쿠폰 야~호 — 할인 생활의 즐거움"
+        alt="쿠폰 야~호, 할인 생활의 즐거움"
         className={`${className} w-auto object-contain`}
       />
     );
@@ -66,7 +66,7 @@ export function BrandLogo({
   return (
     <img
       src="/hero-yaho.png"
-      alt="쿠폰 야~호 — 할인 생활의 즐거움"
+      alt="쿠폰 야~호, 할인 생활의 즐거움"
       className={`${className} w-auto object-contain`}
     />
   );

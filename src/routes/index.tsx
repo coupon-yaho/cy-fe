@@ -30,12 +30,12 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "쿠폰 야~호 — 브랜드 데이 선착순 쿠폰" },
+      { title: "쿠폰 야~호 · 브랜드 데이 선착순 쿠폰" },
       {
         name: "description",
         content: "매월 열리는 12개 브랜드 데이. 한정 수량 쿠폰을 선착순으로 발급받으세요.",
       },
-      { property: "og:title", content: "쿠폰 야~호 — 브랜드 데이 선착순 쿠폰" },
+      { property: "og:title", content: "쿠폰 야~호 · 브랜드 데이 선착순 쿠폰" },
       {
         property: "og:description",
         content: "지금 발급 중인 브랜드 데이와 남은 수량을 실시간으로 확인하세요.",
@@ -281,7 +281,7 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
       {/* 뜯어 가는 쪽입니다. 종이 색(--yh-paper)으로 두면 페이지 바탕과 정확히
           같은 값이라(#f6f9fd) 절취선 아래가 카드 밖처럼 보입니다. 한 단계 눌러
           두 면을 갈라 놓습니다 — 쿠폰함 티켓의 번호 칸과 같은 처리입니다. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-b-[17px] bg-yh-paper-2 px-6 py-5 sm:px-8">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-b-[15px] bg-yh-paper-2 px-6 py-5 sm:px-8">
         <Link
           to="/events/$couponRoundId"
           params={{ couponRoundId: String(round.id) }}
@@ -289,10 +289,9 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
         >
           발급받기
         </Link>
-        <Link to="/events" className="yh-btn-ghost">
-          전체 일정 보기
-        </Link>
-        {/* 값만 두면 "전체 등급" 이 무슨 말인지 알 수 없습니다 — 서술어를 붙입니다. */}
+        {/* "전체 일정 보기" 를 여기 두지 않습니다. 바로 아래 일정 섹션 머리에 같은
+            버튼이 있고 헤더 네비에도 같은 곳으로 가는 항목이 있어서, 한 화면에
+            같은 말이 셋이었습니다. 이 카드의 일은 "이 회차를 받는 것" 하나입니다. */}
         <p className="yh-small ml-auto text-yh-ink-3">
           {eligible
             ? `${gradesLabel(round.eligibleGrades)} 참여 가능`
@@ -340,9 +339,6 @@ function HeroNext({ round, grade }: { round: CouponRoundView; grade: MembershipG
           className="yh-btn"
         >
           회차 정보 보기
-        </Link>
-        <Link to="/events" className="yh-btn-ghost">
-          전체 일정 보기
         </Link>
       </div>
 
@@ -521,24 +517,19 @@ function BrandGrid() {
    사양서 U1. 대기열이 왜 뜨는지 미리 알려 두지 않으면
    순번 화면이 처음 뜨는 순간 사용자는 실패로 읽습니다. */
 
+/* 번호마다 다른 색을 주었었습니다. 세 단계는 같은 줄기의 1·2·3 인데 색이 셋이면
+   서로 다른 갈래로 읽힙니다. 색은 분류를 뜻하지 순서를 뜻하지 않습니다. */
 const STEPS = [
-  {
-    n: "01",
-    head: "입장",
-    body: "오픈 시각에 입장하면 즉시 입장하거나 대기열에 배정됩니다.",
-    tint: "bg-yh-t-sky",
-  },
+  { n: "01", head: "입장", body: "오픈 시각에 입장하면 즉시 입장하거나 대기열에 배정됩니다." },
   {
     n: "02",
     head: "대기",
     body: "내 순번과 예상 시간이 1초마다 갱신됩니다. 창을 열어 두기만 하면 됩니다.",
-    tint: "bg-yh-t-peri",
   },
   {
     n: "03",
     head: "발급",
     body: "입장 토큰으로 발급합니다. 1인 1매, 초과 발급은 발생하지 않습니다.",
-    tint: "bg-yh-t-mint",
   },
 ];
 
@@ -569,8 +560,10 @@ function Closing() {
       <div className="relative z-[1] mx-auto w-full max-w-6xl px-5 py-16">
         <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
           <div>
-            <p className="yh-label text-white/50">발급 절차</p>
-            <h2 className="yh-title mt-3 text-white">이렇게 받습니다</h2>
+            {/* 이 자리에 "발급 절차" 라벨이 있었습니다. 섹션마다 작은 대문자 라벨을
+                하나씩 얹으면 지면이 전부 같은 리듬으로 읽힙니다. 제목만으로 충분하고,
+                라벨을 빼니 옆 칸 제목과 밑선도 저절로 맞습니다. */}
+            <h2 className="yh-title text-white">이렇게 받습니다</h2>
 
             <ol className="mt-7 space-y-5">
               {STEPS.map((s, i) => (
@@ -578,9 +571,7 @@ function Closing() {
                   <li className="flex gap-4 border-t border-white/20 pt-4">
                     {/* shrink-0 이 없으면 flex 가 이 배지를 찌그러뜨리고
                         그 안에서 "01" 이 두 줄로 접힙니다. */}
-                    <span
-                      className={`yh-num yh-figure-sm mt-0.5 grid size-9 shrink-0 place-items-center rounded-full text-[0.8125rem] text-yh-navy ${s.tint}`}
-                    >
+                    <span className="yh-num yh-figure-sm mt-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-yh-t-sky text-[0.8125rem] text-yh-navy">
                       {s.n}
                     </span>
                     {/* 두 문단은 한 덩어리로 묶습니다 — flex 직계로 두면
@@ -596,10 +587,7 @@ function Closing() {
           </div>
 
           <div>
-            {/* 왼쪽 칸에만 라벨이 있어 두 제목의 밑선이 28px 어긋났습니다.
-                나란히 놓인 두 칸은 같은 줄에서 시작해야 한 덩어리로 읽힙니다. */}
-            <p className="yh-label text-white/50">발급 원칙</p>
-            <h2 className="yh-title mt-3 text-white">선착순은 이렇게 지켜집니다</h2>
+            <h2 className="yh-title text-white">선착순은 이렇게 지켜집니다</h2>
 
             <dl className="mt-7 space-y-5">
               {RULES.map((r) => (

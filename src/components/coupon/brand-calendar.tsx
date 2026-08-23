@@ -133,7 +133,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
             aria-label="이전 달"
             className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
           >
-            <ChevronLeft className="size-4" strokeWidth={2.2} />
+            <ChevronLeft className="size-4" strokeWidth={1.8} />
           </button>
           <p className="yh-sub yh-num min-w-[8.5rem] text-center">
             {year}년 {month + 1}월
@@ -144,7 +144,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
             aria-label="다음 달"
             className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
           >
-            <ChevronRight className="size-4" strokeWidth={2.2} />
+            <ChevronRight className="size-4" strokeWidth={1.8} />
           </button>
         </div>
 
@@ -456,12 +456,12 @@ function DayCard({ entry, grade }: { entry: CalendarEntry; grade: MembershipGrad
           </p>
         ) : (
           // 지난 달 회차에는 재고 기록이 없습니다. 0 으로 그리면 "품절"이라 거짓말합니다.
-          <p className="yh-small text-yh-ink-3">지난 회차 — 재고 기록 없음</p>
+          <p className="yh-small text-yh-ink-3">지난 회차라 재고 기록이 없습니다</p>
         )}
       </div>
 
       <p className="yh-small mt-4 flex items-center gap-1.5 text-yh-ink-3">
-        {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />}
+        {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden />}
         {eligible ? gradesLabel(entry.eligibleGrades) : `${gradesLabel(entry.eligibleGrades)} 전용`}
       </p>
     </>

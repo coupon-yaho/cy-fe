@@ -60,7 +60,7 @@ export function RoundCard({
           <span className="yh-label">{ROUND_STATUS_LABEL[round.status]}</span>
         )}
         <span className="yh-num yh-small text-yh-ink-3">
-          {formatClock(round.openAt)} – {formatClock(round.closeAt)}
+          {formatClock(round.openAt)}-{formatClock(round.closeAt)}
         </span>
       </div>
 
@@ -97,7 +97,7 @@ export function RoundCard({
             eligible ? undefined : "inline-flex items-center gap-1.5 font-bold text-yh-ink-2"
           }
         >
-          {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />}
+          {!eligible && <Lock className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden />}
           {eligible
             ? gradesLabel(round.eligibleGrades)
             : `${gradesLabel(round.eligibleGrades)} 전용`}
@@ -144,7 +144,7 @@ export function RoundRow({
           회차 이름이 두세 글자만 남습니다. 이름 아래 줄로 내립니다. */}
       <span className="yh-num yh-small hidden font-semibold text-yh-ink-2 sm:block">
         {formatClock(round.openAt)}
-        <span className="font-normal text-yh-ink-3"> – {formatClock(round.closeAt)}</span>
+        <span className="font-normal text-yh-ink-3">-{formatClock(round.closeAt)}</span>
       </span>
 
       <BrandPlate brandId={round.brandId} size="sm" />

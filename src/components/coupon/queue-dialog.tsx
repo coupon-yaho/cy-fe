@@ -75,11 +75,11 @@ export function QueueDialog({
             <dl className="mt-7 grid grid-cols-3 border-t border-yh-rule text-center">
               <Stat
                 label="내 뒤"
-                value={place ? `${place.behind.toLocaleString("ko-KR")}명` : "—"}
+                value={place ? `${place.behind.toLocaleString("ko-KR")}명` : "집계 중"}
               />
               <Stat
                 label="전체 대기"
-                value={place ? `${place.totalWaiting.toLocaleString("ko-KR")}명` : "—"}
+                value={place ? `${place.totalWaiting.toLocaleString("ko-KR")}명` : "집계 중"}
               />
               <Stat
                 label="예상 대기"

@@ -28,7 +28,7 @@ import {
 
 export const Route = createFileRoute("/my/coupons")({
   head: () => ({
-    meta: [{ title: "내 쿠폰함 — 쿠폰 야~호" }],
+    meta: [{ title: "내 쿠폰함 · 쿠폰 야~호" }],
   }),
   component: MyCoupons,
 });
