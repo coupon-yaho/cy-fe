@@ -150,7 +150,7 @@ function Hero() {
 
           {/* 어두운 띠 위입니다. --yh-ink-2 는 종이 면에서 본문 다음 단계로 쓰는
               잉크라 여기 얹으면 2.55:1 이 됩니다(측정). 흰색을 눌러서 씁니다. */}
-          <p className="yh-lede mt-5 max-w-[40ch] text-white/72">
+          <p className="yh-hero-lede yh-lede mt-5 max-w-[40ch] text-white/72">
             정해진 수량을 선착순으로 나눠 드립니다. 수량이 떨어지면 마감 시각 전에도 닫히니, 열리는
             시각을 미리 확인해 두세요.
           </p>
@@ -219,27 +219,28 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
 
   return (
     /* 실물 쿠폰의 구조 — 왼쪽은 읽는 면, 절취선 오른쪽은 뜯어 가는 면.
-       쿠폰함 티켓과 같은 형태라 두 화면이 같은 물건으로 읽힙니다.
 
-       앞서 세 수치(할인·마감·수량)를 가로로 나란히 놓았습니다. 폭 1112px 짜리 카드에서
-       한 칸이 340px 인데 내용은 100px 남짓이라, 셋이 서로 관계없이 떠 있는 섬처럼
-       보였습니다. 뜯는 면도 왼쪽 끝 버튼 하나와 오른쪽 끝 작은 글자 하나뿐이라
-       가운데 800px 가 비었습니다.
+       ── 왜 다시 짰나 ──
+       카드 폭 1112px 에서 상태줄 오른쪽이 530px, 제목줄 오른쪽이 756px 비어 있었습니다.
+       그런데 정작 **할인율이 회차 이름과 같은 48px** 였습니다. 쿠폰에서 제일 큰 글자는
+       이름이 아니라 깎이는 값입니다 — 둘이 같은 크기면 "얼마짜리인가" 가 이름과 같은
+       목소리로 들립니다.
 
-       그래서 **읽을 것과 할 것으로** 가릅니다. 왼쪽은 "무엇을 얼마나" (브랜드·이름·
-       할인·재고), 오른쪽은 "언제까지, 지금 하기" (카운트다운·발급 버튼). 서두르게
-       만드는 시계는 버튼 옆에 있어야 일을 합니다.
+       그래서 값을 72px 로 올려 왼쪽 닻으로 삼고, 이름은 그 옆에서 설명하게 내렸습니다.
+       빈 폭은 재고 막대를 가로로 눕혀 채웁니다 — 막대는 길수록 잘 읽히므로 채우려고
+       늘린 게 아니라 길어서 좋아진 자리입니다.
 
-       노치(반원)는 못 씁니다 — 이 카드는 네이비 띠와 종이 면 두 배경에 걸쳐 있어서
+       노치(반원)는 쓰지 않습니다 — 이 카드는 네이비 띠와 종이 면 두 배경에 걸쳐 있어서
        반원을 한 색으로 칠하면 한쪽에서는 카드 위에 뜬 동그라미가 됩니다.
-       좁은 화면에서는 카드가 종이 면 위에만 놓이므로 그때만 노치를 뚫습니다.
+       좁은 화면에서는 카드가 종이 면 위에만 놓이므로 그때만 뚫습니다.
 
        좌우로 가르는 시점은 sm(640px)이 아니라 md(768px)입니다. 640px 에서 갈랐더니
-       오른쪽 20rem 을 떼고 남은 왼쪽에서 재고 칸이 76px 까지 눌려 게이지가 손톱만
-       해졌습니다(실측). 그 폭에서는 위아래로 쌓는 쪽이 낫습니다. */
-    <div className="yh-rise yh-coupon grid md:grid-cols-[minmax(0,1fr)_auto_20rem]">
-      <div className="min-w-0 p-6 md:p-8">
-        <div className="flex flex-wrap items-center gap-3">
+       오른쪽 칸을 떼고 남은 왼쪽에서 재고 칸이 76px 까지 눌렸습니다(실측). */
+    <div className="yh-rise yh-coupon grid md:grid-cols-[minmax(0,1fr)_auto_17.5rem]">
+      <div className="min-w-0 p-5 sm:p-6 md:p-8">
+        {/* 참여 등급은 회차의 성질이라 이 줄이 제자리입니다. 버튼 밑에 두었더니
+            줄 오른쪽 530px 가 비고 대신 버튼 아래에 잔글씨가 하나 붙었습니다. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="yh-live">
             <span className="live-dot" />
             지금 발급 중
@@ -250,71 +251,79 @@ function HeroLive({ round, grade }: { round: CouponRoundView; grade: MembershipG
               {brand.name} · {brand.category}
             </span>
           </span>
+          <span className="yh-small ml-auto text-yh-ink-3">
+            {eligible
+              ? `${gradesLabel(round.eligibleGrades)} 참여 가능`
+              : `${gradesLabel(round.eligibleGrades)} 전용`}
+          </span>
         </div>
 
-        <h1 className="yh-hero mt-4">{round.name}</h1>
-
-        {/* 할인과 재고는 같은 질문("이 쿠폰이 지금 쓸 만한가")의 두 쪽이라 붙여 둡니다.
-            할인은 폭이 글자 수에 따라 달라지므로 auto, 재고는 게이지가 남는 폭을 씁니다. */}
-        {/* 좁은 화면에서 둘을 세로로 쌓으면 카드가 579px 이 되어 발급 버튼이 화면
-            아래로 내려갑니다(실측). 두 칸으로 눕히면 게이지가 좁아질 뿐입니다. */}
-        <div className="mt-7 grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-6 md:gap-x-10">
-          <div>
-            <p className="yh-label">할인</p>
-            <p className="yh-figure mt-1.5 text-yh-navy">
-              {round.policyType === "PERCENT_CAPPED" ? `${rate}%` : discountHeadline(round)}
-            </p>
-            <p className="yh-small mt-2 text-yh-ink-2">{discountDetail(round)}</p>
+        {/* 값과 이름을 한 줄에. 밑선을 맞춰야 둘이 한 문장("15% — 버거하우스 점심 특가")
+            으로 읽힙니다. 위아래로 쌓으면 서로 다른 두 소식이 됩니다. */}
+        <div className="mt-4 flex flex-wrap items-end gap-x-7 gap-y-2 sm:mt-6">
+          <p className="yh-figure-lg text-yh-navy">
+            {round.policyType === "PERCENT_CAPPED" ? `${rate}%` : discountHeadline(round)}
+          </p>
+          <div className="min-w-0 flex-1 pb-1.5">
+            {/* 페이지의 h1 은 히어로 문구입니다. 여기까지 h1 이면 문서에 제목이 둘입니다. */}
+            {/* 좁은 화면에서 truncate 를 쓰면 "버거하우스 점심 …" 으로 잘려서 정작 무슨
+                쿠폰인지 모르게 됩니다. 두 줄까지는 접어 보여 줍니다. */}
+            <h2 className="yh-title line-clamp-2">{round.name}</h2>
+            <p className="yh-small mt-1 text-yh-ink-2">{discountDetail(round)}</p>
           </div>
+        </div>
 
-          <div className="min-w-0">
-            <p className="yh-label">남은 수량</p>
-            <p className={`yh-figure yh-num mt-1.5 ${urgent ? "text-yh-accent" : "text-yh-navy"}`}>
-              {remaining.toLocaleString("ko-KR")}
-              <span className="yh-small yh-num ml-2 align-baseline font-medium text-yh-ink-2">
-                / {round.totalQuantity.toLocaleString("ko-KR")}
-              </span>
-            </p>
-            <div className="mt-3">
-              <StockGauge remaining={remaining} total={round.totalQuantity} label={false} />
-            </div>
-          </div>
+        {/* 재고는 가로로 길게 — 라벨 · 막대 · 수치 순서라 왼쪽부터 읽으면
+            "남은 수량은 이만큼이고 6,240장이다" 가 됩니다. */}
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-7">
+          <span className="yh-label shrink-0">남은 수량</span>
+          <span className="order-3 min-w-full flex-1 sm:order-2 sm:min-w-0">
+            <StockGauge remaining={remaining} total={round.totalQuantity} label={false} />
+          </span>
+          <span
+            className={`yh-num order-2 shrink-0 font-bold sm:order-3 ${
+              urgent ? "text-yh-accent" : "text-yh-navy"
+            }`}
+          >
+            {remaining.toLocaleString("ko-KR")}
+            <span className="yh-num font-medium text-yh-ink-3">
+              {" "}
+              / {round.totalQuantity.toLocaleString("ko-KR")}
+            </span>
+          </span>
         </div>
       </div>
 
       <div className="yh-tear mx-6 md:hidden" />
       <div className="yh-tear-y-plain hidden md:block" />
 
-      <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4 rounded-b-[15px] bg-yh-paper-2 p-6 md:flex-col md:flex-nowrap md:items-stretch md:justify-center md:gap-6 md:rounded-b-none md:rounded-r-[15px] md:p-8">
+      <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4 rounded-b-[15px] bg-yh-paper-2 p-5 sm:p-6 md:flex-col md:flex-nowrap md:items-stretch md:justify-center md:gap-6 md:rounded-b-none md:rounded-r-[15px] md:p-8">
         <div>
           <p className="yh-label">마감까지</p>
-          {/* 20rem 칸 안이라 히어로 수치보다 한 단계 작게 둡니다 — 같은 크기면 넘칩니다 */}
+          {/* 17.5rem 칸 안이라 히어로 수치보다 한 단계 작게 둡니다 — 같은 크기면 넘칩니다 */}
           <p
-            className={`yh-figure yh-num mt-1.5 text-[2.25rem] ${
+            className={`yh-figure yh-num mt-1.5 text-[2rem] ${
               urgent ? "text-yh-accent" : "text-yh-navy"
             }`}
           >
             <Countdown target={Date.parse(round.closeAt)} />
           </p>
-          <p className="yh-num yh-small mt-1.5 text-yh-ink-2">
+          {/* 360px 에서는 이 줄까지 넣으면 발급 버튼이 화면 아래로 내려갑니다(실측).
+              카운트다운이 이미 "얼마 남았나" 를 말하므로 절대 시각은 그 폭에서 접습니다. */}
+          <p className="yh-num yh-small mt-1.5 hidden text-yh-ink-2 min-[400px]:block">
             {formatDateTime(round.closeAt)} 마감
           </p>
         </div>
 
-        <div className="min-w-[9rem] flex-1">
-          <Link
-            to="/events/$couponRoundId"
-            params={{ couponRoundId: String(round.id) }}
-            className="yh-btn-live w-full"
-          >
-            발급받기
-          </Link>
-          <p className="yh-small mt-3 text-center text-yh-ink-3">
-            {eligible
-              ? `${gradesLabel(round.eligibleGrades)} 참여 가능`
-              : `${gradesLabel(round.eligibleGrades)} 전용`}
-          </p>
-        </div>
+        <Link
+          to="/events/$couponRoundId"
+          params={{ couponRoundId: String(round.id) }}
+          /* 좁은 화면에서는 시계 옆에서 남는 폭을 먹지만, 세로로 쌓이는 넓은 화면에서는
+             늘어나면 안 됩니다 — 세로로 늘어난 알약은 버튼이 아니라 색 덩어리입니다 */
+          className="yh-btn-live min-w-[9rem] flex-1 md:flex-none"
+        >
+          발급받기
+        </Link>
       </div>
     </div>
   );

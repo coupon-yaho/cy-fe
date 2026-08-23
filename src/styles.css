@@ -799,6 +799,20 @@
 }
 
 /* 큰 수치 — 할인율·카운트다운. 로고 레터링과 같은 무게로 둡니다. */
+/* 쿠폰의 주인공 수치.
+   쿠폰에서 제일 큰 글자는 회차 이름이 아니라 **깎이는 값**이어야 합니다.
+   둘이 같은 48px 이면 "이 쿠폰이 얼마짜리인가" 가 이름과 같은 목소리로 들립니다. */
+@utility yh-figure-lg {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  /* "10,000원" 처럼 긴 값도 한 줄에 들어가는 상한입니다 */
+  font-size: clamp(2.75rem, 5.2vw, 4.5rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.032em;
+  white-space: nowrap;
+}
+
 @utility yh-figure {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
@@ -1432,6 +1446,15 @@
 /* 좁은 화면에서는 히어로의 캐릭터를 접습니다. 헤더 로고에 같은 캐릭터가 이미
    있으므로 브랜드가 사라지지 않고, 그 자리를 쿠폰이 가져갑니다. */
 @media (max-width: 639px) {
+  .yh-hero-band .yh-hero-art {
+    display: none;
+  }
+}
+
+/* lg 아래에서는 캐릭터가 문구 **밑에** 쌓입니다. 옆에 있을 때는 문구 높이 안에
+   들어가지만 밑에 쌓이면 제 높이를 통째로 더합니다 — 900x560 에서 띠가 478px 가
+   되어 발급 버튼이 화면 밖으로 나갔습니다(실측). 그 높이에서는 접습니다. */
+@media (max-height: 640px) and (max-width: 1023px) {
   .yh-hero-band .yh-hero-art {
     display: none;
   }
