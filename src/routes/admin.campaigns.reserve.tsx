@@ -38,6 +38,9 @@ const GRID_H = 460;
 const HOUR_MS = 3_600_000;
 /** 백엔드 요청 DTO 의 @AssertTrue 와 같은 값입니다 */
 const MAX_SPAN_HOURS = 24;
+const SLOT_MIN = 30;
+const SLOTS_PER_HOUR = 60 / SLOT_MIN;
+const SLOTS_PER_DAY = (DAY_END - DAY_START) * SLOTS_PER_HOUR;
 
 const startOfWeek = (ms: number) => {
   const d = new Date(ms);
@@ -50,6 +53,12 @@ const startOfWeek = (ms: number) => {
 /** datetime-local 입력이 읽는 형식. 초는 버립니다. */
 const toLocalInput = (ms: number) =>
   new Date(ms - new Date(ms).getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+
+/** "9월 1일 14:00" — 안내문에 쓰는 짧은 표기 */
+function stampLabel(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 /** 규칙이 가리키는 다음 오픈 시각. 이미 지났으면 다음 달로 넘깁니다. */
 function nextOpenFor(t: CouponTemplateDetail, now: number): number {
@@ -73,6 +82,30 @@ function nextOpenFor(t: CouponTemplateDetail, now: number): number {
   return thisMonth > now ? thisMonth : at(ref.getFullYear(), ref.getMonth() + 1);
 }
 
+/**
+ * `from` 이후로 durationH 짜리 회차를 넣을 수 있는 첫 시각.
+ *
+ * 시간 버튼과 **같은 눈금**(하루 07~24시, 30분 간격)에서만 찾습니다 — 버튼에 없는
+ * 시각을 골라 주면 "선택" 표시가 어디에도 안 붙어서 무엇이 잡혔는지 알 수 없습니다.
+ * 60일 안에 자리가 없으면 원래 시각을 그대로 돌려주고, 판정은 problem 이 합니다.
+ */
+function firstFreeFrom(from: number, durationH: number, taken: Slot[], now: number): number {
+  const start = Math.max(from, now);
+  let day = new Date(start).setHours(0, 0, 0, 0);
+  for (let d = 0; d < 60; d += 1) {
+    for (let i = 0; i < SLOTS_PER_DAY; i += 1) {
+      const at = day + DAY_START * HOUR_MS + i * SLOT_MIN * 60_000;
+      if (at < start) continue;
+      const end = at + durationH * HOUR_MS;
+      if (!taken.some((s) => at < s.close && end > s.open)) return at;
+    }
+    const next = new Date(day);
+    next.setDate(next.getDate() + 1);
+    day = next.getTime();
+  }
+  return from;
+}
+
 function ReservePage() {
   const { template: preset } = useSearch({ from: "/admin/campaigns/reserve" });
   const navigate = useNavigate();
@@ -82,7 +115,7 @@ function ReservePage() {
     queryKey: ["admin", "templates"],
     queryFn: () => couponApi.listTemplates({ size: 50 }),
   });
-  const { data: rounds } = useQuery({
+  const { data: rounds, isPending: roundsPending } = useQuery({
     queryKey: ["rounds"],
     queryFn: () => couponApi.listRounds(),
     refetchInterval: 30_000,
@@ -97,11 +130,36 @@ function ReservePage() {
   const [openLocal, setOpenLocal] = useState("");
   const [closeLocal, setCloseLocal] = useState("");
   const [seeded, setSeeded] = useState<number | null>(null);
+  /** 규칙이 가리킨 시각이 이미 잡혀 있어 옮겼을 때, 왜 옮겼는지 */
+  const [seedNote, setSeedNote] = useState<string | null>(null);
 
-  // 템플릿을 고르면 그 규칙의 다음 회차로 채우고, 달력도 그 날로 옮깁니다.
-  if (picked && seeded !== picked.id) {
+  /* 이미 잡힌 회차 전부. 끝난 회차(CLOSED)는 자리를 비켜 주므로 뺍니다 —
+     백엔드 겹침 검사도 SCHEDULED·OPEN 만 셉니다.
+     **주 단위로 자르지 않습니다.** 겹침 판정은 화면에 보이는 주가 아니라 고른 시각을
+     기준으로 해야 합니다 — 잘라 놓았더니 다른 주 시각을 직접 입력하면 겹치는데도
+     통과하고, 서버가 그제서야 막았습니다. */
+  const taken: Slot[] = useMemo(
+    () =>
+      (rounds ?? [])
+        .filter((r) => r.status !== "CLOSED")
+        .map((r) => ({ round: r, open: Date.parse(r.openAt), close: Date.parse(r.closeAt) })),
+    [rounds],
+  );
+
+  /* 템플릿을 고르면 그 규칙의 다음 회차로 채우고, 달력도 그 날로 옮깁니다.
+     그 시각이 이미 잡혀 있으면 **가장 가까운 빈 시각으로** 옮깁니다 — 그냥 두면
+     화면이 열리자마자 빨간 경고에 예약 버튼이 꺼진 채로 시작해서, 고칠 방법을
+     사용자가 직접 찾아야 했습니다. rounds 를 받은 뒤에 잡아야 판단할 수 있습니다. */
+  if (picked && !roundsPending && seeded !== picked.id) {
+    const now = Date.now();
+    const rule = nextOpenFor(picked, now);
+    const open = firstFreeFrom(rule, picked.durationHours, taken, now);
     setSeeded(picked.id);
-    const open = nextOpenFor(picked, Date.now());
+    setSeedNote(
+      open === rule
+        ? null
+        : `규칙상 ${stampLabel(rule)} 이지만 이미 잡혀 있어 가장 가까운 빈 시각으로 맞췄습니다.`,
+    );
     setOpenLocal(toLocalInput(open));
     setCloseLocal(toLocalInput(open + picked.durationHours * HOUR_MS));
     setWeekStart(startOfWeek(open));
@@ -117,18 +175,13 @@ function ReservePage() {
     [weekStart],
   );
 
-  /* 이 주에 이미 잡힌 회차. 끝난 회차(CLOSED)는 자리를 비켜 주므로 뺍니다 —
-     백엔드 겹침 검사도 SCHEDULED·OPEN 만 셉니다. */
-  const booked = useMemo(() => {
-    const from = weekStart;
-    const to = weekStart + 7 * 24 * HOUR_MS;
-    return (rounds ?? [])
-      .filter((r) => r.status !== "CLOSED")
-      .map((r) => ({ round: r, open: Date.parse(r.openAt), close: Date.parse(r.closeAt) }))
-      .filter((r) => r.open < to && r.close > from);
-  }, [rounds, weekStart]);
+  /** 달력·시간 버튼은 보이는 주만 그리면 됩니다 */
+  const booked = useMemo(
+    () => taken.filter((s) => s.open < weekStart + 7 * 24 * HOUR_MS && s.close > weekStart),
+    [taken, weekStart],
+  );
 
-  const clashes = booked.filter(
+  const clashes = taken.filter(
     (s) =>
       Number.isFinite(openMs) && Number.isFinite(closeMs) && openMs < s.close && closeMs > s.open,
   );
@@ -154,10 +207,15 @@ function ReservePage() {
       queryClient.invalidateQueries({ queryKey: ["rounds"] });
       queryClient.invalidateQueries({ queryKey: ["calendar"] });
       toast.success(`${r.name} 회차를 예약했습니다`);
-      // 화면을 떠나지 않습니다 — 연달아 여러 건을 잡는 일이 흔합니다.
-      const next = Date.parse(r.closeAt);
+      /* 화면을 떠나지 않습니다 — 연달아 여러 건을 잡는 일이 흔합니다.
+         방금 만든 회차 바로 뒤부터, 역시 **비어 있는** 첫 자리로 옮깁니다. */
+      const dur = picked?.durationHours ?? 4;
+      const next = firstFreeFrom(Date.parse(r.closeAt), dur, taken, Date.now());
+      setSeedNote(null);
       setOpenLocal(toLocalInput(next));
-      setCloseLocal(toLocalInput(next + (picked?.durationHours ?? 4) * HOUR_MS));
+      setCloseLocal(toLocalInput(next + dur * HOUR_MS));
+      setWeekStart(startOfWeek(next));
+      setDay(new Date(next).setHours(0, 0, 0, 0));
     },
     onError: (e) => toast.error(errorLine(e)),
   });
@@ -165,6 +223,7 @@ function ReservePage() {
   /** 시간 버튼을 누르면 오픈이 그 시각이 되고, 마감은 템플릿 길이만큼 따라옵니다. */
   const pickSlot = (at: number) => {
     if (!picked) return;
+    setSeedNote(null);
     setOpenLocal(toLocalInput(at));
     setCloseLocal(toLocalInput(at + picked.durationHours * HOUR_MS));
   };
@@ -192,7 +251,7 @@ function ReservePage() {
         }
       />
 
-      {isLoading ? (
+      {isLoading || roundsPending ? (
         <Skeleton className="h-[32rem] rounded-2xl" />
       ) : (
         <div className="grid gap-4 xl:grid-cols-[19rem_minmax(0,1fr)]">
@@ -237,7 +296,7 @@ function ReservePage() {
           <div className="flex flex-col gap-4">
             <Panel
               title="언제 열까요"
-              hint="막힌 시각은 누가 잡았는지 버튼에 적혀 있습니다"
+              hint="회색은 이미 잡혔거나, 여기서 열면 다음 회차와 겹치는 시각입니다"
               action={
                 <span className="flex items-center gap-1">
                   <button
@@ -276,12 +335,17 @@ function ReservePage() {
             </Panel>
 
             <Panel title="예약할 회차" bodyClassName="flex flex-wrap items-end gap-x-5 gap-y-4">
+              {/* 규칙 시각에서 옮겼으면, 옮겼다는 사실을 숨기지 않습니다 */}
+              {seedNote && <p className="t-body-sm w-full text-hig-secondary">{seedNote}</p>}
               <label className="block">
                 <span className="eyebrow">오픈</span>
                 <input
                   type="datetime-local"
                   value={openLocal}
-                  onChange={(e) => setOpenLocal(e.target.value)}
+                  onChange={(e) => {
+                    setSeedNote(null);
+                    setOpenLocal(e.target.value);
+                  }}
                   className="input-line mt-1.5"
                 />
               </label>
@@ -290,7 +354,10 @@ function ReservePage() {
                 <input
                   type="datetime-local"
                   value={closeLocal}
-                  onChange={(e) => setCloseLocal(e.target.value)}
+                  onChange={(e) => {
+                    setSeedNote(null);
+                    setCloseLocal(e.target.value);
+                  }}
                   className="input-line mt-1.5"
                 />
               </label>
@@ -333,9 +400,6 @@ function ReservePage() {
    "여기 열 수 있나" 를 눈대중으로 판단해야 했습니다.
    시간 버튼으로 바꿉니다 — 열 수 있는 시각만 누를 수 있고, 막힌 시각은 누가 잡았는지
    버튼에 적힙니다. 판단을 화면이 대신합니다. */
-
-const SLOT_MIN = 30;
-const SLOTS_PER_HOUR = 60 / SLOT_MIN;
 
 interface Slot {
   round: CouponRoundView;
@@ -413,15 +477,21 @@ function TimeSlots({
   const slots: {
     at: number;
     taken: Slot | null;
+    /** 이 시각 자체가 남의 회차 안에 들어 있는가 */
+    inside: boolean;
     past: boolean;
   }[] = [];
 
-  for (let i = 0; i < (DAY_END - DAY_START) * SLOTS_PER_HOUR; i += 1) {
+  for (let i = 0; i < SLOTS_PER_DAY; i += 1) {
     const at = dayMs + DAY_START * HOUR_MS + i * SLOT_MIN * 60_000;
     const end = at + durationH * HOUR_MS;
     // 이 시각에 열면 어느 회차와 부딪히는지 — 첫 번째 것만 알려 주면 충분합니다
     const taken = booked.find((s) => at < s.close && end > s.open) ?? null;
-    slots.push({ at, taken, past: at < now });
+    /* 막히는 이유가 둘입니다. 이 시각에 남이 이미 있는 경우와, 시작은 비었지만
+       durationH 만큼 열면 뒤 회차를 물고 들어가는 경우.
+       둘 다 "모카빈" 이라고만 적었더니 앞쪽 빈 칸까지 모카빈이 잡은 것처럼 읽혔습니다. */
+    const inside = taken ? at >= taken.open && at < taken.close : false;
+    slots.push({ at, taken, inside, past: at < now });
   }
 
   const free = slots.filter((s) => !s.taken && !s.past).length;
@@ -433,10 +503,12 @@ function TimeSlots({
         <span className="num font-semibold text-hig-fg">{free}</span>개
       </p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5">
-        {slots.map(({ at, taken, past }) => {
+        {slots.map(({ at, taken, inside, past }) => {
           const label = new Date(at).toTimeString().slice(0, 5);
-          const on = selectedOpen === at;
           const off = !!taken || past;
+          /* 못 고르는 자리는 "선택" 으로 그리지 않습니다 — 검게 칠해 놓고 예약 버튼은
+             꺼져 있으면, 고른 것 같은데 왜 안 되는지 알 수 없습니다. */
+          const on = selectedOpen === at && !off;
           return (
             <button
               key={at}
@@ -446,7 +518,7 @@ function TimeSlots({
               aria-pressed={on}
               title={
                 taken
-                  ? `${brandOf(taken.round.brandId).name} ${formatClock(taken.round.openAt)}-${formatClock(taken.round.closeAt)}`
+                  ? `${inside ? "이미 잡힘" : `${durationH}시간을 열면 겹침`} · ${brandOf(taken.round.brandId).name} ${formatClock(taken.round.openAt)}-${formatClock(taken.round.closeAt)}`
                   : past
                     ? "이미 지난 시각입니다"
                     : undefined
@@ -464,7 +536,15 @@ function TimeSlots({
               <span className="num t-body-sm block font-semibold">{label}</span>
               {/* 왜 못 누르는지 버튼이 직접 말합니다 */}
               <span className="t-caption block truncate">
-                {taken ? brandOf(taken.round.brandId).name : past ? "지남" : on ? "선택" : "가능"}
+                {taken
+                  ? inside
+                    ? brandOf(taken.round.brandId).name
+                    : "겹침"
+                  : past
+                    ? "지남"
+                    : on
+                      ? "선택"
+                      : "가능"}
               </span>
             </button>
           );
