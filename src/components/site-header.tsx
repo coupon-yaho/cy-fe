@@ -131,9 +131,15 @@ export function SiteHeader() {
               <DropdownMenuContent
                 align="end"
                 alignOffset={-bellNudge}
-                className="yh w-[min(23rem,calc(100vw-1.5rem))] rounded-xl border-yh-rule bg-yh-surface p-0"
+                /* shadow-[var(--yh-shadow-lg)] 로 띄웁니다 — 기본 그림자는
+                   0 4px 6px 라서 어두운 히어로 띠 위에서 떠 보이지 않았습니다. */
+                className="yh w-[min(23rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border-yh-rule bg-yh-surface p-0 shadow-[var(--yh-shadow-lg)]"
               >
-                <div className="flex items-baseline gap-2 border-b border-yh-rule px-4 py-3">
+                <div
+                  className={`flex items-baseline gap-2 px-4 pt-3 pb-2.5 ${
+                    items.length > 0 ? "border-b border-yh-rule" : ""
+                  }`}
+                >
                   <p className="yh-sub">알림</p>
                   {freshCount > 0 && (
                     <p className="yh-num yh-small font-bold text-yh-accent-dark">
@@ -147,19 +153,13 @@ export function SiteHeader() {
                   )}
                 </div>
                 {items.length === 0 ? (
-                  /* 빈 화면에 회색 한 줄만 두면 고장인지 비어 있는 건지 알 수 없습니다.
-                     무엇이 여기 쌓이는지 말하고, 지금 할 수 있는 일을 하나 답니다. */
-                  <div className="px-5 py-8 text-center">
-                    <span className="mx-auto grid size-11 place-items-center rounded-full bg-yh-paper-2">
-                      <Bell className="size-5 text-yh-ink-3" strokeWidth={1.8} aria-hidden />
-                    </span>
-                    <p className="yh-body mt-3.5 font-bold">아직 온 알림이 없습니다</p>
-                    <p className="yh-small mt-1.5 text-yh-ink-2">
-                      쿠폰을 받거나 쓰면 그 내역이 여기 쌓입니다.
-                    </p>
-                    <Link to="/events" className="yh-btn-sm mt-5">
-                      브랜드 데이 보기
-                    </Link>
+                  /* 아이콘 원 + 굵은 줄 + 설명 + 버튼으로 284px 를 썼습니다. 없다는 걸
+                     말하는 데 그만한 판이 필요하지 않고, 버튼은 바로 위 내비게이션의
+                     "브랜드 데이" 와 같은 곳으로 갔습니다. 두 줄로 줄입니다. */
+                  <div className="px-4 pt-0.5 pb-4">
+                    {/* 제목은 왼쪽인데 본문만 가운데면 두 덩어리로 갈라져 보입니다 */}
+                    <p className="yh-small text-yh-ink-2">아직 온 알림이 없습니다.</p>
+                    <p className="yh-small mt-1 text-yh-ink-3">쿠폰을 받거나 쓰면 여기 쌓입니다.</p>
                   </div>
                 ) : (
                   items.slice(0, 6).map((n, i) => {
