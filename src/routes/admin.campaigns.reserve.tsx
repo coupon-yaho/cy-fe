@@ -93,17 +93,19 @@ function ReservePage() {
   const picked = list.find((t) => t.id === (pickedId ?? preset)) ?? list[0];
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(Date.now()));
+  const [day, setDay] = useState(() => new Date().setHours(0, 0, 0, 0));
   const [openLocal, setOpenLocal] = useState("");
   const [closeLocal, setCloseLocal] = useState("");
   const [seeded, setSeeded] = useState<number | null>(null);
 
-  // 템플릿을 고르면 그 규칙의 다음 회차로 채우고, 그 주로 달력을 옮깁니다.
+  // 템플릿을 고르면 그 규칙의 다음 회차로 채우고, 달력도 그 날로 옮깁니다.
   if (picked && seeded !== picked.id) {
     setSeeded(picked.id);
     const open = nextOpenFor(picked, Date.now());
     setOpenLocal(toLocalInput(open));
     setCloseLocal(toLocalInput(open + picked.durationHours * HOUR_MS));
     setWeekStart(startOfWeek(open));
+    setDay(new Date(open).setHours(0, 0, 0, 0));
   }
 
   const openMs = openLocal ? new Date(openLocal).getTime() : NaN;
@@ -160,15 +162,18 @@ function ReservePage() {
     onError: (e) => toast.error(errorLine(e)),
   });
 
-  /** 격자를 누르면 그 시각으로 잡습니다. 분 단위는 30분으로 맞춥니다. */
-  const pickSlot = (dayMs: number, ratio: number) => {
+  /** 시간 버튼을 누르면 오픈이 그 시각이 되고, 마감은 템플릿 길이만큼 따라옵니다. */
+  const pickSlot = (at: number) => {
     if (!picked) return;
-    const hour = DAY_START + ratio * HOURS;
-    const snapped = Math.round(hour * 2) / 2;
-    const d = new Date(dayMs);
-    d.setHours(Math.floor(snapped), (snapped % 1) * 60, 0, 0);
-    setOpenLocal(toLocalInput(d.getTime()));
-    setCloseLocal(toLocalInput(d.getTime() + picked.durationHours * HOUR_MS));
+    setOpenLocal(toLocalInput(at));
+    setCloseLocal(toLocalInput(at + picked.durationHours * HOUR_MS));
+  };
+
+  const moveWeek = (delta: number) => {
+    const w = weekStart + delta * 7 * 24 * HOUR_MS;
+    setWeekStart(w);
+    // 주를 옮기면 고른 날도 같은 요일로 따라갑니다 — 안 그러면 화면 밖의 날이 선택된 채 남습니다
+    setDay(w + ((day - weekStart) % (7 * 24 * HOUR_MS)));
   };
 
   return (
@@ -231,14 +236,14 @@ function ReservePage() {
 
           <div className="flex flex-col gap-4">
             <Panel
-              title="주간 예약 현황"
-              hint="빈 곳을 누르면 그 시각으로 잡힙니다"
+              title="언제 열까요"
+              hint="막힌 시각은 누가 잡았는지 버튼에 적혀 있습니다"
               action={
                 <span className="flex items-center gap-1">
                   <button
                     type="button"
                     aria-label="이전 주"
-                    onClick={() => setWeekStart((w) => w - 7 * 24 * HOUR_MS)}
+                    onClick={() => moveWeek(-1)}
                     className="btn-outline px-2.5"
                   >
                     ‹
@@ -250,7 +255,7 @@ function ReservePage() {
                   <button
                     type="button"
                     aria-label="다음 주"
-                    onClick={() => setWeekStart((w) => w + 7 * 24 * HOUR_MS)}
+                    onClick={() => moveWeek(1)}
                     className="btn-outline px-2.5"
                   >
                     ›
@@ -258,16 +263,16 @@ function ReservePage() {
                 </span>
               }
             >
-              <WeekGrid
-                days={days}
-                booked={booked}
-                selection={
-                  Number.isFinite(openMs) && Number.isFinite(closeMs) && closeMs > openMs
-                    ? { open: openMs, close: closeMs, clash: clashes.length > 0 }
-                    : null
-                }
-                onPick={pickSlot}
-              />
+              <div className="flex flex-col gap-5">
+                <DayPicker days={days} booked={booked} selected={day} onSelect={setDay} />
+                <TimeSlots
+                  dayMs={day}
+                  durationH={picked?.durationHours ?? 4}
+                  booked={booked}
+                  selectedOpen={Number.isFinite(openMs) ? openMs : null}
+                  onPick={pickSlot}
+                />
+              </div>
             </Panel>
 
             <Panel title="예약할 회차" bodyClassName="flex flex-wrap items-end gap-x-5 gap-y-4">
@@ -323,10 +328,14 @@ function ReservePage() {
   );
 }
 
-/* ── 주간 격자 ─────────────────────────────────────
-   하루를 세로 한 칸으로 두고, 잡힌 회차를 시각에 비례한 높이로 얹습니다.
-   목록으로 적으면 "언제가 비었나" 를 머리로 계산해야 하지만, 자리로 그리면 눈에
-   바로 들어옵니다 — 예약 화면이 해야 할 일이 그것입니다. */
+/* ── 날짜 · 시간 고르기 ─────────────────────────────
+   격자를 눌러 시각을 잡는 방식이었는데, 몇 시를 누른 건지 놓기 전에는 알 수 없었고
+   "여기 열 수 있나" 를 눈대중으로 판단해야 했습니다.
+   시간 버튼으로 바꿉니다 — 열 수 있는 시각만 누를 수 있고, 막힌 시각은 누가 잡았는지
+   버튼에 적힙니다. 판단을 화면이 대신합니다. */
+
+const SLOT_MIN = 30;
+const SLOTS_PER_HOUR = 60 / SLOT_MIN;
 
 interface Slot {
   round: CouponRoundView;
@@ -334,159 +343,130 @@ interface Slot {
   close: number;
 }
 
-function WeekGrid({
+function DayPicker({
   days,
   booked,
-  selection,
-  onPick,
+  selected,
+  onSelect,
 }: {
   days: number[];
   booked: Slot[];
-  selection: { open: number; close: number; clash: boolean } | null;
-  onPick: (dayMs: number, ratio: number) => void;
+  selected: number;
+  onSelect: (dayMs: number) => void;
 }) {
   const today = new Date().setHours(0, 0, 0, 0);
+  return (
+    <div className="flex gap-1.5">
+      {days.map((dayMs) => {
+        const d = new Date(dayMs);
+        const count = booked.filter((s) => s.open < dayMs + 24 * HOUR_MS && s.close > dayMs).length;
+        const on = dayMs === selected;
+        const past = dayMs + 24 * HOUR_MS <= Date.now();
+        return (
+          <button
+            key={dayMs}
+            type="button"
+            disabled={past}
+            onClick={() => onSelect(dayMs)}
+            aria-pressed={on}
+            className={`flex-1 rounded-xl border py-2.5 text-center transition-colors ${
+              on
+                ? "border-hig-fg bg-hig-fg text-hig-surface"
+                : past
+                  ? "border-hig-hairline text-hig-muted"
+                  : "border-hig-hairline hover:bg-fill"
+            }`}
+          >
+            <span className="t-caption block">
+              {DAY_LABEL[DAYS_OF_WEEK[(d.getDay() + 6) % 7]!]}
+            </span>
+            <span
+              className={`num t-body block font-semibold ${dayMs === today && !on ? "text-hig-link" : ""}`}
+            >
+              {d.getDate()}
+            </span>
+            {/* 잡힌 게 있는 날은 미리 알려 줍니다 — 눌러 보고 알면 늦습니다 */}
+            <span className={`t-caption block ${on ? "text-hig-surface/70" : "text-hig-muted"}`}>
+              {count > 0 ? `${count}건` : "비어 있음"}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-  /** 하루 안에서의 위치(%) — 자정을 넘기는 회차는 그 날 칸에서 잘립니다 */
-  const band = (dayMs: number, from: number, to: number) => {
-    const dayFrom = dayMs + DAY_START * HOUR_MS;
-    const dayTo = dayMs + DAY_END * HOUR_MS;
-    const a = Math.max(from, dayFrom);
-    const b = Math.min(to, dayTo);
-    if (b <= a) return null;
-    const span = (DAY_END - DAY_START) * HOUR_MS;
-    return { top: ((a - dayFrom) / span) * 100, height: ((b - a) / span) * 100 };
-  };
+function TimeSlots({
+  dayMs,
+  durationH,
+  booked,
+  selectedOpen,
+  onPick,
+}: {
+  dayMs: number;
+  durationH: number;
+  booked: Slot[];
+  selectedOpen: number | null;
+  onPick: (openMs: number) => void;
+}) {
+  const now = Date.now();
+  const slots: {
+    at: number;
+    taken: Slot | null;
+    past: boolean;
+  }[] = [];
 
-  /* 겹치는 회차를 **나란히** 놓습니다.
-     전부 같은 자리에 그리면 뒤엣것이 앞엣것을 덮어서 이름이 안 읽힙니다 —
-     데모 데이터는 지금 시각 근처에 여러 회차를 동시에 열어 두고, 실서버에서도
-     지난 데이터에는 겹치는 회차가 있을 수 있습니다.
-     시작 순으로 훑으며 앞 회차가 이미 끝난 레인에 넣고, 없으면 레인을 늘립니다. */
-  const laneOf = (dayMs: number) => {
-    const items = booked
-      .map((s) => ({ slot: s, b: band(dayMs, s.open, s.close) }))
-      .filter((x) => x.b !== null)
-      .sort((a, z) => a.b!.top - z.b!.top);
-    const laneEnds: number[] = [];
-    const placed = items.map((x) => {
-      const top = x.b!.top;
-      const bottom = top + x.b!.height;
-      let lane = laneEnds.findIndex((end) => end <= top + 0.01);
-      if (lane === -1) {
-        lane = laneEnds.length;
-        laneEnds.push(bottom);
-      } else {
-        laneEnds[lane] = bottom;
-      }
-      return { ...x, lane };
-    });
-    return { placed, lanes: Math.max(1, laneEnds.length) };
-  };
+  for (let i = 0; i < (DAY_END - DAY_START) * SLOTS_PER_HOUR; i += 1) {
+    const at = dayMs + DAY_START * HOUR_MS + i * SLOT_MIN * 60_000;
+    const end = at + durationH * HOUR_MS;
+    // 이 시각에 열면 어느 회차와 부딪히는지 — 첫 번째 것만 알려 주면 충분합니다
+    const taken = booked.find((s) => at < s.close && end > s.open) ?? null;
+    slots.push({ at, taken, past: at < now });
+  }
+
+  const free = slots.filter((s) => !s.taken && !s.past).length;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex min-w-[46rem] gap-px">
-        {/* 시간 눈금 */}
-        <div className="w-11 shrink-0">
-          <div className="h-7" />
-          <div className="relative" style={{ height: GRID_H }}>
-            {Array.from({ length: HOURS + 1 }, (_, i) => (
-              <span
-                key={i}
-                className="num t-caption absolute right-1.5 -translate-y-1/2 text-hig-muted"
-                style={{ top: `${(i / HOURS) * 100}%` }}
-              >
-                {DAY_START + i}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {days.map((dayMs) => {
-          const d = new Date(dayMs);
-          const isToday = dayMs === today;
-          const past = dayMs < today;
+    <div>
+      <p className="t-body-sm mb-3 text-hig-secondary">
+        {durationH}시간짜리 회차를 열 수 있는 시각{" "}
+        <span className="num font-semibold text-hig-fg">{free}</span>개
+      </p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5">
+        {slots.map(({ at, taken, past }) => {
+          const label = new Date(at).toTimeString().slice(0, 5);
+          const on = selectedOpen === at;
+          const off = !!taken || past;
           return (
-            <div key={dayMs} className="min-w-0 flex-1">
-              <p
-                className={`t-caption flex h-7 items-center justify-center gap-1 ${
-                  isToday ? "font-bold text-hig-fg" : past ? "text-hig-muted" : "text-hig-secondary"
-                }`}
-              >
-                {DAY_LABEL[DAYS_OF_WEEK[(d.getDay() + 6) % 7]!]}
-                <span className="num">{d.getDate()}</span>
-              </p>
-
-              <button
-                type="button"
-                aria-label={`${d.getMonth() + 1}월 ${d.getDate()}일 시간 고르기`}
-                onClick={(e) => {
-                  const r = e.currentTarget.getBoundingClientRect();
-                  onPick(dayMs, (e.clientY - r.top) / r.height);
-                }}
-                className={`relative block w-full cursor-crosshair border-t border-hig-hairline ${
-                  past ? "bg-fill/40" : "bg-fill/70 hover:bg-fill"
-                }`}
-                style={{ height: GRID_H }}
-              >
-                {/* 시간 괘선 */}
-                {Array.from({ length: HOURS }, (_, i) => (
-                  <span
-                    key={i}
-                    className="pointer-events-none absolute inset-x-0 border-t border-hig-hairline/60"
-                    style={{ top: `${((i + 1) / HOURS) * 100}%` }}
-                  />
-                ))}
-
-                {(() => {
-                  const { placed, lanes } = laneOf(dayMs);
-                  const w = 100 / lanes;
-                  return placed.map(({ slot: s, b, lane }) => {
-                    const brand = brandOf(s.round.brandId);
-                    return (
-                      <span
-                        key={`${s.round.id}-${dayMs}`}
-                        className="pointer-events-none absolute overflow-hidden rounded-[3px] px-1 py-0.5 text-left"
-                        style={{
-                          top: `${b!.top}%`,
-                          height: `${b!.height}%`,
-                          left: `calc(${lane * w}% + 2px)`,
-                          width: `calc(${w}% - 4px)`,
-                          background: brand.ink,
-                        }}
-                        title={`${brand.name} ${formatClock(s.round.openAt)}-${formatClock(s.round.closeAt)}`}
-                      >
-                        <span className="t-caption block truncate leading-tight font-semibold text-white">
-                          {lanes > 2 ? brand.plate : brand.name}
-                        </span>
-                        {b!.height > 6 && (
-                          <span className="num t-caption block truncate leading-tight text-white/75">
-                            {formatClock(s.round.openAt)}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  });
-                })()}
-
-                {selection &&
-                  (() => {
-                    const b = band(dayMs, selection.open, selection.close);
-                    if (!b) return null;
-                    return (
-                      <span
-                        className={`pointer-events-none absolute inset-x-0.5 rounded-[3px] border-2 border-dashed ${
-                          selection.clash
-                            ? "border-viz-critical bg-viz-critical/20"
-                            : "border-hig-fg bg-hig-fg/10"
-                        }`}
-                        style={{ top: `${b.top}%`, height: `${b.height}%` }}
-                      />
-                    );
-                  })()}
-              </button>
-            </div>
+            <button
+              key={at}
+              type="button"
+              disabled={off}
+              onClick={() => onPick(at)}
+              aria-pressed={on}
+              title={
+                taken
+                  ? `${brandOf(taken.round.brandId).name} ${formatClock(taken.round.openAt)}-${formatClock(taken.round.closeAt)}`
+                  : past
+                    ? "이미 지난 시각입니다"
+                    : undefined
+              }
+              className={`rounded-lg border px-1 py-2 text-center transition-colors ${
+                on
+                  ? "border-hig-fg bg-hig-fg text-hig-surface"
+                  : taken
+                    ? "border-transparent bg-fill text-hig-muted"
+                    : past
+                      ? "border-transparent text-hig-muted/60"
+                      : "border-hig-hairline hover:border-hig-fg hover:bg-fill"
+              }`}
+            >
+              <span className="num t-body-sm block font-semibold">{label}</span>
+              {/* 왜 못 누르는지 버튼이 직접 말합니다 */}
+              <span className="t-caption block truncate">
+                {taken ? brandOf(taken.round.brandId).name : past ? "지남" : on ? "선택" : "가능"}
+              </span>
+            </button>
           );
         })}
       </div>
