@@ -296,7 +296,7 @@ function ReservePage() {
           <div className="flex flex-col gap-4">
             <Panel
               title="언제 열까요"
-              hint="회색은 이미 잡혔거나, 여기서 열면 다음 회차와 겹치는 시각입니다"
+              hint="회색으로 채운 칸이 이미 잡힌 시간입니다"
               action={
                 <span className="flex items-center gap-1">
                   <button
@@ -496,8 +496,33 @@ function TimeSlots({
 
   const free = slots.filter((s) => !s.taken && !s.past).length;
 
+  /* 이 날 이미 잡힌 회차. 버튼만 회색으로 칠해 두면 "몇 시부터 몇 시까지 잡혔나" 를
+     회색 띠의 시작점에서 **추측**해야 합니다 — 그런데 띠는 실제 시작보다 durationH
+     만큼 앞에서 시작하므로 항상 틀리게 읽힙니다(18시에 잡았는데 띠는 14:30부터).
+     그래서 잡힌 구간은 추측하게 두지 않고 여기 그대로 적습니다. */
+  const onThisDay = booked
+    .filter((s) => s.open < dayMs + 24 * HOUR_MS && s.close > dayMs)
+    .sort((a, b) => a.open - b.open);
+
   return (
     <div>
+      {onThisDay.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="eyebrow">이 날 잡힌 회차</span>
+          {onThisDay.map((s) => (
+            <span
+              key={s.round.id}
+              className="t-caption inline-flex items-center gap-1.5 rounded-full bg-fill px-2.5 py-1"
+            >
+              <BrandPlate brandId={s.round.brandId} size="sm" />
+              <span className="num font-semibold">
+                {formatClock(s.round.openAt)}–{formatClock(s.round.closeAt)}
+              </span>
+              <span className="text-hig-secondary">{brandOf(s.round.brandId).name}</span>
+            </span>
+          ))}
+        </div>
+      )}
       <p className="t-body-sm mb-3 text-hig-secondary">
         {durationH}시간짜리 회차를 열 수 있는 시각{" "}
         <span className="num font-semibold text-hig-fg">{free}</span>개
@@ -523,23 +548,33 @@ function TimeSlots({
                     ? "이미 지난 시각입니다"
                     : undefined
               }
+              /* 남이 앉아 있는 자리(inside)만 회색으로 **채웁니다.** 앞의 lead-in 은
+                 채우지 않고 시각에 취소선만 그어 둡니다 — 둘 다 회색 덩어리로 칠했더니
+                 띠가 하나로 이어져 보여서, 18시에 잡은 회차를 14:30부터 잡힌 것으로
+                 읽었습니다. 채운 칸의 시작이 곧 실제 시작이어야 합니다. */
               className={`rounded-lg border px-1 py-2 text-center transition-colors ${
                 on
                   ? "border-hig-fg bg-hig-fg text-hig-surface"
-                  : taken
+                  : inside
                     ? "border-transparent bg-fill text-hig-muted"
-                    : past
-                      ? "border-transparent text-hig-muted/60"
-                      : "border-hig-hairline hover:border-hig-fg hover:bg-fill"
+                    : taken
+                      ? "border-hig-hairline/60 text-hig-muted/70"
+                      : past
+                        ? "border-transparent text-hig-muted/60"
+                        : "border-hig-hairline hover:border-hig-fg hover:bg-fill"
               }`}
             >
-              <span className="num t-body-sm block font-semibold">{label}</span>
+              <span
+                className={`num t-body-sm block font-semibold ${taken && !inside ? "line-through" : ""}`}
+              >
+                {label}
+              </span>
               {/* 왜 못 누르는지 버튼이 직접 말합니다 */}
               <span className="t-caption block truncate">
                 {taken
                   ? inside
                     ? brandOf(taken.round.brandId).name
-                    : "겹침"
+                    : "자리 부족"
                   : past
                     ? "지남"
                     : on
