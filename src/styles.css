@@ -642,6 +642,12 @@
   --yh-live-fg: light-dark(var(--yh-accent-dark), #ff9198);
   --yh-card-border: light-dark(rgb(22 48 92 / 0.07), rgb(255 255 255 / 0.08));
 
+  /* 쿠폰 카드가 히어로 띠를 파고드는 깊이.
+     띠의 아래 패딩과 카드의 음수 마진이 **같은 값을 봐야** 합니다. 따로 두었더니
+     짧은 화면에서 패딩만 줄어들어 카드가 제목 위로 올라와 "하루씩 문을 엽니다" 를
+     반쯤 덮었습니다(1327x700 실측). 한 곳에서 정하고 양쪽이 읽습니다. */
+  --yh-overlap: 5rem;
+
   /* 등급색. :root 의 --grade-* 는 관제가 쓰는 값이라 건드리지 않고, 고객 화면
      안에서만 덮습니다(AGENTS.md §3 — 관제 색 체계는 OBS-16 몫).
      원래 값은 틴트 카드 위에서 3.44~4.42:1 이었고 다크에서는 2.23:1 까지
@@ -1439,10 +1445,19 @@
    그래서 **화면 높이에 반응**시킵니다 — 세로가 좁을수록 여백과 이미지를 줄입니다.
    글자 크기는 건드리지 않습니다. 읽기 어려워지면 공간을 아낀 의미가 없습니다. */
 
+/* 아래 여백은 **겹침 깊이와 같습니다.** 직접 값을 적으면 겹침과 어긋납니다.
+   딱 같은 값이면 카드 윗선이 히어로 내용의 아랫선에 정확히 닿습니다 —
+   글자를 덮지 않으면서 띠에 걸친 모양은 그대로입니다. 더 주면 띠만 두꺼워집니다. */
+.yh-hero-band {
+  padding-bottom: var(--yh-overlap);
+}
+
 @media (max-height: 800px) {
+  .yh {
+    --yh-overlap: 3.5rem;
+  }
   .yh-hero-band {
     padding-top: 1.25rem;
-    padding-bottom: 2.5rem;
   }
   .yh-hero-band .yh-hero-art {
     max-width: 22rem;
@@ -1450,9 +1465,11 @@
 }
 
 @media (max-height: 720px) {
+  .yh {
+    --yh-overlap: 2.5rem;
+  }
   .yh-hero-band {
     padding-top: 0.75rem;
-    padding-bottom: 1.75rem;
   }
   .yh-hero-band .yh-hero-art {
     max-width: 15rem;

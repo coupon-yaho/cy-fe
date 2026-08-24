@@ -120,7 +120,7 @@ function Landing() {
 
 function Hero() {
   return (
-    <section className="yh-hero-band yh-deep yh-grain relative overflow-hidden pb-16">
+    <section className="yh-hero-band yh-deep yh-grain relative overflow-hidden">
       {/* 캐릭터 뒤 광 — 어두운 면 위에서 아트워크의 흰 외곽선이 살아납니다 */}
       <div
         className="pointer-events-none absolute top-0 left-0 size-[46rem] rounded-full opacity-45 blur-3xl"
@@ -128,18 +128,25 @@ function Hero() {
         aria-hidden
       />
 
-      <div className="relative z-[1] mx-auto grid w-full max-w-6xl items-center gap-6 px-5 pt-8 pb-2 lg:grid-cols-[minmax(0,46%)_minmax(0,1fr)] lg:pt-10">
-        <div className="order-2 lg:order-1">
+      {/* 좌우로 가르는 시점이 lg(1024)였습니다. 그 아래에서는 문구가 왼쪽 절반만 쓰고
+          캐릭터는 가운데 떠서 서로 축이 안 맞았고, 오른쪽 절반이 통째로 비었습니다.
+
+          sm(640)까지 당깁니다. 캐릭터가 문구 **밑에** 쌓이면 제 높이를 통째로 더해서
+          640x800 에서 띠가 576px 가 되고 발급 버튼이 화면 밖으로 나갔습니다(실측).
+          옆에 두면 문구 높이 안에 들어갑니다. 640 미만에서는 캐릭터를 접으므로
+          쌓이는 구간 자체가 없어집니다. */}
+      <div className="relative z-[1] mx-auto grid w-full max-w-6xl items-center gap-5 px-5 pt-8 pb-2 sm:grid-cols-[minmax(0,42%)_minmax(0,1fr)] md:gap-8 md:grid-cols-[minmax(0,44%)_minmax(0,1fr)] md:pt-10 lg:grid-cols-[minmax(0,46%)_minmax(0,1fr)]">
+        <div className="order-2 sm:order-1">
           <img
             src="/hero-character.png"
             alt="쿠폰을 펼쳐 든 쿠폰 야~호 안내 캐릭터"
             width={844}
             height={595}
-            className="yh-hero-art mx-auto w-full max-w-[11rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:max-w-[15rem] lg:max-w-[28rem]"
+            className="yh-hero-art mx-auto w-full max-w-[11rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:max-w-[14rem] md:max-w-[20rem] lg:max-w-[28rem]"
           />
         </div>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 sm:order-2">
           {/* 로고 리본에 적힌 문구를 그대로 씁니다 — 브랜드가 이미 정해 둔 말입니다 */}
           <p className="yh-label inline-flex rounded-full bg-white/14 px-3.5 py-1.5 text-white/80 ring-1 ring-white/20">
             할인 생활의 즐거움
@@ -182,7 +189,9 @@ function LiveNow({
 }) {
   return (
     /* 히어로 아래 끝에 걸치게 두면 두 면이 한 덩어리로 읽힙니다 */
-    <section className="relative z-[2] mx-auto -mt-20 w-full max-w-6xl px-5">
+    /* 파고드는 깊이는 --yh-overlap 한 곳에서 옵니다. 띠의 아래 여백도 같은 값을
+       보므로, 화면이 짧아져도 카드가 제목을 덮지 않습니다. */
+    <section className="relative z-[2] mx-auto mt-[calc(-1*var(--yh-overlap))] w-full max-w-6xl px-5">
       {loading || !round ? (
         <HeroSkeleton />
       ) : round.status === "OPEN" ? (
