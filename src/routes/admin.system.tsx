@@ -1,11 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { SeriesChart, SeriesLegend, UtilBar, type SeriesSpec } from "@/components/admin/charts";
+import { ConsistencyStatus } from "@/components/admin/consistency-status";
+import { LatencySignalPanel } from "@/components/admin/latency-signal";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
 import { MetaChips, PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
 import { StateBadge, StatedValue, Value } from "@/components/admin/state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
+import { consistencySeverityTone } from "@/lib/admin/consistency-view";
+import { latencySuccessP99 } from "@/lib/admin/latency-view";
 import {
   ENGINE_LABEL,
   GAP_LABEL,
@@ -124,7 +128,9 @@ function SystemConsole() {
           <SignalTabs data={data} signal={signal} onSelect={setSignal} />
 
           {signal === "C" && <ConsistencySignal data={data} />}
-          {signal === "L" && <LatencySignal data={data} />}
+          {signal === "L" && (
+            <LatencySignalPanel latency={data.latency} dependencies={data.dependencies} />
+          )}
           {signal === "T" && <TrafficSignal data={data} />}
           {signal === "E" && <ErrorSignal data={data} />}
           {signal === "S" && <SaturationSignal data={data} />}
@@ -152,12 +158,8 @@ function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Sign
   // 6칸은 전부 다른 블록에서 읽습니다(백엔드 회신 2절). 화면이 다시 계산하는 건 없습니다.
   const c = data.consistency;
   const t = data.traffic;
-  const p99 = data.latency.success.value?.p99Millis ?? null;
-  const p99Source: SourceValue<number> = {
-    value: p99,
-    state: data.latency.success.state,
-    observedAt: data.latency.success.observedAt,
-  };
+  const p99Source = latencySuccessP99(data.latency);
+  const p99 = p99Source.value ?? null;
   // 판정이 아니라 개수 세기입니다. severity 재판정(OBS-16)과 다른 이야기입니다.
   const gaps = [c.luaGap, c.activeDbGap, c.dbCounterGap, c.persistGap];
   const gapsValid = gaps.filter((g) => g.state === "VALID").length;
@@ -207,7 +209,7 @@ function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Sign
       <Tile
         label="시스템 실패율"
         onClick={() => onJump("E")}
-        alert={rate !== null && rate > KPI_TARGET.systemFailurePct}
+        alert={rate != null && rate > KPI_TARGET.systemFailurePct}
         sub={`목표 ${KPI_TARGET.systemFailurePct}% 이하`}
       >
         <StatedValue source={rateSource} render={(v) => `${v.toFixed(3)}%`} />
@@ -285,7 +287,7 @@ function systemFailureRate(classes: ErrorPanel["classes"]): SourceValue<number> 
 }
 
 function signalTone(data: AdminMetricsResponse, s: Signal): string {
-  if (s === "C") return data.consistency.verdict == null ? "bg-attention" : "bg-positive";
+  if (s === "C") return consistencySeverityTone(data.consistency.severity);
   if (s === "L") {
     const p99 = data.latency.success.value?.p99Millis ?? null;
     return p99 !== null && p99 > KPI_TARGET.issueP99Ms ? "bg-attention" : "bg-positive";
@@ -296,7 +298,7 @@ function signalTone(data: AdminMetricsResponse, s: Signal): string {
     // errors 가 없으면 판정하지 않습니다 — 실패가 없다는 뜻이 아닙니다.
     const classes = data.errors?.classes.filter((k) => !k.excludedFromNumerator) ?? [];
     const rate = systemFailureRate(classes).value;
-    if (rate === null) return "bg-hig-muted";
+    if (rate == null) return "bg-hig-muted";
     return rate > KPI_TARGET.systemFailurePct ? "bg-viz-critical" : "bg-viz-good";
   }
   // saturation 은 서버 미구현입니다. 값이 없으면 회색 — 정상(초록)으로 칠하지 않습니다.
@@ -364,11 +366,16 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1fr_1.2fr]">
-      <Panel
-        title="초과 발급"
-        hint={c.phase === "LIVE" ? "집계 진행 중" : "최종"}
-        state={c.overIssued.state}
-      >
+      <div className="xl:col-span-3">
+        <ConsistencyStatus
+          phase={c.phase}
+          verdict={c.verdict}
+          severity={c.severity}
+          gaps={gaps.map((gap) => gap.value)}
+        />
+      </div>
+
+      <Panel title="초과 발급" state={c.overIssued.state}>
         <p className="t-hero num">
           <Value source={c.overIssued} render={(v) => v.toLocaleString("ko-KR")} />
         </p>
@@ -378,12 +385,6 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
             <span className="num">{c.totalQuantity.toLocaleString("ko-KR")}</span>
           </p>
         )}
-        <p className="t-body-sm mt-4">
-          판정{" "}
-          <b className={c.verdict === "PASS" ? "text-positive" : "text-attention"}>
-            {c.verdict ?? "대기"}
-          </b>
-        </p>
       </Panel>
 
       <TablePanel title="Redis ↔ DB 격차">
@@ -457,99 +458,6 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
               />
             </dd>
           </div>
-        </dl>
-      </Panel>
-    </div>
-  );
-}
-
-/* ── L ───────────────────────────────────────────── */
-
-const PCT_SERIES: SeriesSpec[] = [
-  { key: "p50", label: "p50", color: "var(--viz-3)" },
-  { key: "p95", label: "p95", color: "var(--viz-1)" },
-  { key: "p99", label: "p99", color: "var(--viz-2)" },
-];
-
-function LatencySignal({ data }: { data: AdminMetricsResponse }) {
-  const l = data.latency;
-  const d = data.dependencies;
-  // 백분위 3종은 한 원천에서 같이 나옵니다 — 상태도 하나입니다(admin-api-spec §6.1).
-  // 셋을 쪼개 다른 상태로 그리지 않습니다.
-  const pct = (
-    src: typeof l.success,
-    key: "p50Millis" | "p95Millis" | "p99Millis",
-  ): SourceValue<number> => ({
-    value: src.value?.[key] ?? null,
-    state: src.state,
-    observedAt: src.observedAt,
-  });
-  const depRow = (label: string, src: (typeof d)["redis"], key: "p99Millis" | "p95Millis") => (
-    <div key={label}>
-      <dt className="t-caption text-hig-muted">{label}</dt>
-      <dd className="num t-body-sm font-semibold">
-        <StatedValue
-          source={{ value: src.value?.[key] ?? null, state: src.state, observedAt: src.observedAt }}
-          render={(v) => `${v < 10 ? v.toFixed(1) : v.toLocaleString("ko-KR")}ms`}
-        />
-      </dd>
-    </div>
-  );
-  const pctRow = (label: string, src: typeof l.success) => (
-    <div className="flex flex-wrap gap-x-8 gap-y-2">
-      {(["p50Millis", "p95Millis", "p99Millis"] as const).map((k) => (
-        <div key={k}>
-          <p className="t-caption text-hig-muted">{k.replace("Millis", "")}</p>
-          <p className="t-tile num">
-            <StatedValue
-              source={pct(src, k)}
-              render={(v) => `${v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString("ko-KR")}ms`}
-            />
-          </p>
-        </div>
-      ))}
-      <span className="sr-only">{label}</span>
-    </div>
-  );
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title="성공 응답시간" hint="/issue 201" state={l.success.state}>
-          {pctRow("성공", l.success)}
-          <p className="t-caption mt-3 text-hig-muted">목표 p99 {KPI_TARGET.issueP99Ms}ms</p>
-          {l.successSeries && l.successSeries.length > 0 && (
-            <div className="mt-3">
-              <SeriesChart
-                data={l.successSeries}
-                series={PCT_SERIES}
-                unit="ms"
-                reference={{
-                  y: KPI_TARGET.issueP99Ms,
-                  label: `목표 ${KPI_TARGET.issueP99Ms}ms`,
-                }}
-              />
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="실패 응답시간" hint="정책 거절 · 시스템 실패는 축이 다릅니다">
-          <p className="t-caption text-hig-muted">정책 거절</p>
-          {pctRow("정책 거절", l.policyReject)}
-          <p className="t-caption mt-4 text-hig-muted">시스템 실패</p>
-          {pctRow("시스템 실패", l.systemFailure)}
-          <p className="t-caption mt-3 text-hig-muted">
-            둘 다 PENDING 이면 OBS-4 Timer 가 outcome 을 성공·실패로만 등록해 두 경로가 아직 갈리지
-            않은 것입니다.
-          </p>
-        </Panel>
-      </div>
-
-      <Panel title="의존성 지연" hint="통계 종류가 달라 한 축에 합치지 않습니다">
-        <dl className="flex flex-wrap gap-x-8 gap-y-3">
-          {depRow("Redis p99", d.redis, "p99Millis")}
-          {depRow("Hikari p99", d.hikari, "p99Millis")}
-          {depRow("Kafka p95", d.kafka, "p95Millis")}
         </dl>
       </Panel>
     </div>
@@ -793,7 +701,7 @@ function SaturationSignal({ data }: { data: AdminMetricsResponse }) {
                 </div>
                 <div className="mt-1.5">
                   <UtilBar
-                    value={r.utilization.value}
+                    value={r.utilization.value ?? null}
                     warnAt={r.warnAt}
                     thresholds={s.thresholds}
                   />
