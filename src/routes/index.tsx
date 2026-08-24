@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Reveal, useCountUp, useDropPulse } from "@/components/coupon/reveal";
 import { SectionHead } from "@/components/coupon/section-head";
@@ -65,7 +66,15 @@ function Landing() {
     .filter((r) => r.status === "SCHEDULED")
     .sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
 
-  const headline = live[0] ?? upcoming[0];
+  /* 발급 중이 둘 이상일 때만 넘길 수 있게 합니다.
+     **자동으로 넘기지 않습니다.** 선착순 화면에서 발급 버튼이 손가락 밑에서 바뀌면
+     다른 브랜드 쿠폰이 발급됩니다 — 1인 1매라 되돌리려면 발급을 취소해야 합니다.
+     백엔드가 회차 시간 겹침을 브랜드 무관 전역으로 막으므로(existsOverlappingSchedule,
+     SCHEDULED·OPEN 대상) 실서버에서는 보통 한 개입니다. 그때는 화살표가 아예 안 뜹니다. */
+  const [slide, setSlide] = useState(0);
+  const featured = live.length > 0 ? live : upcoming.slice(0, 1);
+  const index = Math.min(slide, Math.max(0, featured.length - 1));
+  const headline = featured[index];
   /* 바로 위 쿠폰 카드가 이미 크게 보여 준 회차입니다. 목록 첫 줄에 또 넣으면
      200px 안에서 같은 회차를 두 번 읽게 됩니다 — "다가오는 일정" 이라는 제목과도
      어긋납니다. 그 회차를 빼고 다음 것부터 셉니다. */
@@ -75,7 +84,12 @@ function Landing() {
     <div>
       <Hero />
 
-      <LiveNow round={headline} loading={isLoading} grade={session?.grade ?? null} />
+      <LiveNow
+        round={headline}
+        loading={isLoading}
+        grade={session?.grade ?? null}
+        page={featured.length > 1 ? { index, total: featured.length, onGo: setSlide } : null}
+      />
 
       <section className="mx-auto w-full max-w-6xl px-5 py-14">
         {/* 제목은 연출로 감싸지 않습니다 — 스크롤이 닿기 전에 섹션이 통째로
@@ -182,10 +196,13 @@ function LiveNow({
   round,
   loading,
   grade,
+  page,
 }: {
   round: CouponRoundView | undefined;
   loading: boolean;
   grade: MembershipGrade | null;
+  /** 발급 중이 둘 이상일 때만 옵니다 */
+  page: { index: number; total: number; onGo: (i: number) => void } | null;
 }) {
   return (
     /* 히어로 아래 끝에 걸치게 두면 두 면이 한 덩어리로 읽힙니다 */
@@ -199,7 +216,61 @@ function LiveNow({
       ) : (
         <HeroNext round={round} grade={grade} />
       )}
+
+      {page && <Pager {...page} />}
     </section>
+  );
+}
+
+/* 발급 중이 여러 개일 때의 넘기기.
+   카드 **밖 아래**에 둡니다 — 카드 안에 넣으면 화살표가 발급 버튼 옆에 붙어서
+   서둘러 누르다 잘못 누릅니다. 지금 몇 번째인지 점으로 같이 보여 줍니다. */
+function Pager({
+  index,
+  total,
+  onGo,
+}: {
+  index: number;
+  total: number;
+  onGo: (i: number) => void;
+}) {
+  return (
+    <div className="mt-4 flex items-center justify-center gap-3">
+      <button
+        type="button"
+        onClick={() => onGo((index - 1 + total) % total)}
+        aria-label="이전 회차"
+        className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
+      >
+        <ChevronLeft className="size-[18px]" strokeWidth={1.8} aria-hidden />
+      </button>
+
+      <span className="flex items-center gap-1.5">
+        {Array.from({ length: total }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onGo(i)}
+            aria-label={`${i + 1}번째 회차`}
+            aria-current={i === index}
+            className={`h-1.5 rounded-full transition-all ${
+              i === index ? "w-6 bg-yh-solid" : "w-1.5 bg-yh-rule hover:bg-yh-navy-400"
+            }`}
+          />
+        ))}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => onGo((index + 1) % total)}
+        aria-label="다음 회차"
+        className="grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
+      >
+        <ChevronRight className="size-[18px]" strokeWidth={1.8} aria-hidden />
+      </button>
+
+      <span className="yh-small yh-num ml-1 text-yh-ink-3">발급 중 {total}개</span>
+    </div>
   );
 }
 

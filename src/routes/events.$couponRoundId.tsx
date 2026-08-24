@@ -482,7 +482,11 @@ function Ready({
         </p>
         {/* 아직 안 열린 회차에서 로그아웃 상태라면, 지금 할 수 있는 일이 하나 있습니다 */}
         {!session && (
-          <Link to="/login" className="yh-btn mt-6 w-full">
+          <Link
+            to="/login"
+            search={{ redirect: `/events/${round.id}` }}
+            className="yh-btn mt-6 w-full"
+          >
             로그인
           </Link>
         )}
@@ -495,7 +499,11 @@ function Ready({
       <div>
         <h2 className="yh-sub">로그인하면 발급받을 수 있습니다</h2>
         <p className="yh-body mt-2.5 text-yh-ink-2">등급에 따라 참여할 수 있는 회차가 다릅니다.</p>
-        <Link to="/login" className="yh-btn mt-6 w-full">
+        <Link
+          to="/login"
+          search={{ redirect: `/events/${round.id}` }}
+          className="yh-btn mt-6 w-full"
+        >
           로그인하고 발급받기
         </Link>
       </div>

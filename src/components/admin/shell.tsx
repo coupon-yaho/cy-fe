@@ -155,7 +155,7 @@ export function AdminForbidden() {
       <p className="t-body mt-3 text-hig-secondary">
         데모에서는 로그인할 때 관리자 화면을 고르면 됩니다.
       </p>
-      <Link to="/login" className="btn-primary mt-8">
+      <Link to="/login" search={{ redirect: undefined }} className="btn-primary mt-8">
         관리자로 로그인
       </Link>
     </div>

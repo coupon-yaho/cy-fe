@@ -60,14 +60,18 @@ function CampaignAdmin() {
     <>
       <PageHead
         title="캠페인"
+        /* 순서가 [세그먼트][추가 버튼] 이라 템플릿 탭에서 버튼이 나타나면 세그먼트가
+           108px 왼쪽으로 밀렸습니다(실측). 탭은 화면의 뼈대라 내용에 따라 움직이면
+           안 됩니다 — 누르려고 겨눈 자리가 누른 뒤에 옮겨집니다.
+           세그먼트를 오른쪽 끝에 고정하고 버튼이 그 왼쪽에 나타나게 뒤집습니다. */
         controls={
           <>
-            <Segmented value={tab} options={TABS} onChange={setTab} />
             {tab === "templates" && (
               <button type="button" onClick={() => setEditing("new")} className="btn-compact">
                 템플릿 추가
               </button>
             )}
+            <Segmented value={tab} options={TABS} onChange={setTab} />
           </>
         }
       />
@@ -82,6 +86,18 @@ function CampaignAdmin() {
 }
 
 /* ── 회차 ────────────────────────────────────────── */
+
+/** "09.01 14:00". 회차에는 번호가 없어서(백엔드에 그런 필드가 없습니다), 이 시각이
+    같은 브랜드의 다른 회차와 구분하는 유일한 단서입니다. */
+function openShortLabel(iso: string): string {
+  return new Date(iso).toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
 function RoundTable() {
   const { data, isLoading } = useQuery({
@@ -121,7 +137,7 @@ function RoundTable() {
                     <span>
                       {r.name}
                       <span className="t-caption block text-hig-muted">
-                        {brandOf(r.brandId).name}
+                        {brandOf(r.brandId).name} · {openShortLabel(r.openAt)}
                       </span>
                     </span>
                   </Link>
@@ -135,15 +151,7 @@ function RoundTable() {
                     / {r.totalQuantity.toLocaleString("ko-KR")}
                   </span>
                 </td>
-                <td className="num text-hig-secondary">
-                  {new Date(r.openAt).toLocaleString("ko-KR", {
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                  })}
-                </td>
+                <td className="num text-hig-secondary">{openShortLabel(r.openAt)}</td>
                 <td>{ROUND_STATUS_LABEL[r.status]}</td>
                 <td className="num text-right">
                   {r.status === "SCHEDULED" ? (

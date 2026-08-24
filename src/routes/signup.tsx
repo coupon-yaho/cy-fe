@@ -42,7 +42,8 @@ function SignupPage() {
     }
     login({ nickname: trimmed, grade, role: "USER" });
     toast.success(`${trimmed}님, 환영합니다`);
-    navigate({ to: "/events" });
+    // 가입 직후에도 홈입니다 — 일정 목록보다 "지금 받을 수 있는 것" 이 먼저입니다
+    void navigate({ to: "/", replace: true });
   };
 
   return (
@@ -113,7 +114,11 @@ function SignupPage() {
 
         <p className="yh-small mt-3.5 text-center text-yh-ink-3">
           이미 계정이 있으신가요?{" "}
-          <Link to="/login" className="font-bold text-yh-navy underline underline-offset-4">
+          <Link
+            to="/login"
+            search={{ redirect: undefined }}
+            className="font-bold text-yh-navy underline underline-offset-4"
+          >
             로그인
           </Link>
         </p>

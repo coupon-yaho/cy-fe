@@ -352,7 +352,7 @@ function NeedLogin() {
       <p className="yh-lede mt-4 max-w-[38ch] text-yh-ink-2">
         로그인하면 발급받은 쿠폰을 여기서 볼 수 있습니다.
       </p>
-      <Link to="/login" className="yh-btn mt-9">
+      <Link to="/login" search={{ redirect: "/my/coupons" }} className="yh-btn mt-9">
         로그인
       </Link>
     </div>

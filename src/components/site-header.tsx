@@ -208,7 +208,8 @@ export function SiteHeader() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/login" className="yh-btn-sm">
+              // 지금 보던 화면으로 돌아옵니다 — 로그인 때문에 자리를 잃지 않게
+              <Link to="/login" search={{ redirect: pathname }} className="yh-btn-sm">
                 로그인
               </Link>
             )}

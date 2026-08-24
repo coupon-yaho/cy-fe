@@ -9,8 +9,24 @@ import { GRADES, type MembershipGrade } from "@/lib/coupon";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "로그인 · 쿠폰 야~호" }] }),
+  /* 어디서 로그인하러 왔는지 받습니다.
+     지금까지는 어디서 눌렀든 고정된 곳으로 떨어뜨렸습니다 — 회차 상세에서
+     "로그인하고 발급받기" 를 눌러도 일정 목록으로 가서, 받으려던 쿠폰을 다시
+     찾아가야 했습니다. */
+  validateSearch: (s: Record<string, unknown>) => ({
+    redirect: typeof s["redirect"] === "string" ? s["redirect"] : undefined,
+  }),
   component: LoginPage,
 });
+
+/** 로그인 뒤 갈 곳. 돌아갈 자리가 없으면 홈입니다 — 일정 목록이 아니라 홈이
+ *  "지금 뭘 받을 수 있나" 에 답하는 첫 화면입니다. */
+function landing(role: Role, redirect: string | undefined): string {
+  if (role === "ADMIN") return "/admin";
+  // 외부 주소로 튕겨 보내지 않도록 우리 경로만 받습니다
+  if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
+  return "/";
+}
 
 const DESTINATIONS: { key: Role; label: string; desc: string }[] = [
   { key: "USER", label: "고객", desc: "브랜드 데이를 보고 쿠폰을 받습니다" },
@@ -20,6 +36,7 @@ const DESTINATIONS: { key: Role; label: string; desc: string }[] = [
 function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const [nickname, setNickname] = useState("");
   const [grade, setGrade] = useState<MembershipGrade>("GOLD");
   const [role, setRole] = useState<Role>("USER");
@@ -40,7 +57,7 @@ function LoginPage() {
     }
     login({ nickname: trimmed, grade, role });
     toast.success(`${trimmed}님, 환영합니다`);
-    navigate({ to: role === "ADMIN" ? "/admin" : "/events" });
+    void navigate({ to: landing(role, redirect), replace: true });
   };
 
   return (
