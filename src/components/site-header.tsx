@@ -145,7 +145,13 @@ export function SiteHeader() {
                     놓이면 누를 수 있는 것인지 그냥 이름표인지 알 수 없습니다.
                     로그아웃 상태의 "로그인" 알약과 같은 무게로 맞춥니다. */}
                 <DropdownMenuTrigger className="yh-body flex h-9 items-center gap-2 rounded-full border border-yh-rule bg-yh-surface pr-2 pl-3 font-semibold transition-colors hover:border-yh-navy-400 hover:bg-yh-paper-2 data-[state=open]:border-yh-navy-400 data-[state=open]:bg-yh-paper-2">
-                  <GradeChip grade={session.grade} size="sm" />
+                  {/* 관리자는 로그인할 때 등급을 고르지 않습니다. 그런데 여기에 "골드" 가
+                      떠 있으면 고르지도 않은 값이 어딘가에서 쓰이는 줄 알게 됩니다. */}
+                  {session.role === "ADMIN" ? (
+                    <span className="yh-small font-bold text-yh-ink-2">관리자</span>
+                  ) : (
+                    <GradeChip grade={session.grade} size="sm" />
+                  )}
                   <span className="hidden text-yh-navy sm:inline">{session.nickname}</span>
                   <ChevronDown
                     className="size-3.5 shrink-0 text-yh-ink-3"
@@ -160,7 +166,11 @@ export function SiteHeader() {
                   <div className="border-b border-yh-rule px-4 py-3.5">
                     <div className="flex items-center justify-between gap-3">
                       <p className="yh-sub truncate">{session.nickname}</p>
-                      <GradeChip grade={session.grade} size="sm" />
+                      {session.role === "ADMIN" ? (
+                        <span className="yh-small shrink-0 font-bold text-yh-ink-2">관리자</span>
+                      ) : (
+                        <GradeChip grade={session.grade} size="sm" />
+                      )}
                     </div>
                     {/* "문의하실 때 이 번호를 알려 주세요" 를 매번 한 줄 더 적고 있었습니다.
                         번호가 왜 있는지는 한 번 알면 되는 것이라 라벨에 붙입니다. */}

@@ -6,6 +6,7 @@ import { SeriesChart, SeriesLegend, type SeriesSpec } from "@/components/admin/c
 import { Panel, TablePanel } from "@/components/admin/panel";
 import { PageHead, Segmented } from "@/components/admin/shell";
 import { BrandPlate } from "@/components/coupon/brand-plate";
+import { formatClock } from "@/components/coupon/timer";
 import {
   Dialog,
   DialogContent,
@@ -316,6 +317,16 @@ function RoundReserver({
   const [closeLocal, setCloseLocal] = useState("");
   const [key, setKey] = useState<number | null>(null);
 
+  /* 이미 잡힌 회차를 먼저 보여 줍니다.
+     지금까지는 겹치는 시각을 넣고 **예약을 누른 뒤에야** 409 로 알았습니다.
+     선점된 자리를 눈으로 보고 고르는 편이 맞습니다 — 겹침 판정은 브랜드를 가리지
+     않으므로(백엔드 existsOverlappingSchedule) 그날 열리는 전부를 보여 줍니다. */
+  const { data: rounds } = useQuery({
+    queryKey: ["rounds"],
+    queryFn: () => couponApi.listRounds(),
+    enabled: !!target,
+  });
+
   // 열릴 때마다 그 템플릿의 다음 회차 시각으로 채웁니다 — 규칙대로 여는 게 기본이고,
   // 다르게 열고 싶을 때만 고치면 됩니다.
   if (target && key !== target.id) {
@@ -329,13 +340,35 @@ function RoundReserver({
   const closeMs = closeLocal ? new Date(closeLocal).getTime() : NaN;
   const spanH = (closeMs - openMs) / HOUR_MS;
 
-  // 백엔드가 400 으로 돌려보낼 조건을 여기서 먼저 말해 줍니다.
+  /* 고른 날에 이미 잡힌 회차. 끝난 회차(CLOSED)는 자리를 비켜 주므로 뺍니다 —
+     백엔드도 SCHEDULED·OPEN 만 셉니다. */
+  const daySlots = useMemo(() => {
+    if (!Number.isFinite(openMs)) return [];
+    const day = new Date(openMs);
+    const from = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+    const to = from + 24 * HOUR_MS;
+    return (rounds ?? [])
+      .filter((r) => r.status !== "CLOSED")
+      .map((r) => ({ round: r, open: Date.parse(r.openAt), close: Date.parse(r.closeAt) }))
+      .filter((r) => r.open < to && r.close > from)
+      .sort((a, b) => a.open - b.open);
+  }, [rounds, openMs]);
+
+  /** 지금 고른 구간과 겹치는 회차 — 있으면 서버가 409 로 돌려보냅니다 */
+  const clashes = daySlots.filter(
+    (s) =>
+      Number.isFinite(openMs) && Number.isFinite(closeMs) && openMs < s.close && closeMs > s.open,
+  );
+
+  // 백엔드가 400·409 로 돌려보낼 조건을 여기서 먼저 말해 줍니다.
   let problem: string | null = null;
   if (!Number.isFinite(openMs) || !Number.isFinite(closeMs))
     problem = "오픈·마감 시각을 채워 주세요.";
   else if (openMs < Date.now()) problem = "이미 지난 시각으로는 예약할 수 없습니다.";
   else if (closeMs <= openMs) problem = "마감은 오픈보다 뒤여야 합니다.";
   else if (spanH > MAX_SPAN_HOURS) problem = `한 회차는 ${MAX_SPAN_HOURS}시간을 넘길 수 없습니다.`;
+  else if (clashes.length > 0)
+    problem = `${brandOf(clashes[0]!.round.brandId).name} 회차와 시간이 겹칩니다.`;
 
   const reserve = useMutation({
     mutationFn: () =>
@@ -407,6 +440,54 @@ function RoundReserver({
                 </>
               )}
             </p>
+
+            {/* 그날 이미 잡힌 자리. 네이버 예약처럼 선점된 시간을 눈으로 보고 고릅니다 —
+                겹치는 값을 넣고 누른 뒤에 409 를 받는 것보다 낫습니다. */}
+            {Number.isFinite(openMs) && (
+              <div className="border-t border-hig-hairline pt-4">
+                <p className="eyebrow">
+                  {new Date(openMs).getMonth() + 1}월 {new Date(openMs).getDate()}일 예약 현황
+                </p>
+                {daySlots.length === 0 ? (
+                  <p className="t-body-sm mt-2 text-hig-muted">
+                    이 날은 아직 아무 회차도 잡히지 않았습니다.
+                  </p>
+                ) : (
+                  <ul className="mt-2.5 space-y-1.5">
+                    {daySlots.map((s) => {
+                      const hit = clashes.includes(s);
+                      const mine = s.round.templateId === target.id;
+                      return (
+                        <li
+                          key={s.round.id}
+                          className={`t-body-sm flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 ${
+                            hit ? "bg-viz-critical/10" : "bg-fill"
+                          }`}
+                        >
+                          <BrandPlate brandId={s.round.brandId} size="sm" />
+                          <span className="num shrink-0 font-semibold">
+                            {formatClock(s.round.openAt)}-{formatClock(s.round.closeAt)}
+                          </span>
+                          <span className="min-w-0 truncate text-hig-secondary">
+                            {brandOf(s.round.brandId).name}
+                            {mine ? " · 같은 템플릿" : ""}
+                          </span>
+                          {hit && (
+                            <span className="t-caption ml-auto shrink-0 font-bold text-viz-critical">
+                              겹침
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <p className="t-caption mt-2.5 text-hig-muted">
+                  브랜드가 달라도 시간대가 겹치면 예약할 수 없습니다. 같은 날에 이어서 여는 것은
+                  됩니다.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -494,6 +575,8 @@ function TemplateEditor({
     v: CouponTemplateWriteRequest[K],
   ) => setForm((f) => ({ ...f, [k]: v }));
 
+  /* 정책을 바꾸면 **다른 정책의 값은 비웁니다.** 남겨 두면 서버에 정률 값과
+     정액 값이 동시에 실려 나가고, 나중에 어느 쪽이 진짜인지 알 수 없게 됩니다. */
   const setPolicy = (policyType: CouponPolicyType) =>
     setForm((f) => ({
       ...f,
@@ -501,6 +584,7 @@ function TemplateEditor({
       discountRate: policyType === "PERCENT_CAPPED" ? (f.discountRate ?? 20) : null,
       maxDiscountAmount: policyType === "PERCENT_CAPPED" ? (f.maxDiscountAmount ?? 10000) : null,
       discountAmount: policyType === "FIXED_AMOUNT" ? (f.discountAmount ?? 5000) : null,
+      dataGrantMb: policyType === "DATA_GRANT" ? (f.dataGrantMb ?? 1024) : null,
     }));
 
   const toggleGrade = (g: MembershipGrade) =>
@@ -552,10 +636,14 @@ function TemplateEditor({
 
           <Field label="할인 정책">
             <div className="flex gap-2">
-              {(
+              {/* 정책은 세 종류입니다. 데이터가 빠져 있어서, 게임스테이션(1GB)처럼
+                   DATA_GRANT 로 만들어진 템플릿을 열면 정책이 둘 중 하나로 보이고
+                   그대로 저장하면 **원래 정책이 조용히 바뀌었습니다.** */
+              (
                 [
                   ["PERCENT_CAPPED", "정률 + 상한"],
                   ["FIXED_AMOUNT", "정액"],
+                  ["DATA_GRANT", "데이터 제공"],
                 ] as [CouponPolicyType, string][]
               ).map(([v, label]) => (
                 <button
@@ -594,6 +682,15 @@ function TemplateEditor({
                 />
               </Field>
             </div>
+          ) : form.policyType === "DATA_GRANT" ? (
+            <Field label="제공 데이터 (MB)">
+              <input
+                type="number"
+                value={form.dataGrantMb ?? 0}
+                onChange={(e) => set("dataGrantMb", Number(e.target.value))}
+                className="input-line num"
+              />
+            </Field>
           ) : (
             <Field label="할인 금액 (원)">
               <input

@@ -47,7 +47,11 @@ function LoginPage() {
     <AuthLayout
       eyebrow="시작하기"
       title="로그인"
-      lede="닉네임과 등급만 고르면 바로 시작합니다. 비밀번호는 받지 않습니다."
+      lede={
+        role === "ADMIN"
+          ? "닉네임만 적으면 관제 화면으로 들어갑니다. 비밀번호는 받지 않습니다."
+          : "닉네임과 등급만 고르면 바로 시작합니다. 비밀번호는 받지 않습니다."
+      }
     >
       <form onSubmit={submit} className="mt-5 border-t border-yh-rule pt-5">
         <label className="block">
@@ -79,22 +83,27 @@ function LoginPage() {
           </span>
         </label>
 
-        <fieldset className="mt-5">
-          <legend className="yh-label">멤버십 등급</legend>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {GRADES.map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGrade(g)}
-                aria-pressed={grade === g}
-                className="yh-choice px-2 py-2.5 text-center"
-              >
-                <GradeChip grade={g} size="sm" />
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        {/* 관리자는 등급이 없습니다. 관제 화면은 등급으로 갈리는 게 하나도 없는데
+            고르라고 물으면, 답한 값이 어딘가에서 쓰이는 줄 알게 됩니다.
+            역할을 관리자로 바꾸면 이 칸을 접습니다. */}
+        {role === "USER" && (
+          <fieldset className="mt-5">
+            <legend className="yh-label">멤버십 등급</legend>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {GRADES.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGrade(g)}
+                  aria-pressed={grade === g}
+                  className="yh-choice px-2 py-2.5 text-center"
+                >
+                  <GradeChip grade={g} size="sm" />
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         <fieldset className="mt-5">
           <legend className="yh-label">들어갈 화면</legend>
