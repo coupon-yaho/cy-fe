@@ -130,7 +130,7 @@ export function Value<T>({
   // 값이 남아 있어도 현재값처럼 그리면 안 되는 상태는 여기서 막습니다.
   const suppressed = !!source && SUPPRESSED_STATES.includes(source.state);
 
-  if (!source || source.value === null || suppressed) {
+  if (!source || source.value == null || suppressed) {
     return (
       <span
         className={`num text-hig-muted ${className}`}
