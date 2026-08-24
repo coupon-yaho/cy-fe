@@ -34,7 +34,9 @@ function timeAgo(at: number) {
   const sec = Math.floor((Date.now() - at) / 1000);
   if (sec < 60) return "방금";
   if (sec < 3600) return `${Math.floor(sec / 60)}분 전`;
-  return `${Math.floor(sec / 3600)}시간 전`;
+  // 알림이 저장본에 남으면서 어제 것도 뜹니다. 시간으로만 세면 "48시간 전" 이 됩니다.
+  if (sec < 86400) return `${Math.floor(sec / 3600)}시간 전`;
+  return `${Math.floor(sec / 86400)}일 전`;
 }
 
 /**
