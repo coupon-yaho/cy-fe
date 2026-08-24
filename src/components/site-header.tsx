@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Bell, Check, ChevronDown, LogOut, Menu, RotateCcw, Shield, Ticket, X } from "lucide-react";
 import { ThemeChoices, ThemeToggle } from "@/components/coupon/theme-toggle";
 import { BrandLogo } from "@/components/brand-logo";
@@ -52,6 +52,14 @@ export function SiteHeader() {
      안 그러면 무엇이 새로 온 것인지 열자마자 사라집니다. */
   const [freshCount, setFreshCount] = useState(0);
 
+  /* 알림 패널을 종 아이콘이 아니라 **헤더 오른쪽 끝**에 맞춥니다.
+     종에 맞추면 패널이 종에서 왼쪽으로 매달려 뜹니다 — 오른쪽에 계정 알약이
+     남아 있어서 로그아웃 때 71px, 로그인 때 157px 이 비었습니다(실측 1440px).
+     비는 폭이 닉네임 길이를 따라 달라져서 고정값으로는 못 맞춥니다. 열 때 잽니다. */
+  const clusterRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const [bellNudge, setBellNudge] = useState(0);
+
   const isActive = (to: string) => (to === "/" ? pathname === "/" : pathname.startsWith(to));
 
   return (
@@ -88,7 +96,7 @@ export function SiteHeader() {
             )}
           </nav>
 
-          <div className="ml-auto flex items-center gap-1.5">
+          <div ref={clusterRef} className="ml-auto flex items-center gap-1.5">
             {/* 360px 에서는 이 아이콘 하나가 더 들어갈 자리가 없습니다.
                 그 폭에서는 메뉴 시트 안의 ThemeChoices 가 같은 일을 합니다. */}
             <ThemeToggle className="hidden sm:grid" />
@@ -96,11 +104,15 @@ export function SiteHeader() {
             <DropdownMenu
               onOpenChange={(o) => {
                 if (!o) return;
+                const cluster = clusterRef.current?.getBoundingClientRect();
+                const bell = bellRef.current?.getBoundingClientRect();
+                if (cluster && bell) setBellNudge(Math.round(cluster.right - bell.right));
                 setFreshCount(unread);
                 markAllRead();
               }}
             >
               <DropdownMenuTrigger
+                ref={bellRef}
                 className="relative grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
                 aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
               >
@@ -118,6 +130,7 @@ export function SiteHeader() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
+                alignOffset={-bellNudge}
                 className="yh w-[min(23rem,calc(100vw-1.5rem))] rounded-xl border-yh-rule bg-yh-surface p-0"
               >
                 <div className="flex items-baseline gap-2 border-b border-yh-rule px-4 py-3">
