@@ -21,6 +21,7 @@ import { Route as EventsCouponRoundIdRouteImport } from './routes/events.$coupon
 import { Route as MyCouponsRouteImport } from './routes/my.coupons'
 import { Route as AdminCampaignsIndexRouteImport } from './routes/admin.campaigns.index'
 import { Route as AdminCampaignsCouponRoundIdRouteImport } from './routes/admin.campaigns.$couponRoundId'
+import { Route as AdminCampaignsReserveRouteImport } from './routes/admin.campaigns.reserve'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -83,6 +84,11 @@ const AdminCampaignsCouponRoundIdRoute =
     path: '/campaigns/$couponRoundId',
     getParentRoute: () => AdminRoute,
   } as any)
+const AdminCampaignsReserveRoute = AdminCampaignsReserveRouteImport.update({
+  id: '/campaigns/reserve',
+  path: '/campaigns/reserve',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
   '/admin/campaigns/$couponRoundId': typeof AdminCampaignsCouponRoundIdRoute
+  '/admin/campaigns/reserve': typeof AdminCampaignsReserveRoute
   '/admin/campaigns/': typeof AdminCampaignsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/events': typeof EventsIndexRoute
   '/admin/campaigns/$couponRoundId': typeof AdminCampaignsCouponRoundIdRoute
+  '/admin/campaigns/reserve': typeof AdminCampaignsReserveRoute
   '/admin/campaigns': typeof AdminCampaignsIndexRoute
 }
 export interface FileRoutesById {
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
   '/admin/campaigns/$couponRoundId': typeof AdminCampaignsCouponRoundIdRoute
+  '/admin/campaigns/reserve': typeof AdminCampaignsReserveRoute
   '/admin/campaigns/': typeof AdminCampaignsIndexRoute
 }
 export interface FileRouteTypes {
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/events/'
     | '/admin/campaigns/$couponRoundId'
+    | '/admin/campaigns/reserve'
     | '/admin/campaigns/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/events'
     | '/admin/campaigns/$couponRoundId'
+    | '/admin/campaigns/reserve'
     | '/admin/campaigns'
   id:
     | '__root__'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/events/'
     | '/admin/campaigns/$couponRoundId'
+    | '/admin/campaigns/reserve'
     | '/admin/campaigns/'
   fileRoutesById: FileRoutesById
 }
@@ -266,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCampaignsCouponRoundIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/campaigns/reserve': {
+      id: '/admin/campaigns/reserve'
+      path: '/campaigns/reserve'
+      fullPath: '/admin/campaigns/reserve'
+      preLoaderRoute: typeof AdminCampaignsReserveRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
@@ -274,6 +293,7 @@ interface AdminRouteChildren {
   AdminSystemRoute: typeof AdminSystemRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminCampaignsCouponRoundIdRoute: typeof AdminCampaignsCouponRoundIdRoute
+  AdminCampaignsReserveRoute: typeof AdminCampaignsReserveRoute
   AdminCampaignsIndexRoute: typeof AdminCampaignsIndexRoute
 }
 
@@ -282,6 +302,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSystemRoute: AdminSystemRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminCampaignsCouponRoundIdRoute: AdminCampaignsCouponRoundIdRoute,
+  AdminCampaignsReserveRoute: AdminCampaignsReserveRoute,
   AdminCampaignsIndexRoute: AdminCampaignsIndexRoute,
 }
 

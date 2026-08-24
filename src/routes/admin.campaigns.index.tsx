@@ -55,7 +55,6 @@ const TABS: { value: Tab; label: string }[] = [
 function CampaignAdmin() {
   const [tab, setTab] = useState<Tab>("rounds");
   const [editing, setEditing] = useState<CouponTemplateDetail | "new" | null>(null);
-  const [reserving, setReserving] = useState<CouponTemplateDetail | null>(null);
 
   return (
     <>
@@ -74,11 +73,10 @@ function CampaignAdmin() {
       />
 
       {tab === "rounds" && <RoundTable />}
-      {tab === "templates" && <TemplateTable onEdit={setEditing} onReserve={setReserving} />}
+      {tab === "templates" && <TemplateTable onEdit={setEditing} />}
       {tab === "analytics" && <Analytics />}
 
       <TemplateEditor target={editing} onClose={() => setEditing(null)} />
-      <RoundReserver target={reserving} onClose={() => setReserving(null)} />
     </>
   );
 }
@@ -165,13 +163,7 @@ function RoundTable() {
 
 /* ── 템플릿 ──────────────────────────────────────── */
 
-function TemplateTable({
-  onEdit,
-  onReserve,
-}: {
-  onEdit: (t: CouponTemplateDetail) => void;
-  onReserve: (t: CouponTemplateDetail) => void;
-}) {
+function TemplateTable({ onEdit }: { onEdit: (t: CouponTemplateDetail) => void }) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "templates"],
@@ -243,17 +235,24 @@ function TemplateTable({
               </td>
               <td className="text-right">
                 <span className="inline-flex items-center gap-3">
-                  {/* 규칙을 만들 수는 있는데 그 규칙으로 회차를 여는 길이 화면에
-                      없었습니다. 백엔드에는 예약 API 가 이미 있습니다. */}
-                  <button
-                    type="button"
-                    disabled={!t.active}
-                    onClick={() => onReserve(t)}
-                    className="t-body-sm text-hig-link hover:underline disabled:text-hig-muted disabled:no-underline"
-                    title={t.active ? undefined : "비활성 템플릿으로는 회차를 예약할 수 없습니다"}
-                  >
-                    회차 예약
-                  </button>
+                  {/* 예약은 별도 화면입니다. 다이얼로그에 넣었더니 그날 하루치만
+                      보여 줄 수 있었는데, 빈 자리는 주 단위로 봐야 고를 수 있습니다. */}
+                  {t.active ? (
+                    <Link
+                      to="/admin/campaigns/reserve"
+                      search={{ template: t.id }}
+                      className="t-body-sm text-hig-link hover:underline"
+                    >
+                      회차 예약
+                    </Link>
+                  ) : (
+                    <span
+                      className="t-body-sm text-hig-muted"
+                      title="비활성 템플릿으로는 회차를 예약할 수 없습니다"
+                    >
+                      회차 예약
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => onEdit(t)}
@@ -268,248 +267,6 @@ function TemplateTable({
         </tbody>
       </table>
     </TablePanel>
-  );
-}
-
-/* ── 회차 예약 ───────────────────────────────────────
-   템플릿(반복 규칙) 하나로 실제 회차 한 건을 엽니다.
-   POST /api/v1/admin/coupon-templates/{id}/rounds — 백엔드에 이미 있는 API인데
-   화면에 동선이 없어서 만들어 둔 규칙을 열 방법이 없었습니다.
-
-   평소에는 배치가 규칙대로 미리 찍습니다. 이 화면은 그 밖의 회차 —
-   임시 이벤트나 놓친 회차를 끼워 넣는 자리입니다. */
-
-/** datetime-local 입력이 읽는 형식. 초는 버립니다. */
-function toLocalInput(ms: number): string {
-  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60_000);
-  return d.toISOString().slice(0, 16);
-}
-
-/** 템플릿 규칙이 가리키는 다음 오픈 시각. 이미 지났으면 다음 달로 넘깁니다. */
-function nextOpenFor(t: CouponTemplateDetail, now: number): number {
-  const [h = 0, m = 0] = trimSeconds(t.startTime).split(":").map(Number);
-  const dayIndex = DAYS_OF_WEEK.indexOf(t.dayOfWeek);
-  const at = (year: number, month: number) => {
-    const first = new Date(year, month, 1);
-    // getDay 는 일=0 이고 DAYS_OF_WEEK 는 월=0 이라 맞춰 줍니다
-    const firstIdx = (first.getDay() + 6) % 7;
-    const day = 1 + ((dayIndex - firstIdx + 7) % 7) + (t.nthWeek - 1) * 7;
-    return new Date(year, month, day, h, m, 0, 0).getTime();
-  };
-  const ref = new Date(now);
-  const thisMonth = at(ref.getFullYear(), ref.getMonth());
-  return thisMonth > now ? thisMonth : at(ref.getFullYear(), ref.getMonth() + 1);
-}
-
-const HOUR_MS = 3_600_000;
-/** 백엔드 요청 DTO 의 @AssertTrue 와 같은 값입니다 */
-const MAX_SPAN_HOURS = 24;
-
-function RoundReserver({
-  target,
-  onClose,
-}: {
-  target: CouponTemplateDetail | null;
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [openLocal, setOpenLocal] = useState("");
-  const [closeLocal, setCloseLocal] = useState("");
-  const [key, setKey] = useState<number | null>(null);
-
-  /* 이미 잡힌 회차를 먼저 보여 줍니다.
-     지금까지는 겹치는 시각을 넣고 **예약을 누른 뒤에야** 409 로 알았습니다.
-     선점된 자리를 눈으로 보고 고르는 편이 맞습니다 — 겹침 판정은 브랜드를 가리지
-     않으므로(백엔드 existsOverlappingSchedule) 그날 열리는 전부를 보여 줍니다. */
-  const { data: rounds } = useQuery({
-    queryKey: ["rounds"],
-    queryFn: () => couponApi.listRounds(),
-    enabled: !!target,
-  });
-
-  // 열릴 때마다 그 템플릿의 다음 회차 시각으로 채웁니다 — 규칙대로 여는 게 기본이고,
-  // 다르게 열고 싶을 때만 고치면 됩니다.
-  if (target && key !== target.id) {
-    setKey(target.id);
-    const open = nextOpenFor(target, Date.now());
-    setOpenLocal(toLocalInput(open));
-    setCloseLocal(toLocalInput(open + target.durationHours * HOUR_MS));
-  }
-
-  const openMs = openLocal ? new Date(openLocal).getTime() : NaN;
-  const closeMs = closeLocal ? new Date(closeLocal).getTime() : NaN;
-  const spanH = (closeMs - openMs) / HOUR_MS;
-
-  /* 고른 날에 이미 잡힌 회차. 끝난 회차(CLOSED)는 자리를 비켜 주므로 뺍니다 —
-     백엔드도 SCHEDULED·OPEN 만 셉니다. */
-  const daySlots = useMemo(() => {
-    if (!Number.isFinite(openMs)) return [];
-    const day = new Date(openMs);
-    const from = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
-    const to = from + 24 * HOUR_MS;
-    return (rounds ?? [])
-      .filter((r) => r.status !== "CLOSED")
-      .map((r) => ({ round: r, open: Date.parse(r.openAt), close: Date.parse(r.closeAt) }))
-      .filter((r) => r.open < to && r.close > from)
-      .sort((a, b) => a.open - b.open);
-  }, [rounds, openMs]);
-
-  /** 지금 고른 구간과 겹치는 회차 — 있으면 서버가 409 로 돌려보냅니다 */
-  const clashes = daySlots.filter(
-    (s) =>
-      Number.isFinite(openMs) && Number.isFinite(closeMs) && openMs < s.close && closeMs > s.open,
-  );
-
-  // 백엔드가 400·409 로 돌려보낼 조건을 여기서 먼저 말해 줍니다.
-  let problem: string | null = null;
-  if (!Number.isFinite(openMs) || !Number.isFinite(closeMs))
-    problem = "오픈·마감 시각을 채워 주세요.";
-  else if (openMs < Date.now()) problem = "이미 지난 시각으로는 예약할 수 없습니다.";
-  else if (closeMs <= openMs) problem = "마감은 오픈보다 뒤여야 합니다.";
-  else if (spanH > MAX_SPAN_HOURS) problem = `한 회차는 ${MAX_SPAN_HOURS}시간을 넘길 수 없습니다.`;
-  else if (clashes.length > 0)
-    problem = `${brandOf(clashes[0]!.round.brandId).name} 회차와 시간이 겹칩니다.`;
-
-  const reserve = useMutation({
-    mutationFn: () =>
-      couponApi.reserveRound(target!.id, {
-        openAt: new Date(openMs).toISOString(),
-        closeAt: new Date(closeMs).toISOString(),
-      }),
-    onSuccess: (r) => {
-      queryClient.invalidateQueries({ queryKey: ["rounds"] });
-      queryClient.invalidateQueries({ queryKey: ["calendar"] });
-      toast.success(`${r.name} 회차를 예약했습니다`);
-      onClose();
-    },
-    onError: (e) => toast.error(errorLine(e)),
-  });
-
-  return (
-    <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="rounded-2xl sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="t-tile">회차 예약</DialogTitle>
-          <DialogDescription className="t-body-sm text-hig-secondary">
-            {target ? (
-              <>
-                {brandOf(target.brandId).name} · {target.name} 규칙으로 회차 한 건을 엽니다. 재고{" "}
-                {target.stockPerOccurrence.toLocaleString("ko-KR")}장은 템플릿에서 그대로 옵니다.
-              </>
-            ) : null}
-          </DialogDescription>
-        </DialogHeader>
-
-        {target && (
-          <div className="space-y-5 py-2">
-            <p className="t-body-sm rounded-xl bg-fill px-3.5 py-3 text-hig-secondary">
-              규칙: 매달 {NTH_WEEK_LABEL[target.nthWeek]} {DAY_LABEL[target.dayOfWeek]}{" "}
-              {trimSeconds(target.startTime)} · {target.durationHours}시간
-              {/* 하루 한 브랜드로 오해하면 일정을 못 짭니다. 막히는 건 시간대뿐입니다. */}
-              <span className="mt-1 block text-hig-muted">
-                같은 날에 다른 브랜드를 이어서 열 수 있습니다. 시간대만 겹치지 않으면 됩니다.
-              </span>
-            </p>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="오픈">
-                <input
-                  type="datetime-local"
-                  value={openLocal}
-                  onChange={(e) => setOpenLocal(e.target.value)}
-                  className="input-line"
-                />
-              </Field>
-              <Field label="마감">
-                <input
-                  type="datetime-local"
-                  value={closeLocal}
-                  onChange={(e) => setCloseLocal(e.target.value)}
-                  className="input-line"
-                />
-              </Field>
-            </div>
-
-            <p className="t-body-sm text-hig-secondary">
-              {problem ? (
-                <span className="font-semibold text-viz-critical">{problem}</span>
-              ) : (
-                <>
-                  발급 시간 <span className="num font-semibold text-hig-fg">{spanH}시간</span> ·
-                  최대 {MAX_SPAN_HOURS}시간
-                </>
-              )}
-            </p>
-
-            {/* 그날 이미 잡힌 자리. 네이버 예약처럼 선점된 시간을 눈으로 보고 고릅니다 —
-                겹치는 값을 넣고 누른 뒤에 409 를 받는 것보다 낫습니다. */}
-            {Number.isFinite(openMs) && (
-              <div className="border-t border-hig-hairline pt-4">
-                <p className="eyebrow">
-                  {new Date(openMs).getMonth() + 1}월 {new Date(openMs).getDate()}일 예약 현황
-                </p>
-                {daySlots.length === 0 ? (
-                  <p className="t-body-sm mt-2 text-hig-muted">
-                    이 날은 아직 아무 회차도 잡히지 않았습니다.
-                  </p>
-                ) : (
-                  <ul className="mt-2.5 space-y-1.5">
-                    {daySlots.map((s) => {
-                      const hit = clashes.includes(s);
-                      const mine = s.round.templateId === target.id;
-                      return (
-                        <li
-                          key={s.round.id}
-                          className={`t-body-sm flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 ${
-                            hit ? "bg-viz-critical/10" : "bg-fill"
-                          }`}
-                        >
-                          <BrandPlate brandId={s.round.brandId} size="sm" />
-                          <span className="num shrink-0 font-semibold">
-                            {formatClock(s.round.openAt)}-{formatClock(s.round.closeAt)}
-                          </span>
-                          <span className="min-w-0 truncate text-hig-secondary">
-                            {brandOf(s.round.brandId).name}
-                            {mine ? " · 같은 템플릿" : ""}
-                          </span>
-                          {hit && (
-                            <span className="t-caption ml-auto shrink-0 font-bold text-viz-critical">
-                              겹침
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                <p className="t-caption mt-2.5 text-hig-muted">
-                  브랜드가 달라도 시간대가 겹치면 예약할 수 없습니다. 같은 날에 이어서 여는 것은
-                  됩니다.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <DialogFooter>
-          <button
-            type="button"
-            onClick={onClose}
-            className="t-body px-4 text-hig-link hover:underline"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            disabled={!!problem || reserve.isPending}
-            onClick={() => reserve.mutate()}
-            className="btn-primary"
-          >
-            {reserve.isPending ? "예약하는 중" : "예약"}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -636,30 +393,32 @@ function TemplateEditor({
 
           <Field label="할인 정책">
             <div className="flex gap-2">
-              {/* 정책은 세 종류입니다. 데이터가 빠져 있어서, 게임스테이션(1GB)처럼
+              {
+                /* 정책은 세 종류입니다. 데이터가 빠져 있어서, 게임스테이션(1GB)처럼
                    DATA_GRANT 로 만들어진 템플릿을 열면 정책이 둘 중 하나로 보이고
                    그대로 저장하면 **원래 정책이 조용히 바뀌었습니다.** */
-              (
-                [
-                  ["PERCENT_CAPPED", "정률 + 상한"],
-                  ["FIXED_AMOUNT", "정액"],
-                  ["DATA_GRANT", "데이터 제공"],
-                ] as [CouponPolicyType, string][]
-              ).map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setPolicy(v)}
-                  aria-pressed={form.policyType === v}
-                  className={`t-body-sm rounded-full px-3.5 py-1.5 ${
-                    form.policyType === v
-                      ? "bg-hig-fg font-semibold text-hig-surface"
-                      : "bg-fill text-hig-secondary"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+                (
+                  [
+                    ["PERCENT_CAPPED", "정률 + 상한"],
+                    ["FIXED_AMOUNT", "정액"],
+                    ["DATA_GRANT", "데이터 제공"],
+                  ] as [CouponPolicyType, string][]
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setPolicy(v)}
+                    aria-pressed={form.policyType === v}
+                    className={`t-body-sm rounded-full px-3.5 py-1.5 ${
+                      form.policyType === v
+                        ? "bg-hig-fg font-semibold text-hig-surface"
+                        : "bg-fill text-hig-secondary"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))
+              }
             </div>
           </Field>
 
