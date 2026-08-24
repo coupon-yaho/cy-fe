@@ -88,10 +88,11 @@ function MyCoupons() {
     onSuccess: (result, input) => {
       setUseTarget(null);
       refresh();
-      toast.success(`${result.discountAmount.toLocaleString("ko-KR")}원 할인됐습니다`);
+      toast.success(`${result.discountAmount.toLocaleString("ko-KR")}원 깎았습니다`);
       notify(
-        "쿠폰을 사용했습니다",
-        `${input.coupon.name} · 주문 ${result.orderId} · ${result.discountAmount.toLocaleString("ko-KR")}원 할인`,
+        "used",
+        "쿠폰을 썼습니다",
+        `${input.coupon.name} · ${result.discountAmount.toLocaleString("ko-KR")}원 할인 · 주문 ${result.orderId}`,
       );
     },
     onError: (error) => toast.error(errorLine(error)),
@@ -103,7 +104,7 @@ function MyCoupons() {
     onSuccess: (_, coupon) => {
       refresh();
       toast.success("사용을 취소했습니다");
-      notify("쿠폰이 다시 살아났습니다", `${coupon.name} · 사용 기한 안에 다시 쓸 수 있습니다`);
+      notify("restored", "쿠폰이 되살아났습니다", `${coupon.name} · 사용 기한은 그대로입니다`);
     },
     onError: (error) => toast.error(errorLine(error)),
   });
@@ -114,7 +115,9 @@ function MyCoupons() {
     onSuccess: (_, coupon) => {
       refresh();
       toast.success("발급을 취소했습니다");
-      notify("쿠폰 발급을 취소했습니다", coupon.name);
+      /* 취소하면 재고가 실제로 풀립니다 — issuedCountOf 가 CANCELLED 를 안 셉니다.
+         받은 사람 입장에서는 "내가 자리 하나를 비켜 줬다" 가 그 다음 사실입니다. */
+      notify("canceled", "발급을 취소했습니다", `${coupon.name} · 수량 하나가 돌아갔습니다`);
     },
     onError: (error) => toast.error(errorLine(error)),
   });
@@ -129,7 +132,7 @@ function MyCoupons() {
       <SectionHead
         eyebrow="내 쿠폰함"
         title="발급받은 쿠폰"
-        note="사용 기한이 지나면 자동으로 만료됩니다. 주문을 취소하면 쓴 쿠폰도 다시 살아납니다."
+        note="사용 기한이 지나면 그대로 만료됩니다. 주문을 취소하면 쓴 쿠폰도 되살아납니다."
       />
 
       <div className="mt-12 flex flex-wrap gap-1.5 border-y border-yh-rule py-3">
@@ -336,7 +339,7 @@ function EmptyWallet({ tab }: { tab: Tab }) {
         className="mx-auto w-[200px]"
       />
       <p className="yh-title mt-6">{copy[tab]}</p>
-      <p className="yh-lede mt-4 text-yh-ink-2">지금 열려 있는 브랜드 데이를 확인해 보세요.</p>
+      <p className="yh-lede mt-4 text-yh-ink-2">지금 열려 있는 브랜드 데이를 보세요.</p>
       <Link to="/events" className="yh-btn mt-8">
         브랜드 데이 보기
       </Link>

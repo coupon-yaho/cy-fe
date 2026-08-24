@@ -131,7 +131,7 @@ export function QueueDialog({
                 서버는 같은 토큰에 같은 순번을 돌려줍니다(PRD 설계 규칙 5).
                 이제 프론트도 토큰을 남겨 두므로 새로고침해도 이어서 기다립니다. */}
             <p className="yh-small mt-7 text-center text-yh-ink-2">
-              순서가 오면 이 창에서 알려 드립니다. 새로고침해도 순번은 그대로입니다.
+              차례가 오면 이 창에 뜹니다. 새로고침해도 순번은 그대로입니다.
             </p>
 
             <div className="mt-6 text-center">

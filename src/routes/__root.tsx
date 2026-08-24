@@ -85,7 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "쿠폰 야~호 · 브랜드 데이 선착순 쿠폰" },
       {
         name: "description",
-        content: "매월 열리는 12개 브랜드 데이. 한정 수량 쿠폰을 선착순으로 발급받으세요.",
+        content: "매월 12개 브랜드가 하루씩 엽니다. 수량은 정해져 있고, 먼저 누른 사람이 받습니다.",
       },
       { name: "author", content: "쿠폰 야~호" },
       { property: "og:site_name", content: "쿠폰 야~호" },

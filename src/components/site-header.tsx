@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, ChevronDown, LogOut, Menu, Shield, Ticket } from "lucide-react";
+import { Bell, Check, ChevronDown, LogOut, Menu, RotateCcw, Shield, Ticket, X } from "lucide-react";
 import { ThemeChoices, ThemeToggle } from "@/components/coupon/theme-toggle";
 import { BrandLogo } from "@/components/brand-logo";
 import { GradeChip } from "@/components/coupon/grade-chip";
@@ -13,13 +13,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
-import { useNotifications } from "@/hooks/use-notifications";
+import { useNotifications, type NotificationKind } from "@/hooks/use-notifications";
 
 const NAV = [
   { to: "/", label: "홈" },
   { to: "/events", label: "브랜드 데이" },
   { to: "/my/coupons", label: "내 쿠폰함" },
 ] as const;
+
+/* 알림 한 줄의 겉모습. 발급과 취소가 같은 굵은 글씨로 나란히 있으면
+   좋은 소식인지 아닌지를 제목을 읽어야 압니다. 아이콘과 색으로 먼저 말합니다. */
+const KIND: Record<NotificationKind, { icon: typeof Bell; tone: string; ring: string }> = {
+  issued: { icon: Ticket, tone: "text-yh-accent-dark", ring: "bg-yh-accent-soft" },
+  used: { icon: Check, tone: "text-yh-good", ring: "bg-yh-paper-2" },
+  restored: { icon: RotateCcw, tone: "text-yh-navy", ring: "bg-yh-paper-2" },
+  canceled: { icon: X, tone: "text-yh-ink-3", ring: "bg-yh-paper-2" },
+};
 
 function timeAgo(at: number) {
   const sec = Math.floor((Date.now() - at) / 1000);
@@ -39,6 +48,9 @@ export function SiteHeader() {
   const { items, unread, markAllRead } = useNotifications();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
+  /* 열면 바로 읽음 처리되니, 연 순간의 안 읽은 수를 붙잡아 둡니다 —
+     안 그러면 무엇이 새로 온 것인지 열자마자 사라집니다. */
+  const [freshCount, setFreshCount] = useState(0);
 
   const isActive = (to: string) => (to === "/" ? pathname === "/" : pathname.startsWith(to));
 
@@ -81,7 +93,13 @@ export function SiteHeader() {
                 그 폭에서는 메뉴 시트 안의 ThemeChoices 가 같은 일을 합니다. */}
             <ThemeToggle className="hidden sm:grid" />
 
-            <DropdownMenu onOpenChange={(o) => o && markAllRead()}>
+            <DropdownMenu
+              onOpenChange={(o) => {
+                if (!o) return;
+                setFreshCount(unread);
+                markAllRead();
+              }}
+            >
               <DropdownMenuTrigger
                 className="relative grid size-9 place-items-center rounded-full text-yh-ink-2 transition-colors hover:bg-yh-paper-2 hover:text-yh-navy"
                 aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
@@ -100,12 +118,19 @@ export function SiteHeader() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="yh w-80 rounded-xl border-yh-rule bg-yh-surface p-0"
+                className="yh w-[min(23rem,calc(100vw-1.5rem))] rounded-xl border-yh-rule bg-yh-surface p-0"
               >
                 <div className="flex items-baseline gap-2 border-b border-yh-rule px-4 py-3">
                   <p className="yh-sub">알림</p>
-                  {items.length > 0 && (
-                    <p className="yh-num yh-small text-yh-ink-3">{items.length}건</p>
+                  {freshCount > 0 && (
+                    <p className="yh-num yh-small font-bold text-yh-accent-dark">
+                      새 소식 {freshCount}
+                    </p>
+                  )}
+                  {items.length > 6 && (
+                    <p className="yh-num yh-small ml-auto text-yh-ink-3">
+                      최근 6개 · 전체 {items.length}
+                    </p>
                   )}
                 </div>
                 {items.length === 0 ? (
@@ -115,26 +140,52 @@ export function SiteHeader() {
                     <span className="mx-auto grid size-11 place-items-center rounded-full bg-yh-paper-2">
                       <Bell className="size-5 text-yh-ink-3" strokeWidth={1.8} aria-hidden />
                     </span>
-                    <p className="yh-body mt-3.5 font-bold">아직 받은 알림이 없습니다</p>
+                    <p className="yh-body mt-3.5 font-bold">아직 온 알림이 없습니다</p>
                     <p className="yh-small mt-1.5 text-yh-ink-2">
-                      쿠폰을 발급받거나 대기열 차례가 오면 여기로 알려 드립니다.
+                      쿠폰을 받거나 쓰면 그 내역이 여기 쌓입니다.
                     </p>
                     <Link to="/events" className="yh-btn-sm mt-5">
                       브랜드 데이 보기
                     </Link>
                   </div>
                 ) : (
-                  items.slice(0, 6).map((n) => (
-                    <div key={n.id} className="border-b border-yh-rule px-4 py-3 last:border-0">
-                      {/* 제목과 시각을 한 줄에 둡니다 — 시각이 밑에 따로 있으면
-                          알림 하나가 세 줄이 되어 여섯 개가 화면을 넘깁니다. */}
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="yh-body min-w-0 truncate font-bold">{n.title}</p>
-                        <p className="yh-small yh-num shrink-0 text-yh-ink-3">{timeAgo(n.at)}</p>
-                      </div>
-                      <p className="yh-small mt-0.5 text-yh-ink-2">{n.body}</p>
-                    </div>
-                  ))
+                  items.slice(0, 6).map((n, i) => {
+                    const { icon: Icon, tone, ring } = KIND[n.kind];
+                    return (
+                      /* 줄 전체가 쿠폰함으로 갑니다 — 알림을 읽고 나면 다음에 하는 일이
+                         "그래서 그 쿠폰 어디 있지" 하나뿐입니다. */
+                      <DropdownMenuItem key={n.id} asChild className="p-0 focus:bg-transparent">
+                        <Link
+                          to="/my/coupons"
+                          className="flex w-full items-start gap-3 border-b border-yh-rule px-4 py-3 last:border-0 hover:bg-yh-paper-2"
+                        >
+                          <span
+                            className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full ${ring} ${tone}`}
+                          >
+                            <Icon className="size-4" strokeWidth={2} aria-hidden />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            {/* 제목과 시각을 한 줄에 둡니다 — 시각이 밑에 따로 있으면
+                                알림 하나가 세 줄이 되어 여섯 개가 화면을 넘깁니다. */}
+                            <span className="flex items-baseline justify-between gap-2">
+                              <span className="yh-body min-w-0 truncate font-bold">{n.title}</span>
+                              <span className="yh-small yh-num shrink-0 text-yh-ink-3">
+                                {timeAgo(n.at)}
+                              </span>
+                            </span>
+                            <span className="yh-small mt-0.5 block text-yh-ink-2">{n.body}</span>
+                          </span>
+                          {/* 이번에 열면서 처음 본 것들 */}
+                          {i < freshCount && (
+                            <span
+                              className="mt-2 size-1.5 shrink-0 rounded-full bg-yh-accent"
+                              aria-label="새 알림"
+                            />
+                          )}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

@@ -119,8 +119,9 @@ function RoundDetail() {
         clearQueue();
         setPhase({ kind: "done", issuance });
         notify(
-          "쿠폰이 발급됐습니다",
-          `${round?.name ?? "브랜드 데이"} · ${formatDate(issuance.expiresAt)}까지 사용 가능`,
+          "issued",
+          "쿠폰을 받았습니다",
+          `${round?.name ?? "브랜드 데이"} · 사용 기한 ${formatDate(issuance.expiresAt)}`,
         );
         queryClient.invalidateQueries({ queryKey: ["round", roundId] });
         queryClient.invalidateQueries({ queryKey: ["rounds"] });
@@ -477,8 +478,8 @@ function Ready({
         </p>
         <p className="yh-body mt-5 text-yh-ink-2">
           {session
-            ? "오픈 시각이 되면 이 화면에서 바로 발급받을 수 있습니다."
-            : "선착순이라 오픈 뒤에 로그인하면 늦습니다. 미리 해 두세요."}
+            ? "열리는 시각이 되면 이 화면에서 바로 받습니다."
+            : "선착순이라 열린 뒤에 로그인하면 이미 늦습니다."}
         </p>
         {/* 아직 안 열린 회차에서 로그아웃 상태라면, 지금 할 수 있는 일이 하나 있습니다 */}
         {!session && (
@@ -497,8 +498,8 @@ function Ready({
   if (!session) {
     return (
       <div>
-        <h2 className="yh-sub">로그인하면 발급받을 수 있습니다</h2>
-        <p className="yh-body mt-2.5 text-yh-ink-2">등급에 따라 참여할 수 있는 회차가 다릅니다.</p>
+        <h2 className="yh-sub">로그인해야 받을 수 있습니다</h2>
+        <p className="yh-body mt-2.5 text-yh-ink-2">회차마다 받을 수 있는 등급이 다릅니다.</p>
         <Link
           to="/login"
           search={{ redirect: `/events/${round.id}` }}
@@ -514,7 +515,7 @@ function Ready({
     return (
       <div>
         <h2 className="yh-sub">참여 등급이 아닙니다</h2>
-        <p className="yh-body mt-2.5 text-yh-ink-2">이 회차는 아래 등급만 발급받을 수 있습니다.</p>
+        <p className="yh-body mt-2.5 text-yh-ink-2">이 회차는 아래 등급만 받습니다.</p>
         <div className="mt-4">
           <GradeList grades={round.eligibleGrades} />
         </div>
@@ -529,7 +530,7 @@ function Ready({
     <div>
       <p className="yh-body text-yh-ink-2">
         {round.queueActive
-          ? "지금은 순서대로 발급하고 있습니다. 누르면 순번을 받고, 차례가 되면 자동으로 발급됩니다."
+          ? "지금은 순서대로 내보내고 있습니다. 누르면 순번을 받고, 차례가 오면 알아서 발급됩니다."
           : "한 사람당 한 장입니다. 발급받은 쿠폰은 쿠폰함에서 확인하세요."}
       </p>
 
@@ -656,7 +657,7 @@ function Failed({ error, onReset }: { error: unknown; onReset: () => void }) {
 
 function Terms({ round }: { round: CouponRoundView }) {
   const rules = [
-    "한 사람당 한 장까지 발급받을 수 있습니다.",
+    "한 사람당 한 장입니다.",
     `발급일로부터 ${round.validDays}일 안에 써야 합니다.`,
     round.policyType === "PERCENT_CAPPED"
       ? `${round.discountRate}% 할인, 최대 ${(round.maxDiscountAmount ?? 0).toLocaleString("ko-KR")}원까지 깎입니다.`

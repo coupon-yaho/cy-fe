@@ -16,7 +16,7 @@ export function SiteFooter() {
         <div>
           <BrandLogo variant="key" className="h-16" />
           <p className="yh-small mt-4 max-w-[42ch] text-yh-ink-2">
-            매월 열리는 12개 브랜드 데이. 정해진 수량을 선착순으로 나눠 드립니다.
+            매월 12개 브랜드가 하루씩 엽니다. 수량은 정해져 있고, 먼저 누른 사람이 받습니다.
           </p>
         </div>
         <nav className="yh-body flex flex-wrap gap-x-8 gap-y-3 font-semibold sm:flex-col sm:items-end sm:gap-y-4">
