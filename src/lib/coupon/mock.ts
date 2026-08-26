@@ -446,13 +446,14 @@ export function createMockApi(): CouponApi {
         if (target.status !== "ISSUED") reject("COUPON-310");
         const state = findRoundState(target.couponRoundId, now);
         const discountAmount = state ? calcDiscount(state.round, body.orderAmount) : 0;
+        const orderId = now;
 
         target.status = "USED";
         target.usedAt = new Date(now).toISOString();
-        target.orderId = body.orderId;
+        target.orderId = orderId;
         target.discountAmount = discountAmount;
         target.usages.push({
-          orderId: body.orderId,
+          orderId,
           discountAmount,
           usedAt: target.usedAt,
           canceledAt: null,
@@ -462,7 +463,7 @@ export function createMockApi(): CouponApi {
         return {
           issuanceId,
           status: "USED" as IssuanceStatus,
-          orderId: body.orderId,
+          orderId,
           discountAmount,
           usedAt: target.usedAt,
         };

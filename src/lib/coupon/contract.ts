@@ -94,6 +94,7 @@ export interface CouponApi {
   issue(
     couponRoundId: number,
     member: MemberContext,
+    idempotencyKey: string,
     entryToken?: string | null,
   ): Promise<CouponIssueResponse>;
 
@@ -114,7 +115,7 @@ export interface CouponApi {
   useCoupon(
     issuanceId: number,
     member: MemberContext,
-    body: { orderId: number; orderAmount: number },
+    body: { orderAmount: number },
     idempotencyKey: string,
   ): Promise<CouponUseResponse>;
 
