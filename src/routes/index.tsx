@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Reveal, useCountUp, useDropPulse } from "@/components/coupon/reveal";
 import { SectionHead } from "@/components/coupon/section-head";
@@ -50,8 +50,6 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const FEATURE_ROTATION_MS = 6_000;
-
 function Landing() {
   const { session } = useAuth();
   const { data, isLoading } = useQuery({
@@ -68,29 +66,12 @@ function Landing() {
     .filter((r) => r.status === "SCHEDULED")
     .sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
 
-  /* 발급 중 회차가 둘 이상이면 6초마다 다음 회차를 보여 줍니다.
-     사용자가 화살표나 페이지 점으로 직접 이동하면 그 시점부터 다시 6초를 셉니다. */
+  /* 정상 데이터에서는 전역 일정 충돌 검증으로 발급 중 회차가 하나뿐입니다.
+     기존 데이터 이상 등으로 둘 이상 들어온 경우에만 수동으로 넘길 수 있게 합니다. */
   const [slide, setSlide] = useState(0);
-  const [rotationReset, setRotationReset] = useState(0);
   const featured = live.length > 0 ? live : upcoming.slice(0, 1);
   const index = Math.min(slide, Math.max(0, featured.length - 1));
-  const featuredIds = featured.map((round) => round.id).join(",");
   const headline = featured[index];
-
-  useEffect(() => {
-    if (featured.length <= 1) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setSlide((index + 1) % featured.length);
-    }, FEATURE_ROTATION_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [featured.length, featuredIds, index, rotationReset]);
-
-  const goToSlide = (nextIndex: number) => {
-    setSlide(nextIndex);
-    setRotationReset((current) => current + 1);
-  };
   /* 바로 위 쿠폰 카드가 이미 크게 보여 준 회차입니다. 목록 첫 줄에 또 넣으면
      200px 안에서 같은 회차를 두 번 읽게 됩니다 — "다가오는 일정" 이라는 제목과도
      어긋납니다. 그 회차를 빼고 다음 것부터 셉니다. */
@@ -104,7 +85,7 @@ function Landing() {
         round={headline}
         loading={isLoading}
         grade={session?.grade ?? null}
-        page={featured.length > 1 ? { index, total: featured.length, onGo: goToSlide } : null}
+        page={featured.length > 1 ? { index, total: featured.length, onGo: setSlide } : null}
       />
 
       <section className="mx-auto w-full max-w-6xl px-5 py-14">
