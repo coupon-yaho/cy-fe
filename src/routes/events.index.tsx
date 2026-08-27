@@ -69,11 +69,13 @@ function Schedule() {
 
   const rounds = useMemo(() => data ?? [], [data]);
 
+  const gradeFilteredRounds = useMemo(() => {
+    return rounds.filter((r) => !mineOnly || !session || r.eligibleGrades.includes(session.grade));
+  }, [rounds, mineOnly, session]);
+
   const filtered = useMemo(() => {
-    return rounds
-      .filter((r) => filter === "ALL" || r.status === filter)
-      .filter((r) => !mineOnly || !session || r.eligibleGrades.includes(session.grade));
-  }, [rounds, filter, mineOnly, session]);
+    return gradeFilteredRounds.filter((r) => filter === "ALL" || r.status === filter);
+  }, [gradeFilteredRounds, filter]);
 
   const live = filtered.filter((r) => r.status === "OPEN");
 
@@ -143,8 +145,8 @@ function Schedule() {
                 {f.label}
                 <span className="yh-num ml-2 text-[0.75rem] opacity-55">
                   {f.key === "ALL"
-                    ? rounds.length
-                    : rounds.filter((r) => r.status === f.key).length}
+                    ? gradeFilteredRounds.length
+                    : gradeFilteredRounds.filter((r) => r.status === f.key).length}
                 </span>
               </button>
             ))}

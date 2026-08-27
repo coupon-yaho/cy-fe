@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Reveal, useCountUp, useDropPulse } from "@/components/coupon/reveal";
 import { SectionHead } from "@/components/coupon/section-head";
@@ -50,6 +50,8 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
+const FEATURE_ROTATION_MS = 6_000;
+
 function Landing() {
   const { session } = useAuth();
   const { data, isLoading } = useQuery({
@@ -66,15 +68,29 @@ function Landing() {
     .filter((r) => r.status === "SCHEDULED")
     .sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
 
-  /* 발급 중이 둘 이상일 때만 넘길 수 있게 합니다.
-     **자동으로 넘기지 않습니다.** 선착순 화면에서 발급 버튼이 손가락 밑에서 바뀌면
-     다른 브랜드 쿠폰이 발급됩니다 — 1인 1매라 되돌리려면 발급을 취소해야 합니다.
-     백엔드가 회차 시간 겹침을 브랜드 무관 전역으로 막으므로(existsOverlappingSchedule,
-     SCHEDULED·OPEN 대상) 실서버에서는 보통 한 개입니다. 그때는 화살표가 아예 안 뜹니다. */
+  /* 발급 중 회차가 둘 이상이면 6초마다 다음 회차를 보여 줍니다.
+     사용자가 화살표나 페이지 점으로 직접 이동하면 그 시점부터 다시 6초를 셉니다. */
   const [slide, setSlide] = useState(0);
+  const [rotationReset, setRotationReset] = useState(0);
   const featured = live.length > 0 ? live : upcoming.slice(0, 1);
   const index = Math.min(slide, Math.max(0, featured.length - 1));
+  const featuredIds = featured.map((round) => round.id).join(",");
   const headline = featured[index];
+
+  useEffect(() => {
+    if (featured.length <= 1) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setSlide((index + 1) % featured.length);
+    }, FEATURE_ROTATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [featured.length, featuredIds, index, rotationReset]);
+
+  const goToSlide = (nextIndex: number) => {
+    setSlide(nextIndex);
+    setRotationReset((current) => current + 1);
+  };
   /* 바로 위 쿠폰 카드가 이미 크게 보여 준 회차입니다. 목록 첫 줄에 또 넣으면
      200px 안에서 같은 회차를 두 번 읽게 됩니다 — "다가오는 일정" 이라는 제목과도
      어긋납니다. 그 회차를 빼고 다음 것부터 셉니다. */
@@ -88,7 +104,7 @@ function Landing() {
         round={headline}
         loading={isLoading}
         grade={session?.grade ?? null}
-        page={featured.length > 1 ? { index, total: featured.length, onGo: setSlide } : null}
+        page={featured.length > 1 ? { index, total: featured.length, onGo: goToSlide } : null}
       />
 
       <section className="mx-auto w-full max-w-6xl px-5 py-14">
