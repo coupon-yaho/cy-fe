@@ -22,6 +22,7 @@ import type {
   CouponRoundReservation,
   CouponRoundReservationRequest,
   CouponRoundView,
+  CouponRoundStatus,
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
   CouponUseResponse,
@@ -150,6 +151,26 @@ export function createHttpApi(baseUrl: string): CouponApi {
 
   const admin = { [USER_ROLE]: "ADMIN" };
 
+  const listRoundPage = (
+    params: {
+      status?: CouponRoundStatus | null;
+      eligibleGrade?: MemberContext["grade"] | null;
+      page?: number;
+      size?: number;
+    } = {},
+  ) => {
+    const q = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+    });
+    if (params.status) q.set("status", params.status);
+    if (params.eligibleGrade) q.set("eligibleGrade", params.eligibleGrade);
+    return call<Page<CouponRoundResponse>>(`/api/v1/coupon-rounds/public?${q}`).then((page) => ({
+      ...page,
+      content: page.content.map(toCouponRound),
+    }));
+  };
+
   return {
     listBrandDays: () => call<BrandDay[]>("/api/v1/brand-days"),
 
@@ -159,12 +180,8 @@ export function createHttpApi(baseUrl: string): CouponApi {
         `/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       ),
 
-    listRounds: async () => {
-      const page = await call<Page<CouponRoundResponse>>(
-        "/api/v1/coupon-rounds/public?page=0&size=100",
-      );
-      return page.content.map(toCouponRound);
-    },
+    listRounds: () => listRoundPage({ size: 100 }).then((page) => page.content),
+    listRoundPage,
 
     getRound: async (id) =>
       toCouponRound(await call<CouponRoundResponse>(`/api/v1/coupon-rounds/${id}`)),

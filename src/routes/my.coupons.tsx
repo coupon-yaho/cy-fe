@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { SectionHead } from "@/components/coupon/section-head";
 import { CouponTicket } from "@/components/coupon/ticket";
+import { PageNavigation } from "@/components/coupon/page-navigation";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ function MyCoupons() {
   const { notify } = useNotifications();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("ALL");
+  const [page, setPage] = useState(0);
   const [useTarget, setUseTarget] = useState<MemberCoupon | null>(null);
 
   const member: MemberContext | null = session
@@ -55,9 +57,13 @@ function MyCoupons() {
     : null;
 
   const coupons = useQuery({
-    queryKey: ["my-coupons", member?.memberId, tab],
+    queryKey: ["my-coupons", member?.memberId, tab, page],
     queryFn: () =>
-      couponApi.listMyCoupons(member!, { status: tab === "ALL" ? null : tab, size: 50 }),
+      couponApi.listMyCoupons(member!, {
+        status: tab === "ALL" ? null : tab,
+        page,
+        size: 10,
+      }),
     enabled: !!member,
   });
 
@@ -144,7 +150,10 @@ function MyCoupons() {
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setPage(0);
+            }}
             aria-pressed={tab === t.key}
             className={`yh-body rounded-[3px] px-3.5 py-1.5 font-semibold transition-colors ${
               tab === t.key
@@ -166,48 +175,56 @@ function MyCoupons() {
       ) : rows.length === 0 ? (
         <EmptyWallet tab={tab} />
       ) : (
-        <ul className="mt-12 space-y-5">
-          {rows.map((c) => (
-            <li key={c.issuanceId}>
-              <CouponTicket
-                coupon={c}
-                brandId={brandByRound.get(c.couponRoundId) ?? 0}
-                dimmed={c.status === "EXPIRED" || c.status === "CANCELLED"}
-                actions={
-                  c.status === "ISSUED" ? (
-                    <>
+        <>
+          <ul className="mt-12 space-y-5">
+            {rows.map((c) => (
+              <li key={c.issuanceId}>
+                <CouponTicket
+                  coupon={c}
+                  brandId={brandByRound.get(c.couponRoundId) ?? 0}
+                  dimmed={c.status === "EXPIRED" || c.status === "CANCELLED"}
+                  actions={
+                    c.status === "ISSUED" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => cancelIssue.mutate(c)}
+                          className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
+                        >
+                          발급 취소
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setUseTarget(c)}
+                          className="yh-btn-sm"
+                        >
+                          사용하기
+                        </button>
+                      </>
+                    ) : c.status === "USED" ? (
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => cancelIssue.mutate(c)}
+                        onClick={() => cancelUse.mutate(c)}
                         className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
                       >
-                        발급 취소
+                        사용 취소
                       </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setUseTarget(c)}
-                        className="yh-btn-sm"
-                      >
-                        사용하기
-                      </button>
-                    </>
-                  ) : c.status === "USED" ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => cancelUse.mutate(c)}
-                      className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
-                    >
-                      사용 취소
-                    </button>
-                  ) : null
-                }
-              />
-            </li>
-          ))}
-        </ul>
+                    ) : null
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+          <PageNavigation
+            page={coupons.data?.page ?? page}
+            totalPages={coupons.data?.totalPages ?? 0}
+            totalElements={coupons.data?.totalElements}
+            onChange={setPage}
+          />
+        </>
       )}
 
       <UseDialog

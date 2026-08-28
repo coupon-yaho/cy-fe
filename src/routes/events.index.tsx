@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { BrandCalendar } from "@/components/coupon/brand-calendar";
 import { SectionHead } from "@/components/coupon/section-head";
 import { RoundCard, RoundRow } from "@/components/coupon/round-card";
+import { PageNavigation } from "@/components/coupon/page-navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { GRADE_LABEL, couponApi, type CouponRoundStatus, type CouponRoundView } from "@/lib/coupon";
@@ -60,22 +61,38 @@ function Schedule() {
   const [view, setView] = useState<View>("CALENDAR");
   const [filter, setFilter] = useState<Filter>("ALL");
   const [mineOnly, setMineOnly] = useState(false);
+  const [page, setPage] = useState(0);
+  const eligibleGrade = mineOnly && session ? session.grade : null;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["rounds"],
-    queryFn: () => couponApi.listRounds(),
+    queryKey: ["rounds", "public", filter, eligibleGrade, page],
+    queryFn: () =>
+      couponApi.listRoundPage({
+        status: filter === "ALL" ? null : filter,
+        eligibleGrade,
+        page,
+        size: 12,
+      }),
+    enabled: view === "LIST",
     refetchInterval: 15_000,
   });
 
-  const rounds = useMemo(() => data ?? [], [data]);
+  const countQueries = useQueries({
+    queries: FILTERS.map((item) => ({
+      queryKey: ["rounds", "public-count", item.key, eligibleGrade],
+      queryFn: () =>
+        couponApi.listRoundPage({
+          status: item.key === "ALL" ? null : item.key,
+          eligibleGrade,
+          page: 0,
+          size: 1,
+        }),
+      enabled: view === "LIST",
+      refetchInterval: 15_000,
+    })),
+  });
 
-  const gradeFilteredRounds = useMemo(() => {
-    return rounds.filter((r) => !mineOnly || !session || r.eligibleGrades.includes(session.grade));
-  }, [rounds, mineOnly, session]);
-
-  const filtered = useMemo(() => {
-    return gradeFilteredRounds.filter((r) => filter === "ALL" || r.status === filter);
-  }, [gradeFilteredRounds, filter]);
+  const filtered = useMemo(() => data?.content ?? [], [data]);
 
   const live = filtered.filter((r) => r.status === "OPEN");
 
@@ -134,7 +151,10 @@ function Schedule() {
               <button
                 key={f.key}
                 type="button"
-                onClick={() => setFilter(f.key)}
+                onClick={() => {
+                  setFilter(f.key);
+                  setPage(0);
+                }}
                 aria-pressed={filter === f.key}
                 className={`yh-body rounded-[3px] px-3.5 py-1.5 font-semibold transition-colors ${
                   filter === f.key
@@ -144,9 +164,7 @@ function Schedule() {
               >
                 {f.label}
                 <span className="yh-num ml-2 text-[0.75rem] opacity-55">
-                  {f.key === "ALL"
-                    ? gradeFilteredRounds.length
-                    : gradeFilteredRounds.filter((r) => r.status === f.key).length}
+                  {countQueries[FILTERS.indexOf(f)]?.data?.totalElements ?? 0}
                 </span>
               </button>
             ))}
@@ -154,7 +172,10 @@ function Schedule() {
             {session && (
               <button
                 type="button"
-                onClick={() => setMineOnly((v) => !v)}
+                onClick={() => {
+                  setMineOnly((v) => !v);
+                  setPage(0);
+                }}
                 aria-pressed={mineOnly}
                 className={`yh-body ml-auto rounded-[3px] border px-3.5 py-1.5 font-semibold transition-colors ${
                   mineOnly
@@ -203,6 +224,12 @@ function Schedule() {
                   </div>
                 ))}
               </section>
+              <PageNavigation
+                page={data?.page ?? page}
+                totalPages={data?.totalPages ?? 0}
+                totalElements={data?.totalElements}
+                onChange={setPage}
+              />
             </>
           )}
         </>

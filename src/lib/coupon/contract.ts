@@ -25,6 +25,7 @@ import type {
   CouponCancelUseResponse,
   CouponIssueResponse,
   CouponRoundView,
+  CouponRoundStatus,
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
   CouponUseResponse,
@@ -57,6 +58,12 @@ export interface CouponApi {
    * (status 자체는 DB 에 있고 CouponRoundLifecycleScheduler 가 실제로 전이시킵니다.)
    */
   listRounds(): Promise<CouponRoundView[]>;
+  listRoundPage(params?: {
+    status?: CouponRoundStatus | null;
+    eligibleGrade?: MembershipGrade | null;
+    page?: number;
+    size?: number;
+  }): Promise<Page<CouponRoundView>>;
   /** ❌ GET /api/v1/coupon-rounds/{couponRoundId} — 단건 조회가 없습니다 */
   getRound(couponRoundId: number): Promise<CouponRoundView>;
 
