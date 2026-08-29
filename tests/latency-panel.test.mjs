@@ -9,6 +9,7 @@ let LatencySignalPanel;
 
 before(async () => {
   server = await createServer({
+    cacheDir: ".vite-test",
     appType: "custom",
     logLevel: "silent",
     server: { middlewareMode: true },
@@ -66,14 +67,14 @@ test("success renders p50 p95 p99 from one source and preserves STALE", () => {
   assert.equal((staleHtml.match(/>갱신 지연<\/span>/g) ?? []).length, 1);
 });
 
-test("pending failures and dependencies render dashes and remain separate from success", () => {
+test("pending failures and dependencies are not presented as measured values", () => {
   const html = renderPanel();
-  assert.match(html, /성공 응답시간[\s\S]*<\/section>[\s\S]*실패 응답시간/);
-  assert.match(html, /정책 거절/);
-  assert.match(html, /시스템 실패/);
+  assert.match(html, /성공 응답시간/);
+  assert.doesNotMatch(html, /실패 응답시간/);
+  assert.doesNotMatch(html, /정책 거절/);
+  assert.doesNotMatch(html, /시스템 실패/);
   assert.match(html, /의존성 지연/);
-  assert.match(html, /원천 미배선/);
-  assert.equal((html.match(/>집계 전<\/span>/g) ?? []).length, 5);
+  assert.match(html, /현재 연결된 의존성 지연 값이 없습니다/);
   for (const label of [
     "Redis p95",
     "Redis p99",
@@ -82,9 +83,8 @@ test("pending failures and dependencies render dashes and remain separate from s
     "Kafka p95",
     "Kafka p99",
   ]) {
-    assert.match(html, new RegExp(label));
+    assert.doesNotMatch(html, new RegExp(label));
   }
-  assert.ok((html.match(/>—<\/span>/g) ?? []).length >= 12);
   assert.doesNotMatch(html, />0(?:\.0)?ms</);
 });
 

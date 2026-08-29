@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { LiveCampaignDetail } from "@/components/admin/live-campaign-detail";
 import { SeriesChart, SeriesLegend, type SeriesSpec } from "@/components/admin/charts";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
 import { MetaChips, PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
@@ -10,8 +12,13 @@ import {
   ENGINE_LABEL,
   adminApi,
   type CouponMetricsResponse,
+  isLiveAdminOverview,
+  isLiveCouponMetrics,
   type MetricsWindow,
+  type Point,
 } from "@/lib/admin";
+import { appendTransitionSample } from "@/lib/admin/transition-series";
+import { mergeEventPoll } from "@/lib/admin/event-poll-state";
 
 export const Route = createFileRoute("/admin/campaigns/$couponRoundId")({
   component: CampaignDetail,
@@ -25,6 +32,15 @@ function clockMs(iso: string) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 }
 
+export function EventScopeNotice() {
+  return (
+    <p className="t-caption mb-3 text-hig-muted">
+      백엔드는 전체 회차 이벤트를 반환하고 이 화면에서 선택 회차만 표시합니다. 이벤트가 많으면
+      조회 범위 밖의 일부 이벤트가 보이지 않을 수 있습니다.
+    </p>
+  );
+}
+
 const WINDOWS: { value: MetricsWindow; label: string }[] = [
   { value: "1m", label: "1m" },
   { value: "5m", label: "5m" },
@@ -36,6 +52,12 @@ function CampaignDetail() {
   const roundId = Number(couponRoundId);
   const [interval, setInterval] = useState<PollInterval>(1000);
   const [window, setWindow] = useState<MetricsWindow>("1m");
+  const [transitionHistory, setTransitionHistory] = useState<{
+    key: string;
+    points: Point[];
+  }>({ key: "", points: [] });
+  const eventCursor = useRef<string | null>(null);
+  const [eventStream, setEventStream] = useState<ReturnType<typeof mergeEventPoll>>();
 
   const metrics = useAdminPolling({
     pollKey: ["admin", "coupon-metrics", roundId, window],
@@ -44,7 +66,14 @@ function CampaignDetail() {
   });
   const events = useAdminPolling({
     pollKey: ["admin", "events", roundId],
-    queryFn: (signal) => adminApi.getEvents({ couponRoundId: roundId, limit: 14 }, signal),
+    queryFn: async (signal) => {
+      const page = await adminApi.getEvents(
+        { couponRoundId: roundId, cursor: eventCursor.current, limit: 14 },
+        signal,
+      );
+      eventCursor.current = page.nextCursor;
+      return page;
+    },
     intervalMs: interval,
   });
   const histories = useAdminPolling({
@@ -54,6 +83,43 @@ function CampaignDetail() {
   });
 
   const d = metrics.data;
+  useEffect(() => {
+    eventCursor.current = null;
+    setEventStream(undefined);
+  }, [roundId]);
+  useEffect(() => {
+    if (events.data) setEventStream((previous) => mergeEventPoll(previous, events.data!, 14));
+  }, [events.data]);
+  const visibleEvents = eventStream ?? events.data;
+  const transitionKey = `${roundId}:${window}`;
+  useEffect(() => {
+    if (!d || !isLiveCouponMetrics(d) || !d.transitionRate.value) return;
+    setTransitionHistory((previous) => ({
+      key: transitionKey,
+      points: appendTransitionSample(
+        previous.key === transitionKey ? previous.points : [],
+        d.snapshotAt,
+        d.transitionRate.value!,
+      ),
+    }));
+  }, [d, transitionKey]);
+  const transitionSeries = transitionHistory.key === transitionKey ? transitionHistory.points : [];
+  const overview = useQuery({
+    queryKey: ["admin", "overview", "detail-label", roundId],
+    queryFn: ({ signal }) => adminApi.getOverview({}, signal),
+    enabled: !!d && isLiveCouponMetrics(d),
+    staleTime: 30_000,
+  });
+  const liveCampaignName =
+    overview.data && isLiveAdminOverview(overview.data)
+      ? overview.data.campaigns.value?.find((campaign) => campaign.couponId === roundId)
+          ?.campaignName
+      : undefined;
+  const campaignTitle = !d
+    ? `회차 #${roundId}`
+    : isLiveCouponMetrics(d)
+      ? (liveCampaignName ?? `회차 #${d.couponId}`)
+      : d.campaign;
   // 셋 중 하나만 멈춰도 이 화면의 숫자는 서로 다른 시각의 값이 섞입니다.
   const stale = metrics.isStale || events.isStale || histories.isStale;
 
@@ -64,13 +130,21 @@ function CampaignDetail() {
           캠페인
         </Link>
         <span className="mx-1.5">/</span>
-        <span>{d?.campaign ?? "상세"}</span>
+        <span>{campaignTitle}</span>
       </nav>
 
       <PageHead
-        title={d?.campaign ?? "캠페인 상세"}
+        title={campaignTitle}
         meta={
-          d && (
+          d && isLiveCouponMetrics(d) ? (
+            <MetaChips
+              items={[
+                ["회차", `#${d.couponId}`],
+                ["상태", d.campaign?.status ?? "—"],
+                ["구간", d.window],
+              ]}
+            />
+          ) : d ? (
             <MetaChips
               items={[
                 ["engine", ENGINE_LABEL.v3],
@@ -78,7 +152,7 @@ function CampaignDetail() {
                 ["상태", d.roundStatus.value?.status ?? "—"],
               ]}
             />
-          )
+          ) : null
         }
         controls={
           <>
@@ -87,7 +161,9 @@ function CampaignDetail() {
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}
-              snapshotAt={d?.meta.snapshotAt}
+              snapshotAt={
+                d ? (isLiveCouponMetrics(d) ? d.snapshotAt : d.meta.snapshotAt) : undefined
+              }
             />
           </>
         }
@@ -104,32 +180,47 @@ function CampaignDetail() {
         </div>
       ) : (
         <div className="space-y-4">
-          <Tiles data={d} />
+          {isLiveCouponMetrics(d) ? (
+            <LiveCampaignDetail
+              data={d}
+              {...(liveCampaignName ? { campaignName: liveCampaignName } : {})}
+              transitionSeries={transitionSeries}
+            />
+          ) : (
+            <>
+              <Tiles data={d} />
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <StatusBreakdown data={d} />
-            <NotificationPanel data={d} />
-            <TransitionRate data={d} />
-          </div>
+              <div className="grid gap-4 xl:grid-cols-3">
+                <StatusBreakdown data={d} />
+                <NotificationPanel data={d} />
+                <TransitionRate data={d} />
+              </div>
+            </>
+          )}
 
           <div className="grid gap-4 xl:grid-cols-2">
             <TablePanel
               title="발급 이벤트"
               hint="샘플링"
               action={
-                events.data && (
+                visibleEvents && (
                   <span className="t-caption num text-hig-muted">
-                    +{events.data.droppedCount.toLocaleString("ko-KR")} 생략
+                    +{visibleEvents.droppedCount.toLocaleString("ko-KR")} 생략
                   </span>
                 )
               }
             >
-              {!events.data ? (
+              <EventScopeNotice />
+              {!visibleEvents ? (
                 <Skeleton className="h-56 rounded-xl" />
+              ) : visibleEvents.events.length === 0 ? (
+                <p className="t-body-sm py-3 text-hig-muted">
+                  표시할 이벤트가 없습니다. Kafka가 꺼져 있으면 이벤트 원천은 비어 있습니다.
+                </p>
               ) : (
                 <table className="ops-table">
                   <tbody>
-                    {events.data.events.map((e) => (
+                    {visibleEvents.events.map((e) => (
                       <tr key={e.eventId}>
                         <td className="num w-28 text-hig-muted">{clockMs(e.occurredAt)}</td>
                         <td className="num w-24 text-hig-secondary">m_{e.memberId}</td>
@@ -162,6 +253,10 @@ function CampaignDetail() {
             <TablePanel title="상태 변경">
               {!histories.data ? (
                 <Skeleton className="h-56 rounded-xl" />
+              ) : histories.data.histories.length === 0 ? (
+                <p className="t-body-sm py-3 text-hig-muted">
+                  이 회차의 상태 변경 이력이 없습니다.
+                </p>
               ) : (
                 <table className="ops-table">
                   <tbody>
