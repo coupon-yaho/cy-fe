@@ -277,6 +277,128 @@ export interface AdminOverviewResponse {
   notifications: NotificationSummary;
 }
 
+/** 실제 GET /api/v1/admin/overview 응답. 기존 프론트 Mock 화면 계약과 섞지 않습니다. */
+export interface LiveAdminOverviewResponse {
+  snapshotAt: string;
+  overallStatus: "COMPLETE" | "PARTIAL" | "UNAVAILABLE";
+  actionRequired: SourceValue<{
+    totalCount: number;
+    urgentCount: number;
+    warningCount: number;
+  }>;
+  openingSoon: SourceValue<{
+    totalCount: number;
+    preparationIncompleteCount: number;
+  }>;
+  queueRisk: SourceValue<{
+    thresholdExceededCount: number;
+    longestWait?: string | null;
+  }>;
+  stockRisk: SourceValue<{
+    depletionRiskCount: number;
+    nearestDepletion?: string | null;
+  }>;
+  aggregateIssuanceRate: SourceValue<{
+    currentPerSecond: number;
+    sessionPeakPerSecond: number;
+  }>;
+  aggregateQueue: SourceValue<{
+    waitingCount: number;
+    admissionsPerSecond: number;
+    estimatedWait?: string | null;
+  }>;
+  latencySummary: SourceValue<{
+    successfulP99?: string | null;
+    failedP99?: string | null;
+    windowStart: string;
+    windowEnd: string;
+  }>;
+  campaignStatusSummary: SourceValue<{
+    openCount: number;
+    scheduledCount: number;
+    closedCount: number;
+  }>;
+  actionItems: SourceValue<{
+    totalCount: number;
+    topItems: LiveOperationActionItem[];
+  }>;
+  campaigns: SourceValue<LiveCampaignOverview[]>;
+  customerOutcomes: SourceValue<{
+    windowStart: string;
+    windowEnd: string;
+    totalCount: number;
+    outcomes: {
+      type: string;
+      count: number;
+      ratio: number;
+      displayText: string;
+    }[];
+  }>;
+}
+
+export interface LiveRecommendedAction {
+  code: string;
+  displayText: string;
+  targetScreen: string;
+}
+
+export interface LiveOperationActionItem {
+  couponId: number;
+  campaignName: string;
+  opensAt?: string | null;
+  severity: string;
+  customerImpact: string;
+  customerImpactText?: string | null;
+  detectedAt: string;
+  duration?: string | null;
+  recommendedAction?: LiveRecommendedAction | null;
+}
+
+export interface LiveCampaignOverview {
+  priority: number;
+  couponId: number;
+  campaignName: string;
+  brandName: string;
+  status: string;
+  opensAt: string;
+  closesAt?: string | null;
+  severity: string;
+  issuanceFlow: SourceValue<{
+    currentPerMinute: number;
+    windowStart: string;
+    windowEnd: string;
+    points: { observedAt: string; issuancesPerMinute: number }[];
+    state: string;
+    stateDuration?: string | null;
+  }>;
+  campaignQueueStatus: SourceValue<{
+    waitingCount: number;
+    trend: string;
+    waitingDeltaPerMinute: number;
+    admissionsPerMinute?: number | null;
+    estimatedWait?: string | null;
+    assessment: string;
+  }>;
+  stockForecast: SourceValue<{
+    remainingQuantity: number;
+    totalQuantity: number;
+    remainingRatio: number;
+    estimatedDepletion?: string | null;
+  }>;
+  failedPreparationItems: string[];
+  customerImpact: string;
+  customerImpactText?: string | null;
+  recommendedAction?: LiveRecommendedAction | null;
+}
+
+export type AdminOverviewApiResponse = AdminOverviewResponse | LiveAdminOverviewResponse;
+
+export function isLiveAdminOverview(
+  response: AdminOverviewApiResponse,
+): response is LiveAdminOverviewResponse {
+  return "overallStatus" in response && "snapshotAt" in response;
+}
+
 export interface AdminOverviewQuery {
   brandId?: number | null;
   filter?: "ALL" | "ACTION" | "OPENING" | "RUNNING";
@@ -319,6 +441,48 @@ export interface CouponMetricsResponse {
   transitionRate: SourceValue<Point[]>;
 }
 
+/** 실제 GET /api/v1/admin/coupon-metrics 응답. Mock 상세 계약과 섞지 않습니다. */
+export interface LiveCouponMetricsResponse {
+  couponId: number;
+  snapshotAt: string;
+  window: MetricsWindowName;
+  stock: {
+    initialCount: SourceValue<number>;
+    remainingCount: SourceValue<number>;
+  };
+  issuanceProgress: SourceValue<number>;
+  issuanceRate: SourceValue<{
+    currentPerSecond: number;
+    peakPerSecond: number;
+  }>;
+  queue: {
+    waitingCount: SourceValue<number>;
+    estimatedWaitMillis: SourceValue<number>;
+  };
+  campaign: { status: string; opensAt: string } | null;
+  usageRatio: SourceValue<number>;
+  holdingCounts: SourceValue<{
+    unusedCount: number;
+    usedCount: number;
+    cancelledCount: number;
+    expiredCount: number;
+  }>;
+  transitionRate: SourceValue<{
+    usePerSecond: number;
+    cancelUsePerSecond: number;
+    cancelPerSecond: number;
+    expirePerSecond: number;
+  }>;
+}
+
+export type CouponMetricsApiResponse = CouponMetricsResponse | LiveCouponMetricsResponse;
+
+export function isLiveCouponMetrics(
+  response: CouponMetricsApiResponse,
+): response is LiveCouponMetricsResponse {
+  return "snapshotAt" in response && "stock" in response;
+}
+
 /* ══ 스트림 (OBS-15 · A-08) ════════════════════════ */
 
 /** 8 발급 이벤트 — 실패 이벤트가 어디에도 남지 않아 새로 만든 파이프라인입니다 */
@@ -346,7 +510,7 @@ export interface EventSlice {
 
 /** 9 상태 전이 — coupon_histories 커서 폴링. 전이는 성공만 존재합니다 */
 export interface IssuanceHistoryRow {
-  id: number;
+  id: number | string;
   occurredAt: string;
   code: string;
   from: string;
@@ -676,6 +840,28 @@ export interface AdminBenchmarksResponse {
   }[];
 }
 
+/** 실제 GET /api/v1/admin/benchmarks 목록 응답. */
+export interface LiveBenchmarkListResponse {
+  items: {
+    benchmarkRunId: number;
+    engineVersion: "V1" | "V2" | "V3";
+    scenarioCode: string;
+    startedAt: string;
+    runStatus: "RUNNING" | "LOAD_STOPPED" | "OBSERVED" | "FINALIZED";
+    archiveStatus: "NONE" | "IN_PROGRESS" | "DONE" | "FAILED";
+  }[];
+  nextBeforeCursor?: string | null;
+  hasOlder: boolean;
+}
+
+export type AdminBenchmarksApiResponse = AdminBenchmarksResponse | LiveBenchmarkListResponse;
+
+export function isLiveBenchmarkList(
+  response: AdminBenchmarksApiResponse,
+): response is LiveBenchmarkListResponse {
+  return "items" in response && Array.isArray(response.items);
+}
+
 /* ══ 기획 참고 (A-11) ══════════════════════════════ */
 
 export interface AdminAnalyticsResponse {
@@ -695,6 +881,12 @@ export interface AdminAnalyticsResponse {
   };
   /** 28 상태 전이 퍼널 — 유효기간 정책 근거 */
   funnel: { stage: string; label: string; count: number; ratio: number }[];
+  /** 실제 백엔드 집계 원천 상태. 목 응답에는 없을 수 있습니다. */
+  sourceStates?: {
+    brandTrend: SourceState;
+    heatmap: SourceState;
+    funnel: SourceState;
+  };
 }
 
 /* ══ 회원 발급 문의 (A-07) ═════════════════════════ */

@@ -32,6 +32,61 @@ import type {
   ResponseEnvelope,
 } from "./types";
 
+type PublicCouponRoundPage = {
+  content: {
+    couponRoundId: number;
+    templateId: number;
+    brandId: number;
+    name: string;
+    policyType: CouponRoundView["policyType"];
+    discountRate: number | null;
+    maxDiscountAmount: number | null;
+    discountAmount: number | null;
+    validDays: number;
+    eligibleGrades: CouponRoundView["eligibleGrades"];
+    openAt: string;
+    closeAt: string;
+    status: CouponRoundView["status"];
+    totalQuantity: number;
+    remainingQuantity: number;
+  }[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+const GRADE_MASK = { WELCOME: 1, SILVER: 2, GOLD: 4, VIP: 8 } as const;
+
+function normalizePublicRound(
+  round: PublicCouponRoundPage["content"][number],
+): CouponRoundView {
+  return {
+    id: round.couponRoundId,
+    templateId: round.templateId,
+    brandId: round.brandId,
+    name: round.name,
+    policyType: round.policyType,
+    discountRate: round.discountRate,
+    maxDiscountAmount: round.maxDiscountAmount,
+    discountAmount: round.discountAmount,
+    dataGrantMb: null,
+    minOrderAmount: null,
+    validDays: round.validDays,
+    eligibleGradesMask: round.eligibleGrades.reduce(
+      (mask, grade) => mask | GRADE_MASK[grade],
+      0,
+    ),
+    eligibleGrades: round.eligibleGrades,
+    openAt: round.openAt,
+    closeAt: round.closeAt,
+    status: round.status,
+    totalQuantity: round.totalQuantity,
+    activeCount: Math.max(0, round.totalQuantity - round.remainingQuantity),
+    queueActive: false,
+  };
+}
+
 const MEMBER_ID = "X-Member-Id";
 const MEMBERSHIP_GRADE = "X-Membership-Grade";
 const USER_ROLE = "X-User-Role";
@@ -113,7 +168,12 @@ export function createHttpApi(baseUrl: string): CouponApi {
         `/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       ),
 
-    listRounds: () => call<CouponRoundView[]>("/api/v1/coupon-rounds"),
+    listRounds: async () => {
+      const page = await call<PublicCouponRoundPage>(
+        "/api/v1/coupon-rounds/public?page=0&size=100",
+      );
+      return page.content.map(normalizePublicRound);
+    },
 
     getRound: (id) => call<CouponRoundView>(`/api/v1/coupon-rounds/${id}`),
 

@@ -12,11 +12,11 @@
 import type { QueueSettings } from "@/lib/runtime-config";
 import type {
   AdminAnalyticsResponse,
-  AdminBenchmarksResponse,
+  AdminBenchmarksApiResponse,
   AdminMetricsResponse,
   AdminOverviewQuery,
-  AdminOverviewResponse,
-  CouponMetricsResponse,
+  AdminOverviewApiResponse,
+  CouponMetricsApiResponse,
   EventSlice,
   HistorySlice,
   MemberInquiryResponse,
@@ -25,14 +25,14 @@ import type {
 
 export interface AdminApi {
   /** GET /api/v1/admin/overview — 1초 */
-  getOverview(query?: AdminOverviewQuery, signal?: AbortSignal): Promise<AdminOverviewResponse>;
+  getOverview(query?: AdminOverviewQuery, signal?: AbortSignal): Promise<AdminOverviewApiResponse>;
 
   /** GET /api/v1/admin/coupon-metrics — 1초 */
   getCouponMetrics(
     couponRoundId: number,
     window: MetricsWindow,
     signal?: AbortSignal,
-  ): Promise<CouponMetricsResponse>;
+  ): Promise<CouponMetricsApiResponse>;
 
   /** GET /api/v1/admin/events — 커서. 이벤트 커서와 DB 커서는 분리합니다 */
   getEvents(
@@ -58,10 +58,10 @@ export interface AdminApi {
   getMetrics(window: MetricsWindow, signal?: AbortSignal): Promise<AdminMetricsResponse>;
 
   /** GET /api/v1/admin/benchmarks — 정적 */
-  getBenchmarks(): Promise<AdminBenchmarksResponse>;
+  getBenchmarks(): Promise<AdminBenchmarksApiResponse>;
 
   /** GET /api/v1/admin/analytics — 정적 */
-  getAnalytics(): Promise<AdminAnalyticsResponse>;
+  getAnalytics(query: { from: string; to: string }): Promise<AdminAnalyticsResponse>;
 
   /** GET /api/v1/admin/members/issuance-inquiries — 회원 ID 정확 일치만 */
   inquireMember(memberId: number): Promise<MemberInquiryResponse>;
