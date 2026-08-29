@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SeriesChart, SeriesLegend, UtilBar, type SeriesSpec } from "@/components/admin/charts";
 import { ConsistencyStatus } from "@/components/admin/consistency-status";
 import { LatencySignalPanel } from "@/components/admin/latency-signal";
@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
 import { consistencySeverityTone } from "@/lib/admin/consistency-view";
 import { latencySuccessP99 } from "@/lib/admin/latency-view";
+import { mergeEventPoll } from "@/lib/admin/event-poll-state";
+import { withTelemetryDelay } from "@/lib/admin/telemetry-delay";
 import {
   ENGINE_LABEL,
   GAP_LABEL,
@@ -17,7 +19,7 @@ import {
   TRAFFIC_LABEL,
   adminApi,
   type AdminMetricsResponse,
-  type ErrorPanel,
+  type EventSlice,
   type GapType,
   type GapValue,
   type MetricsWindow,
@@ -38,13 +40,12 @@ export const Route = createFileRoute("/admin/system")({
   component: SystemConsole,
 });
 
-type Signal = "C" | "L" | "T" | "E" | "S";
+type Signal = "C" | "L" | "T" | "S";
 
 const SIGNALS: { key: Signal; label: string }[] = [
   { key: "C", label: "정합성" },
   { key: "L", label: "지연" },
   { key: "T", label: "처리량" },
-  { key: "E", label: "실패" },
   { key: "S", label: "포화" },
 ];
 
@@ -65,7 +66,28 @@ function SystemConsole() {
     intervalMs: interval,
   });
 
-  const data = query.data;
+  const eventCursor = useRef<string | null>(null);
+  const [eventStream, setEventStream] = useState<EventSlice>();
+  const eventQuery = useAdminPolling({
+    pollKey: ["admin", "system", "telemetry-events"],
+    queryFn: (signal) => adminApi.getEvents({ cursor: eventCursor.current, limit: 200 }, signal),
+    intervalMs: interval,
+  });
+
+  useEffect(() => {
+    const next = eventQuery.data;
+    if (!next) return;
+    if (next.nextCursor) eventCursor.current = next.nextCursor;
+    setEventStream((previous) => mergeEventPoll(previous, next, 200));
+  }, [eventQuery.data]);
+
+  const data = useMemo(
+    () =>
+      query.data
+        ? withTelemetryDelay(query.data, eventStream, eventQuery.lastSuccessAt ?? Date.now())
+        : undefined,
+    [query.data, eventStream, eventQuery.lastSuccessAt],
+  );
 
   return (
     <>
@@ -125,14 +147,13 @@ function SystemConsole() {
       ) : (
         <div className="space-y-4">
           <KpiRow data={data} onJump={setSignal} />
-          <SignalTabs data={data} signal={signal} onSelect={setSignal} />
+          <SystemSignalNavigation data={data} signal={signal} onSelect={setSignal} />
 
           {signal === "C" && <ConsistencySignal data={data} />}
           {signal === "L" && (
             <LatencySignalPanel latency={data.latency} dependencies={data.dependencies} />
           )}
           {signal === "T" && <TrafficSignal data={data} />}
-          {signal === "E" && <ErrorSignal data={data} />}
           {signal === "S" && <SaturationSignal data={data} />}
         </div>
       )}
@@ -164,15 +185,11 @@ function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Sign
   const gaps = [c.luaGap, c.activeDbGap, c.dbCounterGap, c.persistGap];
   const gapsValid = gaps.filter((g) => g.state === "VALID").length;
   const gapsPending = gaps.filter((g) => g.state === "PENDING").length;
-  // 실패율은 errors 가 담당합니다. 서버 미구현이면 지어내지 않고 미구현으로 둡니다.
-  const failureClasses = data.errors?.classes.filter((k) => !k.excludedFromNumerator) ?? [];
-  const rateSource = systemFailureRate(failureClasses);
-  const rate = rateSource.value;
   const lag = data.persistence;
   const drainSeconds = lag.value?.drainEtaMillis ? Math.ceil(lag.value.drainEtaMillis / 1000) : 0;
 
   return (
-    <div className="grid gap-4 md:grid-cols-3 2xl:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
       <Tile
         label="초과 발급"
         onClick={() => onJump("C")}
@@ -207,45 +224,20 @@ function KpiRow({ data, onJump }: { data: AdminMetricsResponse; onJump: (s: Sign
       </Tile>
 
       <Tile
-        label="시스템 실패율"
-        onClick={() => onJump("E")}
-        alert={rate != null && rate > KPI_TARGET.systemFailurePct}
-        sub={`목표 ${KPI_TARGET.systemFailurePct}% 이하`}
-      >
-        <StatedValue source={rateSource} render={(v) => `${v.toFixed(3)}%`} />
-      </Tile>
-
-      <Tile
         label="persist lag"
         onClick={() => onJump("S")}
-        sub={drainSeconds ? `소진 예상 ${drainSeconds}초` : "0에 도달해 최종 판정 가능"}
+        sub={
+          lag.value
+            ? drainSeconds
+              ? `소진 예상 ${drainSeconds}초`
+              : "0에 도달해 최종 판정 가능"
+            : "원천 값 없음"
+        }
       >
         <Value
           source={{ ...lag, value: lag.value?.lagTotal ?? null }}
           render={(v) => v.toLocaleString("ko-KR")}
         />
-      </Tile>
-
-      <Tile
-        label="Circuit Breaker"
-        hint={`임계 ${KPI_TARGET.breakerPct}%`}
-        onClick={() => onJump("E")}
-      >
-        {data.circuitBreakers.length === 0 ? (
-          // 빈 배열은 "차단기 정상"이 아닙니다. Resilience4j 도입 전이라 원천이 없습니다.
-          <p className="t-body-sm text-hig-muted">차단기 미도입</p>
-        ) : (
-          <ul className="space-y-0.5">
-            {data.circuitBreakers.map((b) => (
-              <li key={b.name} className="t-body-sm flex items-baseline gap-2 whitespace-nowrap">
-                <span className="num shrink-0 text-hig-secondary">{b.name}</span>
-                <span className="t-caption ml-auto shrink-0 text-right text-hig-muted">
-                  {b.state}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </Tile>
     </div>
   );
@@ -261,31 +253,6 @@ function rps(v: SourceValue<number>) {
     : Math.round(v.value).toLocaleString("ko-KR");
 }
 
-/**
- * 시스템 실패율 — 분자는 분자 제외가 아닌 분류의 합입니다.
- * 서버가 이미 퍼센트로 나눠 준 값을 더하기만 합니다. 화면이 분모로 나누지 않습니다.
- */
-function systemFailureRate(classes: ErrorPanel["classes"]): SourceValue<number> {
-  if (classes.length === 0) {
-    return { value: null, state: "PENDING", observedAt: null, note: "서버 미구현 (OBS-13)" };
-  }
-  const usable = classes.filter((k) => k.rate.value !== null && k.rate.value !== undefined);
-  if (usable.length === 0) {
-    const first = classes[0]!.rate;
-    return {
-      value: null,
-      state: first.state,
-      observedAt: first.observedAt,
-      ...(first.note ? { note: first.note } : {}),
-    };
-  }
-  return {
-    value: usable.reduce((sum, k) => sum + (k.rate.value ?? 0), 0),
-    state: "VALID",
-    observedAt: usable[0]!.rate.observedAt,
-  };
-}
-
 function signalTone(data: AdminMetricsResponse, s: Signal): string {
   if (s === "C") return consistencySeverityTone(data.consistency.severity);
   if (s === "L") {
@@ -294,13 +261,6 @@ function signalTone(data: AdminMetricsResponse, s: Signal): string {
   }
   if (s === "T")
     return data.traffic.issueAttemptRps.state === "NO_TRAFFIC" ? "bg-hig-muted" : "bg-positive";
-  if (s === "E") {
-    // errors 가 없으면 판정하지 않습니다 — 실패가 없다는 뜻이 아닙니다.
-    const classes = data.errors?.classes.filter((k) => !k.excludedFromNumerator) ?? [];
-    const rate = systemFailureRate(classes).value;
-    if (rate == null) return "bg-hig-muted";
-    return rate > KPI_TARGET.systemFailurePct ? "bg-viz-critical" : "bg-viz-good";
-  }
   // saturation 은 서버 미구현입니다. 값이 없으면 회색 — 정상(초록)으로 칠하지 않습니다.
   const sat = data.saturation;
   if (!sat) return "bg-hig-muted";
@@ -312,7 +272,7 @@ function signalTone(data: AdminMetricsResponse, s: Signal): string {
       : "bg-positive";
 }
 
-function SignalTabs({
+export function SystemSignalNavigation({
   data,
   signal,
   onSelect,
@@ -420,7 +380,7 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
         state={lag.state}
         action={
           <span className="num t-caption text-hig-muted">
-            {drainSeconds ? `${drainSeconds}초 남음` : "완료"}
+            {lag.value ? (drainSeconds ? `${drainSeconds}초 남음` : "완료") : "원천 값 없음"}
           </span>
         }
       >
@@ -469,21 +429,13 @@ function ConsistencySignal({ data }: { data: AdminMetricsResponse }) {
 function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
   const t = data.traffic;
   const series: SeriesSpec[] = [
-    { key: "issueSuccessTps", label: "발급 성공", color: "var(--viz-1)" },
-    { key: "queueAcceptedRps", label: "대기 진입", color: "var(--viz-3)" },
-    { key: "policyRejectRps", label: "정책 거절", color: "var(--viz-2)" },
-    { key: "systemFailureRps", label: "시스템 실패", color: "var(--viz-8)" },
+    { key: "issueAttemptRps", label: "발급 시도", color: "var(--viz-1)" },
   ];
   const last = t.series?.[t.series.length - 1];
 
   // 거절 = RPS − TPS 는 폐기됐습니다. totalRps 도 계약에서 빠졌습니다 — 폴링·조회가 섞여
   // 있어 분모로도 배경으로도 못 씁니다. 분모는 issueAttemptRps 하나뿐이라 그것만 따로 세웁니다.
-  const outcomes: TrafficKey[] = [
-    "issueSuccessTps",
-    "queueAcceptedRps",
-    "policyRejectRps",
-    "systemFailureRps",
-  ];
+  const outcomes: TrafficKey[] = ["issueSuccessTps", "queueAcceptedRps", "policyRejectRps"];
   const counterRow = (key: TrafficKey) => (
     <tr key={key}>
       <td className="font-medium">
@@ -540,124 +492,6 @@ function TrafficSignal({ data }: { data: AdminMetricsResponse }) {
               추이는 폴링 누적으로 그립니다 — 누적 버퍼 작업 대기(계약 티켓).
             </p>
           )}
-        </div>
-      </Panel>
-    </div>
-  );
-}
-
-/* ── E ───────────────────────────────────────────── */
-
-function ErrorSignal({ data }: { data: AdminMetricsResponse }) {
-  // 서버(OBS-13 본체)가 아직 errors 를 내려주지 않습니다. 계약상 필수 필드라 타입에는 있지만
-  // 실응답에는 없어서, 없는 채로 렌더하면 화면이 죽습니다. 0 으로 채우지 않고 미구현이라 적습니다.
-  const e = data.errors as ErrorPanel | undefined;
-  if (!e) {
-    return (
-      <Panel title="실패 분류">
-        <p className="t-body-sm text-hig-muted">
-          서버가 실패 분류를 아직 내려주지 않습니다 — 백엔드 OBS-13 구현 대기.
-        </p>
-      </Panel>
-    );
-  }
-  // 분모는 서버가 denominator 로 알려줍니다. 화면에 문자열을 박으면 서버가 바꿔도 캡션이 거짓말합니다.
-  const denominatorLabel = TRAFFIC_LABEL[e.denominator] ?? e.denominator;
-  const series: SeriesSpec[] = [
-    { key: "dependencyFailure", label: "의존성", color: "var(--viz-2)" },
-    { key: "applicationFailure", label: "애플리케이션", color: "var(--viz-8)" },
-    // clientObservedFailure 는 원천이 없어 N_A 입니다 — 선으로 그리지 않습니다
-  ];
-  // 0 건 행을 거르는 건 서버가 아니라 화면 몫입니다 (백엔드 3차 회신 2절)
-  const visibleReasons = e.topReasons.filter((r) => r.count > 0);
-  // 판정식(서버가 내려주는 사실)과 "지금 이 값을 믿지 마라"(한시적 경고)는 성격이 다릅니다.
-  // 서버 definition 에 섞지 않고 화면 상수로 둡니다 — OBS-5 후속(발급 경로 dependency 표기)이
-  // 끝나면 이 상수만 지우면 됩니다.
-  const CAVEAT: Partial<Record<ErrorPanel["classes"][number]["key"], string>> = {
-    dependencyFailure:
-      "발급 경로가 dependency 를 아직 표기하지 않아 실제 의존성 장애는 applicationFailure 에 섞입니다 (OBS-5 후속 대기)",
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
-        <TablePanel title="실패 분류" hint={`${denominatorLabel} 기준`}>
-          <table className="ops-table">
-            <thead>
-              <tr>
-                <th>분류</th>
-                <th>정의</th>
-                <th className="text-right">현재</th>
-              </tr>
-            </thead>
-            <tbody>
-              {e.classes.map((c) => (
-                <tr key={c.key}>
-                  <td className="num font-medium whitespace-nowrap">
-                    {c.label}
-                    {c.excludedFromNumerator && (
-                      <span className="t-caption block font-normal text-hig-muted">
-                        비율에서 제외
-                      </span>
-                    )}
-                    {c.key === "policyReject" && (
-                      <Link
-                        to="/admin"
-                        className="t-caption block font-normal whitespace-nowrap text-hig-link hover:underline"
-                      >
-                        구성비는 운영 현황에서 →
-                      </Link>
-                    )}
-                  </td>
-                  <td className="text-hig-secondary">
-                    {c.definition}
-                    {CAVEAT[c.key] && (
-                      <span className="t-caption mt-1 block text-attention">⚠ {CAVEAT[c.key]}</span>
-                    )}
-                  </td>
-                  <td className="num text-right font-semibold">
-                    <StatedValue source={c.rate} render={(v) => `${v}%`} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TablePanel>
-
-        <TablePanel title="실패 원인 Top 5">
-          <table className="ops-table">
-            <tbody>
-              {visibleReasons.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="t-caption text-hig-muted">
-                    실패 원인 없음
-                  </td>
-                </tr>
-              )}
-              {visibleReasons.map((r) => (
-                <tr key={r.reasonCode}>
-                  <td className="num w-10 text-hig-muted">{r.httpStatus}</td>
-                  <td className="num">{r.reasonCode}</td>
-                  <td className="num text-right font-semibold">
-                    {r.count.toLocaleString("ko-KR")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TablePanel>
-      </div>
-
-      <Panel title="실패율 추이">
-        <SeriesLegend series={series} />
-        <div className="mt-3">
-          <SeriesChart
-            data={e.series ?? []}
-            series={series}
-            unit="%"
-            format={(v) => v.toFixed(2)}
-            height={180}
-          />
         </div>
       </Panel>
     </div>

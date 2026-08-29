@@ -86,9 +86,21 @@ export function LatencySignalPanel({
   latency: LatencyPanel;
   dependencies: DependencyPanel;
 }) {
+  const failures = [
+    ["정책 거절", latency.policyReject],
+    ["시스템 실패", latency.systemFailure],
+  ] as const;
+  const visibleFailures = failures.filter(([, source]) => source.value != null);
+  const dependencyRows = [
+    ["Redis", dependencies.redis],
+    ["Hikari", dependencies.hikari],
+    ["Kafka", dependencies.kafka],
+  ] as const;
+  const visibleDependencies = dependencyRows.filter(([, source]) => source.value != null);
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className={`grid gap-4 ${visibleFailures.length > 0 ? "xl:grid-cols-2" : ""}`}>
         <Panel
           title="성공 응답시간"
           hint="발급(ISSUE) 성공 · 집계 인스턴스 최댓값"
@@ -102,14 +114,13 @@ export function LatencySignalPanel({
           </p>
         </Panel>
 
-        <Panel title="실패 응답시간" hint="성공 지연과 별도 축">
-          <PercentileBlock label="정책 거절" source={latency.policyReject} />
-          <PercentileBlock label="시스템 실패" source={latency.systemFailure} />
-          <p className="t-caption mt-3 text-hig-muted">
-            원천 미배선 — OBS-4 Timer가 실패를 정책 거절과 시스템 실패로 아직 분리하지 않습니다.
-            PENDING을 0이나 빈 정상 차트로 바꾸지 않습니다.
-          </p>
-        </Panel>
+        {visibleFailures.length > 0 && (
+          <Panel title="실패 응답시간" hint="성공 지연과 별도 축">
+            {visibleFailures.map(([label, source]) => (
+              <PercentileBlock key={label} label={label} source={source} />
+            ))}
+          </Panel>
+        )}
       </div>
 
       <Panel title="지연 해석 기준" hint="집계 인스턴스 최댓값">
@@ -124,15 +135,17 @@ export function LatencySignalPanel({
       </Panel>
 
       <Panel title="의존성 지연" hint="통계 종류가 달라 한 절대 ms 축에 합치지 않습니다">
-        <dl className="flex flex-wrap gap-x-8 gap-y-3">
-          <DependencyValues label="Redis" source={dependencies.redis} />
-          <DependencyValues label="Hikari" source={dependencies.hikari} />
-          <DependencyValues label="Kafka" source={dependencies.kafka} />
-        </dl>
-        <p className="t-caption mt-3 text-hig-muted">
-          원천 미배선 — 값이 연결되기 전에는 자체 최댓값 대비 비율이나 가짜 절대값을 만들지
-          않습니다.
-        </p>
+        {visibleDependencies.length > 0 ? (
+          <dl className="flex flex-wrap gap-x-8 gap-y-3">
+            {visibleDependencies.map(([label, source]) => (
+              <DependencyValues key={label} label={label} source={source} />
+            ))}
+          </dl>
+        ) : (
+          <p className="t-body-sm text-hig-muted">
+            현재 연결된 의존성 지연 값이 없습니다.
+          </p>
+        )}
       </Panel>
     </div>
   );

@@ -9,6 +9,7 @@ let ConsistencyStatus;
 
 before(async () => {
   server = await createServer({
+    cacheDir: ".vite-test",
     appType: "custom",
     logLevel: "silent",
     server: { middlewareMode: true },

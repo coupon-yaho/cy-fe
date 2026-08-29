@@ -4,11 +4,11 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --port 5173 --strictPort",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "node tests/value.test.mjs && node tests/consistency-view.test.mjs && node tests/consistency-status.test.mjs && node tests/latency-view.test.mjs && node tests/latency-panel.test.mjs && node tests/latency-mock.test.mjs",
+    "test": "node tests/vite-test-cache.test.mjs && node tests/value.test.mjs && node tests/consistency-view.test.mjs && node tests/consistency-status.test.mjs && node tests/latency-view.test.mjs && node tests/latency-panel.test.mjs && node tests/latency-mock.test.mjs && node tests/admin-http-metrics.test.mjs && node tests/admin-live-contract.test.mjs && node tests/vite-api-proxy.test.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

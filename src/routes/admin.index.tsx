@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { MiniSeries } from "@/components/admin/charts";
+import { LiveOverview } from "@/components/admin/live-overview";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
 import { PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
 import { StateBadge, StatedValue } from "@/components/admin/state";
@@ -19,6 +20,7 @@ import {
   type ActionSeverity,
   type AdminOverviewQuery,
   type AdminOverviewResponse,
+  isLiveAdminOverview,
   type MemberInquiryResponse,
 } from "@/lib/admin";
 import { BRANDS, brandOf, couponApi } from "@/lib/coupon";
@@ -39,14 +41,22 @@ function OperationsOverview() {
   const [interval, setInterval] = useState<PollInterval>(1000);
   const [filter, setFilter] = useState<NonNullable<AdminOverviewQuery["filter"]>>("ALL");
   const [brandId, setBrandId] = useState<number | null>(null);
+  const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   const query = useAdminPolling({
-    pollKey: ["admin", "overview", filter, brandId],
+    pollKey: ["admin", "overview", filter, brandId, retryToken],
     queryFn: (signal) => adminApi.getOverview({ filter, brandId }, signal),
     intervalMs: interval,
   });
 
   const data = query.data;
+  const liveData = data && isLiveAdminOverview(data) ? data : null;
+  const snapshotAt = data
+    ? isLiveAdminOverview(data)
+      ? data.snapshotAt
+      : data.meta.snapshotAt
+    : undefined;
 
   return (
     <>
@@ -54,32 +64,65 @@ function OperationsOverview() {
         title="운영 현황"
         controls={
           <>
-            <select
-              aria-label="브랜드 필터"
-              value={brandId ?? ""}
-              onChange={(e) => setBrandId(e.target.value ? Number(e.target.value) : null)}
-              className="t-caption rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
-            >
-              <option value="">전체 브랜드</option>
-              {BRANDS.map((b) => (
-                <option key={b.brandId} value={b.brandId}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <Segmented value={filter} options={FILTERS} onChange={setFilter} />
+            {liveData ? (
+              <>
+                <select
+                  aria-label="회차 선택"
+                  value={selectedCouponId ?? ""}
+                  onChange={(e) =>
+                    setSelectedCouponId(e.target.value ? Number(e.target.value) : null)
+                  }
+                  className="t-caption max-w-72 rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
+                >
+                  <option value="">전체 회차</option>
+                  {(liveData.campaigns.value ?? []).map((campaign) => (
+                    <option key={campaign.couponId} value={campaign.couponId}>
+                      #{campaign.couponId} {campaign.campaignName}
+                    </option>
+                  ))}
+                </select>
+                <Segmented value={filter} options={FILTERS} onChange={setFilter} />
+              </>
+            ) : (
+              <>
+                <select
+                  aria-label="브랜드 필터"
+                  value={brandId ?? ""}
+                  onChange={(e) => setBrandId(e.target.value ? Number(e.target.value) : null)}
+                  className="t-caption rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
+                >
+                  <option value="">전체 브랜드</option>
+                  {BRANDS.map((b) => (
+                    <option key={b.brandId} value={b.brandId}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <Segmented value={filter} options={FILTERS} onChange={setFilter} />
+              </>
+            )}
             {query.isStale && <StateBadge state="STALE" />}
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}
-              snapshotAt={data?.meta.snapshotAt}
+              snapshotAt={snapshotAt}
             />
           </>
         }
       />
 
-      {!data ? (
+      {!data && query.error ? (
+        <OverviewUnavailable onRetry={() => setRetryToken((value) => value + 1)} />
+      ) : !data ? (
         <Loading />
+      ) : isLiveAdminOverview(data) ? (
+        <LiveOverview
+          data={data}
+          selectedCouponId={selectedCouponId}
+          filter={filter}
+          queueControl={<QueueControl />}
+          inquiryPanel={<InquiryPanel />}
+        />
       ) : (
         <div className="space-y-4">
           <Counts data={data} />
@@ -107,6 +150,19 @@ function OperationsOverview() {
         </div>
       )}
     </>
+  );
+}
+
+export function OverviewUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Panel title="운영 현황을 불러오지 못했습니다" state="UNAVAILABLE">
+      <p className="t-body-sm text-hig-muted">
+        백엔드 연결과 관리자 권한을 확인한 뒤 다시 시도해 주세요.
+      </p>
+      <button type="button" onClick={onRetry} className="btn-compact mt-4">
+        다시 시도
+      </button>
+    </Panel>
   );
 }
 
