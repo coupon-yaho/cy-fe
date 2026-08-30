@@ -10,7 +10,21 @@
  * 토큰을 브라우저로 내려보내지 않으려는 것이라, 운영에서는 이 경로가 그대로는 안 선다.
  */
 
-const BATCH_ROOT = "/batch-api/api/v1/admin";
+/**
+ * 배치 엔드포인트. <b>두 개인 이유가 있다.</b>
+ *
+ * <p>배치 한 대는 {@code DB_NAME} 으로 <b>DB 하나</b>만 본다. 그런데 오염셋(정답을 심어
+ * 둔 것)과 정상셋(평상시 도는 것)은 서로 다른 DB 에 있다. 그래서 둘을 나란히 보이려면
+ * 배치가 두 대여야 하고, 화면은 <b>엔드포인트로</b> 그 둘을 가른다 — 파라미터로 고르면
+ * 그 배치가 안 가진 쪽을 골랐을 때 빈 화면이 나온다.
+ *
+ * <p>두 번째는 없을 수 있다. 개발 서버가 {@code BATCH_ALT_ORIGIN} 을 안 받으면 프록시
+ * 자체가 안 생기고, 그때는 화면이 한 쪽만 그린다.
+ */
+export const BATCH_ROOTS = ["/batch-api", "/batch-alt-api"] as const;
+export type BatchRoot = (typeof BATCH_ROOTS)[number];
+
+const API_PATH = "/api/v1/admin";
 
 export type Verdict = "PASS" | "FAIL";
 export type Dataset = "CLEAN" | "CORRUPT";
@@ -144,8 +158,13 @@ type Page<T> = {
   nextAnchor?: number | null;
 };
 
-async function request<T>(path: string, method: "GET" | "POST", signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${BATCH_ROOT}${path}`, {
+async function request<T>(
+  root: string,
+  path: string,
+  method: "GET" | "POST",
+  signal?: AbortSignal,
+): Promise<T> {
+  const res = await fetch(`${root}${API_PATH}${path}`, {
     method,
     // signal 을 undefined 로 넘기면 오버로드가 안 맞는다 — 있을 때만 싣는다.
     ...(signal ? { signal } : {}),
@@ -169,13 +188,22 @@ async function request<T>(path: string, method: "GET" | "POST", signal?: AbortSi
   return envelope.data;
 }
 
-function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  return request<T>(path, "GET", signal);
+function get<T>(root: string, path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>(root, path, "GET", signal);
 }
 
 /** 최신 확정 판정 하나. 아직 한 번도 안 돌았으면 404 라 호출부가 빈 화면을 그린다. */
-export function getVerifyReport(dataset: Dataset, scope: Scope, signal?: AbortSignal) {
-  return get<VerifyReport>(`/verify/reports/latest?dataset=${dataset}&scope=${scope}`, signal);
+export function getVerifyReport(
+  root: string,
+  dataset: Dataset,
+  scope: Scope,
+  signal?: AbortSignal,
+) {
+  return get<VerifyReport>(
+    root,
+    `/verify/reports/latest?dataset=${dataset}&scope=${scope}`,
+    signal,
+  );
 }
 
 /**
@@ -185,8 +213,8 @@ export function getVerifyReport(dataset: Dataset, scope: Scope, signal?: AbortSi
 export type VerifyRunRow = Omit<VerifyRun, "id" | "seedRunId"> & { runId: number };
 
 /** 검증 실행 이력. 같은 `asOf` 가 여러 줄이면 체크섬이 같아야 한다. */
-export function getVerifyRuns(limit: number, signal?: AbortSignal) {
-  return get<Page<VerifyRunRow>>(`/verify/runs?limit=${limit}`, signal);
+export function getVerifyRuns(root: string, limit: number, signal?: AbortSignal) {
+  return get<Page<VerifyRunRow>>(root, `/verify/runs?limit=${limit}`, signal);
 }
 
 /**
@@ -219,10 +247,14 @@ export type JobStanding = {
  * 표가 답해야 하는 질문이 "돌기는 돌았나" 라서, 그 착시는 오답이다.
  * 잡별로 물으면 실행 횟수와 무관하게 세 줄이 항상 제 값으로 선다.
  */
-export function getJobStandings(signal?: AbortSignal): Promise<JobStanding[]> {
+export function getJobStandings(root: string, signal?: AbortSignal): Promise<JobStanding[]> {
   return Promise.all(
     BATCH_JOBS.map(async (jobName) => {
-      const page = await get<Page<BatchRun>>(`/batch/runs?jobName=${jobName}&limit=1`, signal);
+      const page = await get<Page<BatchRun>>(
+        root,
+        `/batch/runs?jobName=${jobName}&limit=1`,
+        signal,
+      );
       return { jobName, runCount: page.total ?? page.items.length, latest: page.items[0] ?? null };
     }),
   );
@@ -236,11 +268,38 @@ export function getJobStandings(signal?: AbortSignal): Promise<JobStanding[]> {
  * 안 가진 쪽을 골랐을 때 빈 화면이 나오고, 시연 중이면 "고장" 으로 보인다.
  * 그래서 최신 실행이 무엇이었는지를 먼저 묻고 그 조합으로 리포트를 받는다.
  */
-export async function getLatestReport(signal?: AbortSignal): Promise<VerifyReport | null> {
-  const page = await getVerifyRuns(1, signal);
+export async function getLatestReport(
+  root: string,
+  signal?: AbortSignal,
+): Promise<VerifyReport | null> {
+  const page = await getVerifyRuns(root, 1, signal);
   const latest = page.items[0];
   if (!latest) return null;
-  return getVerifyReport(latest.dataset, latest.scope, signal);
+  return getVerifyReport(root, latest.dataset, latest.scope, signal);
+}
+
+/** 화면이 고를 수 있는 셋 하나. 이름표는 <b>서버가 말한 dataset</b> 에서 온다. */
+export type BatchSource = { root: BatchRoot; report: VerifyReport };
+
+/**
+ * 어떤 엔드포인트가 살아 있고 각각 무슨 셋인지 <b>물어서</b> 정한다.
+ *
+ * <p>어느 포트가 오염셋이라고 화면이 미리 정해 두면 안 된다 — 배치를 어느 DB 로 세울지는
+ * 띄우는 사람이 정하고, 화면은 그것을 모른다. 최신 실행을 물어 서버가 말한 {@code dataset}
+ * 을 그대로 이름표로 쓴다. 안 뜬 엔드포인트는 조용히 빠진다.
+ */
+export async function discoverSources(signal?: AbortSignal): Promise<BatchSource[]> {
+  const settled = await Promise.allSettled(
+    BATCH_ROOTS.map(async (root) => ({ root, report: await getLatestReport(root, signal) })),
+  );
+  const found: BatchSource[] = [];
+  for (const r of settled) {
+    if (r.status !== "fulfilled" || !r.value.report) continue;
+    // 두 배치가 같은 DB 를 보고 있으면 같은 셋이 두 번 뜬다. 먼저 온 쪽만 남긴다.
+    if (found.some((f) => f.report.run.dataset === r.value.report!.run.dataset)) continue;
+    found.push({ root: r.value.root, report: r.value.report });
+  }
+  return found;
 }
 
 /** 접수 응답. `runId` 가 아니라 `executionId` 다 — 실행 행은 가드를 다 통과한 뒤에 생긴다. */
@@ -265,7 +324,11 @@ export type TriggerAccepted = {
  * 밀리고, 조용한 시각이면 가드를 다 통과해 <b>틀린 시점으로 PASS 가 남는다.</b>
  * 서버 포맷은 {@code yyyy-MM-dd'T'HH:mm[:ss]} 이고 오프셋을 아예 안 받는다.
  */
-export function rerunVerify(run: VerifyRun, signal?: AbortSignal): Promise<TriggerAccepted> {
+export function rerunVerify(
+  root: string,
+  run: VerifyRun,
+  signal?: AbortSignal,
+): Promise<TriggerAccepted> {
   const query = new URLSearchParams({
     asOf: run.asOf,
     dataset: run.dataset,
@@ -276,5 +339,5 @@ export function rerunVerify(run: VerifyRun, signal?: AbortSignal): Promise<Trigg
   if (run.dataset === "CORRUPT" && run.seedRunId !== null) {
     query.set("seedRunId", String(run.seedRunId));
   }
-  return request<TriggerAccepted>(`/verify?${query.toString()}`, "POST", signal);
+  return request<TriggerAccepted>(root, `/verify?${query.toString()}`, "POST", signal);
 }

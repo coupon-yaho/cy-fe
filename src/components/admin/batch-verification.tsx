@@ -3,14 +3,18 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Panel, TablePanel } from "@/components/admin/panel";
 import {
   BATCH_JOB_LABEL,
+  BATCH_ROOTS,
   BatchApiError,
   FINDING_LABEL,
   FINDING_RULE,
   FINDING_TONE,
+  discoverSources,
   getJobStandings,
   getLatestReport,
   getVerifyRuns,
   rerunVerify,
+  type BatchRoot,
+  type BatchSource,
   type FindingType,
   type JobStanding,
   type VerifyReport,
@@ -100,26 +104,43 @@ export function BatchVerification() {
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (signal: AbortSignal): Promise<JobStanding[] | null> => {
-    setLoading(true);
-    // 셋을 따로 잡는다 — 리포트가 404(아직 한 번도 안 돌았다)여도 이력은 보여 준다.
-    const [r, v, b] = await Promise.allSettled([
-      getLatestReport(signal),
-      getVerifyRuns(8, signal),
-      getJobStandings(signal),
-    ]);
-    if (signal.aborted) return null;
-    // 실패했을 때 이전 판정을 지우지 않는다. 재검증이 도는 동안 리포트 조회가 한 번
-    // 흔들리면 패널이 통째로 사라지는데, 확정 판정은 다음 판정이 날 때까지 여전히 참이다.
-    if (r.status === "fulfilled" && r.value) setReport(r.value);
-    if (v.status === "fulfilled") setRuns(v.value.items);
-    const standings = b.status === "fulfilled" ? b.value : null;
-    if (standings) setJobs(standings);
-    const dead = [r, v, b].every((x) => x.status === "rejected");
-    setError(dead ? "배치 관리 API 에 연결하지 못했습니다." : undefined);
-    setLoading(false);
-    return standings;
-  }, []);
+  /**
+   * 이 화면이 고를 수 있는 셋들. 배치가 한 대뿐이면 한 칸이고, 그때 고르는 자리는
+   * 아예 안 그린다 — 고를 것이 없는 선택지는 화면만 어지럽힌다.
+   */
+  const [sources, setSources] = useState<BatchSource[]>([]);
+  const [activeRoot, setActiveRoot] = useState<BatchRoot>(BATCH_ROOTS[0]);
+  const active = sources.find((x) => x.root === activeRoot) ?? sources[0];
+  const root = active?.root ?? BATCH_ROOTS[0];
+
+  const load = useCallback(
+    async (signal: AbortSignal, full: boolean): Promise<JobStanding[] | null> => {
+      setLoading(true);
+      // 어떤 엔드포인트가 살아 있고 무슨 셋인지는 물어서 안다. 도는 중에는 다시 묻지
+      // 않는다 — 안 고른 쪽은 그 사이에 바뀔 일이 없고, 요청만 두 배가 된다.
+      const discovery = full ? discoverSources(signal) : null;
+      // 셋을 따로 잡는다 — 리포트가 404(아직 한 번도 안 돌았다)여도 이력은 보여 준다.
+      const [r, v, b, d] = await Promise.allSettled([
+        getLatestReport(root, signal),
+        getVerifyRuns(root, 8, signal),
+        getJobStandings(root, signal),
+        discovery ?? Promise.resolve(null),
+      ]);
+      if (signal.aborted) return null;
+      if (d.status === "fulfilled" && d.value) setSources(d.value);
+      // 실패했을 때 이전 판정을 지우지 않는다. 재검증이 도는 동안 리포트 조회가 한 번
+      // 흔들리면 패널이 통째로 사라지는데, 확정 판정은 다음 판정이 날 때까지 여전히 참이다.
+      if (r.status === "fulfilled" && r.value) setReport(r.value);
+      if (v.status === "fulfilled") setRuns(v.value.items);
+      const standings = b.status === "fulfilled" ? b.value : null;
+      if (standings) setJobs(standings);
+      const dead = [r, v, b].every((x) => x.status === "rejected");
+      setError(dead ? "배치 관리 API 에 연결하지 못했습니다." : undefined);
+      setLoading(false);
+      return standings;
+    },
+    [root],
+  );
 
   /**
    * <b>계속 되읽는다.</b> 도는 중이면 1초, 아니면 5초.
@@ -136,10 +157,12 @@ export function BatchVerification() {
     let timer = 0;
     let stopped = false;
 
+    let live = false;
     const cycle = async () => {
-      const standings = await load(ac.signal);
+      // 도는 중에는 안 고른 셋을 다시 묻지 않는다 — 그 사이에 바뀔 일이 없고 요청만 는다.
+      const standings = await load(ac.signal, !live);
       if (stopped || ac.signal.aborted) return;
-      const live = standings?.find((j) => j.jobName === "verifyJob")?.latest?.status === "STARTED";
+      live = standings?.find((j) => j.jobName === "verifyJob")?.latest?.status === "STARTED";
       timer = window.setTimeout(() => void cycle(), live ? LIVE_POLL_MS : IDLE_POLL_MS);
     };
 
@@ -176,7 +199,7 @@ export function BatchVerification() {
     if (!source || blocked) return;
     setRerun({ phase: "requesting" });
     try {
-      const accepted = await rerunVerify(source);
+      const accepted = await rerunVerify(root, source);
       // 여기서 "도는 중" 으로 바꾸지 않는다 — 그 판단은 폴링이 잡 상태로 한다.
       setRerun({ phase: "accepted", attempt: accepted.attempt });
     } catch (e) {
@@ -187,7 +210,7 @@ export function BatchVerification() {
         message: e instanceof BatchApiError ? e.message : "배치 관리 API 에 연결하지 못했습니다.",
       });
     }
-  }, [source, blocked]);
+  }, [root, source, blocked]);
 
   /** 도는 동안 초를 센다. 17초든 3분이든 "멈춘 게 아니다" 를 화면이 말해야 한다. */
   useEffect(() => {
@@ -331,7 +354,8 @@ export function BatchVerification() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {report && (
+          {/* 셋이 둘이면 위 카드가 이미 판정을 말한다 — 여기 또 적으면 두 번이다. */}
+          {report && sources.length < 2 && (
             <span
               className={`t-caption rounded-full px-3 py-1 font-semibold ${
                 report.run.verdict === "PASS"
@@ -350,13 +374,29 @@ export function BatchVerification() {
             className="inline-flex size-9 items-center justify-center rounded-full border border-hairline text-hig-secondary transition-colors hover:bg-fill disabled:opacity-40"
             onClick={() => void startRerun()}
             disabled={!source || blocked !== undefined || busy}
-            title={blocked ?? "같은 asOf 로 다시 검증"}
-            aria-label="같은 asOf 로 다시 검증"
+            title={blocked ?? "같은 기준 시각으로 다시 검증"}
+            aria-label="같은 기준 시각으로 다시 검증"
           >
             <RefreshIcon spinning={busy} />
           </button>
         </div>
       </header>
+
+      {/* 배치가 두 대일 때만 나온다. 오염셋은 정답을 심어 둔 시험이고, 정상셋은
+          평상시 도는 것이다 — 둘을 같이 걸어야 "놓치지도 않고 헛 잡지도 않는다" 가
+          한 화면에서 읽힌다. */}
+      {sources.length > 1 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {sources.map((s) => (
+            <SourceCard
+              key={s.root}
+              source={s}
+              selected={s.root === root}
+              onSelect={() => setActiveRoot(s.root)}
+            />
+          ))}
+        </div>
+      )}
 
       {running && (
         <p className="surface-card t-body-sm flex flex-wrap items-center gap-x-2 px-5 py-3 text-hig-secondary">
@@ -445,9 +485,6 @@ export function BatchVerification() {
                     {(report.run.findingCount ?? 0).toLocaleString("ko-KR")}
                     <span className="t-title"> 건</span>
                   </p>
-                  <p className="t-body-sm mt-4 text-hig-secondary">
-                    정상 데이터에서는 검출 0건이 통과 조건이다.
-                  </p>
                 </>
               )}
             </Panel>
@@ -474,8 +511,8 @@ export function BatchVerification() {
                 )}
               </p>
               <dl className="t-body-sm mt-4 grid grid-cols-[5.5rem_1fr] gap-y-1.5 text-hig-secondary">
-                {/* "asOf" 는 화면 밖 사람에게 아무 뜻이 없다. 무엇인지 먼저 적고
-                    서버 파라미터 이름을 작게 곁들인다. */}
+                {/* "asOf" 는 화면 밖 사람에게 아무 뜻이 없다. 서버 파라미터 이름이지
+                    화면 말이 아니라, 이력을 여기까지만 자른다는 뜻으로 적는다. */}
                 <dt>기준 시각</dt>
                 <dd className="num text-hig-fg">{report.run.asOf.replace("T", " ")}</dd>
                 <dt>소요</dt>
@@ -510,10 +547,10 @@ export function BatchVerification() {
             title="실행 이력"
             hint={
               determinism.conflicting > 0
-                ? `같은 asOf 가 다른 체크섬을 냈다 — ${determinism.conflicting}건`
+                ? `같은 기준 시각이 다른 체크섬을 냈다 — ${determinism.conflicting}건`
                 : determinism.repeats > 0
                   ? `같은 체크섬이 ${determinism.repeats}회 재현됐다`
-                  : "같은 asOf 는 같은 체크섬이어야 한다"
+                  : "같은 기준 시각은 같은 체크섬이어야 한다"
             }
           >
             <table className="ops-table">
@@ -764,6 +801,63 @@ function FindingDonut({
         })}
       </ul>
     </div>
+  );
+}
+
+/**
+ * 셋 하나를 고르는 카드. <b>고르기 전에 이미 답이 보인다.</b>
+ *
+ * <p>탭으로 두면 안 고른 쪽 결과가 안 보여서, 정작 하고 싶은 말 — 오염셋은 심은 것을
+ * 다 잡았고 정상셋은 한 건도 안 잡았다 — 의 절반이 숨는다. 그래서 두 장을 항상 펴 두고,
+ * 누르면 아래 상세만 바뀐다.
+ */
+function SourceCard({
+  source,
+  selected,
+  onSelect,
+}: {
+  source: BatchSource;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { run, manifest } = source.report;
+  const corrupt = run.dataset === "CORRUPT";
+  const expected = manifest?.present ? (manifest.expectedCount ?? 0) : 0;
+  const hit = expected - (manifest?.missingCount ?? 0);
+  const pass = run.verdict === "PASS";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`surface-card flex items-center gap-4 px-5 py-4 text-left transition-colors ${
+        selected ? "ring-2 ring-hig-fg" : "hover:bg-fill/40"
+      }`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="t-caption block text-hig-muted">
+          {corrupt ? "오염셋 · 정답을 심어 둔 시험" : "정상셋 · 평상시 도는 것"}
+        </span>
+        <span className="t-body mt-0.5 block font-semibold">
+          {corrupt
+            ? `심은 ${expected.toLocaleString("ko-KR")}건 중 ${hit.toLocaleString("ko-KR")}건을 잡음`
+            : `검출 ${(run.findingCount ?? 0).toLocaleString("ko-KR")}건`}
+        </span>
+        <span className="t-caption mt-1 block text-hig-secondary">
+          {corrupt
+            ? `헛 잡은 것 ${(manifest?.unexpectedCount ?? 0).toLocaleString("ko-KR")}건`
+            : "헛경보 없음이 통과 조건"}
+        </span>
+      </span>
+      <span
+        className={`t-caption shrink-0 rounded-full px-3 py-1 font-semibold ${
+          pass ? "bg-hig-fg text-hig-surface" : "bg-viz-critical text-hig-surface"
+        }`}
+      >
+        {run.verdict ?? "진행 중"}
+      </span>
+    </button>
   );
 }
 
