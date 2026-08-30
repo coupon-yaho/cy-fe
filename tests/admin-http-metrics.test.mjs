@@ -13,6 +13,7 @@ let baseUrl;
 let requestedUrl;
 let requestedUrls;
 let requestedHeaders;
+let failMetricsSeries = false;
 
 before(async () => {
   httpServer = createHttpServer((request, response) => {
@@ -20,6 +21,24 @@ before(async () => {
     requestedUrls ??= [];
     requestedUrls.push(request.url);
     requestedHeaders = request.headers;
+    if (failMetricsSeries && request.url?.startsWith("/api/v1/admin/metrics/series")) {
+      response.statusCode = 503;
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify({
+          success: false,
+          data: null,
+          error: {
+            status: 503,
+            code: "ADMIN-METRICS-SERIES-UNAVAILABLE",
+            message: "시계열 집계 원천을 사용할 수 없습니다.",
+            requestId: "req-series-503",
+            timestamp: "2026-08-31T00:00:00Z",
+          },
+        }),
+      );
+      return;
+    }
     let data = {
       traffic: { series: [] },
       saturation: {
@@ -239,6 +258,21 @@ test("metrics HTTP adapter converts backend latency groups into the locked scree
   assert.deepEqual(response.saturation.inFlight.series, [
     { t: Date.parse("2026-08-28T00:00:05Z"), global: 3 },
   ]);
+});
+
+test("metrics HTTP adapter rejects when the required series endpoint fails", async () => {
+  failMetricsSeries = true;
+  try {
+    await assert.rejects(
+      () => createHttpAdminApi(baseUrl).getMetrics("1m"),
+      (error) =>
+        error?.status === 503 &&
+        error?.code === "ADMIN-METRICS-SERIES-UNAVAILABLE" &&
+        error?.requestId === "req-series-503",
+    );
+  } finally {
+    failMetricsSeries = false;
+  }
 });
 
 test("admin API entry point always sends overview requests to HTTP", async () => {

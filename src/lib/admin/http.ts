@@ -411,15 +411,10 @@ export function createHttpAdminApi(baseUrl: string): AdminApi {
         `/api/v1/admin/metrics${qs({ window })}`,
         { signal: signal ?? null },
       );
-      let series: BackendMetricsSeriesResponse | undefined;
-      try {
-        series = await call<BackendMetricsSeriesResponse>(
-          `/api/v1/admin/metrics/series${qs({ window })}`,
-          { signal: signal ?? null },
-        );
-      } catch (error) {
-        if (signal?.aborted) throw error;
-      }
+      const series = await call<BackendMetricsSeriesResponse>(
+        `/api/v1/admin/metrics/series${qs({ window })}`,
+        { signal: signal ?? null },
+      );
       return normalizeMetrics(snapshot, series);
     },
 
