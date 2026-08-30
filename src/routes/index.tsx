@@ -66,11 +66,8 @@ function Landing() {
     .filter((r) => r.status === "SCHEDULED")
     .sort((a, b) => Date.parse(a.openAt) - Date.parse(b.openAt));
 
-  /* 발급 중이 둘 이상일 때만 넘길 수 있게 합니다.
-     **자동으로 넘기지 않습니다.** 선착순 화면에서 발급 버튼이 손가락 밑에서 바뀌면
-     다른 브랜드 쿠폰이 발급됩니다 — 1인 1매라 되돌리려면 발급을 취소해야 합니다.
-     백엔드가 회차 시간 겹침을 브랜드 무관 전역으로 막으므로(existsOverlappingSchedule,
-     SCHEDULED·OPEN 대상) 실서버에서는 보통 한 개입니다. 그때는 화살표가 아예 안 뜹니다. */
+  /* 정상 데이터에서는 전역 일정 충돌 검증으로 발급 중 회차가 하나뿐입니다.
+     기존 데이터 이상 등으로 둘 이상 들어온 경우에만 수동으로 넘길 수 있게 합니다. */
   const [slide, setSlide] = useState(0);
   const featured = live.length > 0 ? live : upcoming.slice(0, 1);
   const index = Math.min(slide, Math.max(0, featured.length - 1));

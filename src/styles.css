@@ -1340,6 +1340,8 @@
 
 @utility yh-coupon {
   position: relative;
+  /* 절취선 노치의 카드 바깥쪽 절반을 숨겨 안쪽으로 파인 반원만 남깁니다. */
+  overflow: hidden;
   background: var(--yh-surface);
   border-radius: 16px;
   border: 1px solid var(--yh-card-border);
@@ -1392,21 +1394,39 @@
   position: relative;
   width: 0;
   border-left: 2px dashed var(--yh-rule);
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    left: -13px;
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    background: var(--yh-notch, var(--yh-surface));
-  }
-  &::before {
-    top: -13px;
-  }
-  &::after {
-    bottom: -13px;
+}
+
+/* 넓은 화면의 보유 쿠폰은 배경색 원으로 덮지 않고 마스크로 실제 픽셀을 잘라냅니다.
+   오른쪽 사용 영역이 13.5rem이므로 절취선과 같은 x 좌표에 위·아래 반원 홈을 냅니다. */
+@media (min-width: 48rem) {
+  .yh-coupon {
+    --yh-coupon-stub-width: 13.5rem;
+    -webkit-mask:
+      radial-gradient(
+          circle 12px at calc(100% - var(--yh-coupon-stub-width)) 0,
+          transparent 11.5px,
+          #000 12px
+        )
+        top / 100% 50% no-repeat,
+      radial-gradient(
+          circle 12px at calc(100% - var(--yh-coupon-stub-width)) 100%,
+          transparent 11.5px,
+          #000 12px
+        )
+        bottom / 100% 50% no-repeat;
+    mask:
+      radial-gradient(
+          circle 12px at calc(100% - var(--yh-coupon-stub-width)) 0,
+          transparent 11.5px,
+          #000 12px
+        )
+        top / 100% 50% no-repeat,
+      radial-gradient(
+          circle 12px at calc(100% - var(--yh-coupon-stub-width)) 100%,
+          transparent 11.5px,
+          #000 12px
+        )
+        bottom / 100% 50% no-repeat;
   }
 }
 

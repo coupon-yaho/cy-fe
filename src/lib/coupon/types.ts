@@ -212,8 +212,7 @@ export interface CouponRoundReservation {
 }
 
 /* ── 쿠폰 회차 조회 ────────────────────────────────────
-   백엔드 미구현. CouponRound 도메인 레코드 필드 그대로 잡아 두었으므로
-   컨트롤러가 붙으면 이 타입 그대로 씁니다. PRD 대기열 규약(§입장과 발급의 분리)도 같습니다. */
+   공개 목록과 단건 상세 응답을 화면에서 공통으로 사용하는 모델입니다. */
 
 export interface CouponRoundView {
   id: number;
