@@ -4,6 +4,7 @@ import {
   BATCH_JOB_LABEL,
   FINDING_LABEL,
   FINDING_RULE,
+  FINDING_TONE,
   getJobStandings,
   getLatestReport,
   getVerifyRuns,
@@ -98,6 +99,17 @@ export function BatchVerification() {
     () => Math.max(0, ...Object.values(report?.byType ?? {}).map((v) => v ?? 0)),
     [report],
   );
+
+  /**
+   * 전체 검출 수. hover 로 띄우는 "전체의 몇 %" 의 분모다.
+   *
+   * <p>유형별 합이 아니라 실행이 적어 낸 수를 먼저 쓴다 — 둘이 어긋나면 그것 자체가
+   * 서버 쪽 신호라, 화면에서 합을 다시 내 덮어 버리면 그 신호가 사라진다.
+   */
+  const total = useMemo(() => {
+    const byType = Object.values(report?.byType ?? {}).reduce((a, v) => a + (v ?? 0), 0);
+    return report?.run.findingCount ?? byType;
+  }, [report]);
 
   /**
    * 이 판정을 만든 잡 실행. 몇 행을 훑었는지가 "규모" 를 말한다.
@@ -221,19 +233,17 @@ export function BatchVerification() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(Object.keys(FINDING_LABEL) as FindingType[]).map((type, i) => {
+                  {(Object.keys(FINDING_LABEL) as FindingType[]).map((type) => {
                     const n = report.byType[type] ?? 0;
+                    const tone = n === 0 ? "var(--hig-muted)" : FINDING_TONE[type];
                     return (
-                      <tr key={type}>
+                      <tr key={type} className="group/rule hover:bg-fill/50">
                         <td className="num text-hig-secondary">{FINDING_RULE[type]}</td>
                         <td className="font-medium">
                           {FINDING_LABEL[type]}
                           {/* 규칙별 색을 고정한다 — 아래 막대와 짝이라 순서가 바뀌어도 같은 색이다. */}
                           <span className="mt-1.5 block max-w-[9rem]">
-                            <Bar
-                              ratio={peak === 0 ? 0 : n / peak}
-                              tone={n === 0 ? "var(--hig-muted)" : `var(--viz-${(i % 8) + 1})`}
-                            />
+                            <Bar ratio={peak === 0 ? 0 : n / peak} tone={tone} />
                           </span>
                         </td>
                         <td className="num text-right font-semibold align-top">
@@ -242,6 +252,7 @@ export function BatchVerification() {
                           ) : (
                             n.toLocaleString("ko-KR")
                           )}
+                          <RuleShare count={n} total={total} />
                         </td>
                       </tr>
                     );
@@ -424,6 +435,28 @@ export function BatchVerification() {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * 마우스를 올린 줄만 "전체의 몇 %" 를 드러낸다.
+ *
+ * <p><b>왜 원형 그래프가 아닌가.</b> 비율은 원형을 쓰고 싶어지는 바로 그 질문이지만
+ * 이 값들은 200·200·200·100·100·0 이다 — 같은 크기 조각 셋이 안 갈리고, 0 은 조각이
+ * 아예 안 생겨 <b>"등급 위반은 없었다" 가 화면에서 사라진다.</b> 그 0 은 이 패널이
+ * 말하려는 "정확히 그것들만 잡았다" 의 일부라 지우면 안 된다. 그래서 건수는 막대와
+ * 숫자로 두고, 비율만 이렇게 곁들인다.
+ *
+ * <p><b>왜 떠 있는 말풍선이 아닌가.</b> {@code TablePanel} 안쪽이 {@code overflow-x-auto}
+ * 라 세로도 같이 잘린다 — 가로만 auto 로 둘 수 없다. 줄 밖으로 나가는 카드는 위아래가
+ * 잘리고, 그 래퍼는 관리자 표 전부가 함께 쓰는 것이라 여기서 못 고친다. 이 방식은 자리를
+ * 항상 잡아 두고 투명도만 바꾸므로 잘릴 일이 없고 hover 에 표가 안 흔들린다.
+ */
+function RuleShare({ count, total }: { count: number; total: number }) {
+  return (
+    <span className="t-caption block font-normal text-hig-muted opacity-0 transition-opacity group-hover/rule:opacity-100">
+      {total === 0 ? "—" : `${((count / total) * 100).toFixed(1)}%`}
+    </span>
   );
 }
 

@@ -34,6 +34,22 @@ export const FINDING_LABEL: Record<FindingType, string> = {
   GRADE_VIOLATION: "등급 위반",
 };
 
+/**
+ * 규칙별 색. <b>순번으로 계산하지 않고 손으로 박는다.</b>
+ *
+ * <p>인덱스로 `viz-(i+1)` 을 만들면 유형이 하나 늘거나 순서가 바뀌는 날 색이 통째로
+ * 밀린다 — 색은 자리가 아니라 <b>규칙 그 자체</b>를 가리켜야 어제 화면과 오늘 화면을
+ * 겹쳐 볼 수 있다. 팔레트는 저장소 시각화 램프(라이트·다크 양쪽 검증됨)를 그대로 쓴다.
+ */
+export const FINDING_TONE: Record<FindingType, string> = {
+  STOCK_MISMATCH: "var(--viz-1)",
+  DUP_PER_MEMBER: "var(--viz-2)",
+  REPLAY_MISMATCH: "var(--viz-3)",
+  ILLEGAL_TRANSITION: "var(--viz-4)",
+  USAGE_MISMATCH: "var(--viz-5)",
+  GRADE_VIOLATION: "var(--viz-6)",
+};
+
 export const FINDING_RULE: Record<FindingType, string> = {
   STOCK_MISMATCH: "V1",
   DUP_PER_MEMBER: "V2",
