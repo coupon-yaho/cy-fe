@@ -911,10 +911,21 @@ function SourceCard({
         <span className="t-caption block text-hig-muted">
           {corrupt ? "오염셋 · 정답을 심어 둔 시험" : "정상셋 · 평상시 도는 것"}
         </span>
+        {/*
+         * <b>"심은 800건" 이 아니다.</b> 심은 오염은 700건이고, 그중 한 종류가 두 규칙에
+         * 동시에 걸려서(CANCEL_USE 이중 기록 → 불법 전이 + 재고 이중 복원) 위반이 800건이
+         * 된다. 세는 단위가 "오염" 이 아니라 "위반" 이라 그렇게 부른다.
+         *
+         * <p>700 은 화면이 모른다 — 매니페스트가 주는 것은 기대·누락·오탐뿐이고, 그 수는
+         * expected_findings 의 corrupt_type 을 세야 나온다. 그래서 관계만 적고 숫자는
+         * 서버가 준 것만 쓴다.
+         */}
         <span className="t-body mt-0.5 block font-semibold">
-          {corrupt
-            ? `심은 ${expected.toLocaleString("ko-KR")}건 중 ${hit.toLocaleString("ko-KR")}건을 잡음`
-            : `검출 ${(run.findingCount ?? 0).toLocaleString("ko-KR")}건`}
+          {!corrupt
+            ? `검출 ${(run.findingCount ?? 0).toLocaleString("ko-KR")}건`
+            : hit === expected
+              ? `심은 오염이 낳는 위반 ${expected.toLocaleString("ko-KR")}건을 전부 잡음`
+              : `위반 ${expected.toLocaleString("ko-KR")}건 중 ${hit.toLocaleString("ko-KR")}건을 잡음`}
         </span>
         <span className="t-caption mt-1 block text-hig-secondary">
           {corrupt
