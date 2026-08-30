@@ -291,6 +291,18 @@ export async function getLatestReport(
 export type BatchSource = { root: BatchRoot; report: VerifyReport };
 
 /**
+ * 한 행도 안 훑은 판정. <b>증거가 아니다.</b>
+ *
+ * <p>빈 DB 를 검증하면 0행을 0초에 훑고 "검출 0건 PASS" 가 나온다(실측: app 스키마가
+ * issuances 0건이라 read=0 · 0초). 그 판정을 300만 행을 178초 훑은 정상셋과 나란히
+ * 놓으면, 보는 사람은 <b>같은 무게의 증거로 읽는다.</b> 실제보다 세게 말하는 것이라
+ * 화면에서 뺀다 — 데이터가 쌓이면 저절로 다시 나타난다.
+ */
+export function isEmptyVerdict(rowsScanned: number | null | undefined): boolean {
+  return (rowsScanned ?? 0) === 0;
+}
+
+/**
  * 어떤 엔드포인트가 살아 있고 각각 무슨 셋인지 <b>물어서</b> 정한다.
  *
  * <p>어느 포트가 오염셋이라고 화면이 미리 정해 두면 안 된다 — 배치를 어느 DB 로 세울지는
@@ -313,7 +325,15 @@ const DEAD_AFTER = 3;
 export async function discoverSources(signal?: AbortSignal): Promise<BatchSource[]> {
   const probe = BATCH_ROOTS.filter((root) => (deadRoots.get(root) ?? 0) < DEAD_AFTER);
   const settled = await Promise.allSettled(
-    probe.map(async (root) => ({ root, report: await getLatestReport(root, signal) })),
+    probe.map(async (root) => {
+      const [report, scanned] = await Promise.all([
+        getLatestReport(root, signal),
+        // 끝난 실행 중 가장 많이 훑은 값. 도는 중인 실행은 0 에서 시작하므로 그것만
+        // 보면 멀쩡한 셋이 잠깐 "빈 판정" 으로 보인다.
+        getVerifyJobScanPeak(root, signal),
+      ]);
+      return { root, report, scanned };
+    }),
   );
   const found: BatchSource[] = [];
   settled.forEach((r, i) => {
@@ -324,6 +344,8 @@ export async function discoverSources(signal?: AbortSignal): Promise<BatchSource
       return;
     }
     deadRoots.delete(root);
+    // 한 행도 안 훑은 판정은 증거가 아니다 — 화면에서 뺀다.
+    if (isEmptyVerdict(r.value.scanned)) return;
     /*
      * 중복은 <b>데이터 지문</b>으로 거른다. 처음엔 dataset 으로 걸렀는데, 그건 "같은 종류"
      * 지 "같은 데이터" 가 아니다 — 시험용 정상셋(coupon_clean)과 운영 DB(app)가 둘 다
@@ -408,6 +430,14 @@ export type VerifyProgress = {
  * 실행 번호라 여기 넣으면 404 다 — 서버 주석이 실측으로 {@code executionId=15} 일 때
  * {@code runId=17} 이었다고 적는다. 그래서 화면은 이력의 최신 행에서 {@code runId} 를 집는다.
  */
+/** 끝난 검증 잡 중 가장 많이 훑은 행 수. "이 셋이 실제로 볼 게 있었나" 를 답한다. */
+async function getVerifyJobScanPeak(root: string, signal?: AbortSignal): Promise<number> {
+  const page = await get<Page<BatchRun>>(root, `/batch/runs?jobName=verifyJob&limit=3`, signal);
+  return page.items
+    .filter((j) => j.status === "COMPLETED")
+    .reduce((max, j) => Math.max(max, j.stepReadTotal ?? 0), 0);
+}
+
 export function getVerifyProgress(root: string, runId: number, signal?: AbortSignal) {
   return get<VerifyProgress>(root, `/verify/runs/${runId}/progress`, signal);
 }

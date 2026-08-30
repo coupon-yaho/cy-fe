@@ -45,7 +45,7 @@ const IDLE_POLL_MS = 5000;
 
 /** 화면 말로 옮긴 {@code asOf} 의 뜻. 표와 패널이 같은 문장을 쓴다. */
 const AS_OF_NOTE =
-  "이 시각까지의 이력만 접어서 판정한다. 같은 값으로 다시 돌리면 같은 답이 나온다.";
+  "이 시각까지의 이력만 대상으로 판정한다. 같은 값으로 재실행하면 같은 결과가 나온다.";
 
 type RerunState =
   | { phase: "idle" }
@@ -310,6 +310,20 @@ export function BatchVerification() {
   const matched = manifest?.present ? manifest.matches : undefined;
 
   /**
+   * 두 셋이 같은 축으로 읽히도록 세 값을 한자리에서 만든다.
+   *
+   * <p>정답 매니페스트가 없는 셋(정상셋)은 서버가 이 값을 안 준다. 그래도 <b>정의에서
+   * 나온다</b> — 정답이 0건이니 기대도 탐지도 0이고, 미탐은 놓칠 것이 없어 0이며,
+   * 정상 데이터에서 나온 검출은 <b>전부 오탐</b>이다. 추정이 아니라 그 셋의 뜻이다.
+   */
+  const expectedCount = manifest?.present ? (manifest.expectedCount ?? 0) : 0;
+  const missed = manifest?.present ? (manifest.missingCount ?? 0) : 0;
+  const detected = expectedCount - missed;
+  const falsePositive = manifest?.present
+    ? (manifest.unexpectedCount ?? 0)
+    : (report?.run.findingCount ?? 0);
+
+  /**
    * <b>적중률</b> — 정답 중 실제로 맞춘 비율.
    *
    * <p>{@code (기대 - 누락) / 기대} 다. 검출 수를 분자로 쓰면 안 된다 — 오탐이 섞여도
@@ -381,8 +395,8 @@ export function BatchVerification() {
     <section className="mt-4 flex flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="t-caption text-hig-muted">배치 검증 · 확정 판정</p>
-          <h2 className="t-title mt-1">이력을 다시 접어 낸 답</h2>
+          <p className="t-caption text-hig-muted">배치 정합성 검증</p>
+          <h2 className="t-title mt-1">이력 재계산 판정</h2>
           {/* 패널마다 붙어 있던 설명을 여기 한 줄로 모았다 — 카드마다 회색 문장이
               달려 있으면 화면이 값보다 말로 읽힌다. */}
           <p className="t-body-sm mt-1.5 text-hig-secondary">
@@ -491,58 +505,56 @@ export function BatchVerification() {
           <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr_1fr]">
             <Panel
               className={inProgress ? "opacity-60 transition-opacity" : "transition-opacity"}
-              title={manifest?.present ? "적중률" : "검출"}
-              {...(inProgress
-                ? { hint: "이전 판정" }
-                : manifest?.present
-                  ? {}
-                  : { hint: "0이 정답" })}
+              title={manifest?.present ? "재현율" : "오탐"}
+              {...(inProgress ? { hint: "이전 판정" } : {})}
             >
-              {manifest?.present ? (
-                <>
-                  <p className={`t-hero num ${matched ? "text-hig-fg" : "text-viz-critical"}`}>
+              {/*
+               * <b>두 셋의 구조를 같게 둔다.</b> 예전에는 오염셋만 아래 세 줄이 있고 정상셋은
+               * 히어로 숫자 하나에 그 아래가 텅 비어서, 셋을 바꿀 때마다 화면을 다시 읽어야
+               * 했다. 히어로가 가리키는 값은 셋마다 다를 수밖에 없지만(정답이 없는 셋에는
+               * 재현율이 정의되지 않는다) 그 아래 축은 같다.
+               *
+               * <p>정상셋의 세 줄은 서버가 계산해 주는 값이 아니라 <b>정의에서 나온다</b> —
+               * 정답이 0건이므로 탐지도 0/0, 미탐도 0이고, 정상 데이터에서 나온 검출은
+               * 전부 오탐이다. 추정이 아니라 그 셋의 뜻 자체다.
+               */}
+              <p
+                className={`t-hero num ${
+                  manifest?.present
+                    ? matched
+                      ? "text-hig-fg"
+                      : "text-viz-critical"
+                    : (report.run.findingCount ?? 0) === 0
+                      ? "text-hig-fg"
+                      : "text-viz-critical"
+                }`}
+              >
+                {manifest?.present ? (
+                  <>
                     {shownHitRate.toFixed(1)}
                     <span className="t-title"> %</span>
-                  </p>
-                  <div className="mt-3">
-                    <Bar
-                      ratio={(hitRate ?? 0) / 100}
-                      tone={matched ? "var(--viz-good)" : "var(--viz-critical)"}
-                    />
-                  </div>
-                  <dl className="t-body-sm mt-4 grid grid-cols-[5.5rem_1fr] gap-y-1.5 text-hig-secondary">
-                    <dt>맞춘 것</dt>
-                    <dd className="num text-hig-fg">
-                      {(
-                        (manifest.expectedCount ?? 0) - (manifest.missingCount ?? 0)
-                      ).toLocaleString("ko-KR")}
-                      <span className="text-hig-secondary">
-                        {" / "}
-                        {(manifest.expectedCount ?? 0).toLocaleString("ko-KR")}
-                      </span>
-                    </dd>
-                    <dt>놓친 것</dt>
-                    <dd className="num text-hig-fg">
-                      {(manifest.missingCount ?? 0).toLocaleString("ko-KR")}
-                    </dd>
-                    <dt>헛 잡은 것</dt>
-                    <dd className="num text-hig-fg">
-                      {(manifest.unexpectedCount ?? 0).toLocaleString("ko-KR")}
-                    </dd>
-                  </dl>
-                </>
-              ) : (
-                <>
-                  <p
-                    className={`t-hero num ${
-                      (report.run.findingCount ?? 0) === 0 ? "text-hig-fg" : "text-viz-critical"
-                    }`}
-                  >
+                  </>
+                ) : (
+                  <>
                     {(report.run.findingCount ?? 0).toLocaleString("ko-KR")}
                     <span className="t-title"> 건</span>
-                  </p>
-                </>
-              )}
+                  </>
+                )}
+              </p>
+              <dl className="t-body-sm mt-5 grid grid-cols-[4rem_1fr] gap-y-1.5 text-hig-secondary">
+                <dt>탐지</dt>
+                <dd className="num text-hig-fg">
+                  {detected.toLocaleString("ko-KR")}
+                  <span className="text-hig-secondary">
+                    {" / "}
+                    {expectedCount.toLocaleString("ko-KR")}
+                  </span>
+                </dd>
+                <dt>미탐</dt>
+                <dd className="num text-hig-fg">{missed.toLocaleString("ko-KR")}</dd>
+                <dt>오탐</dt>
+                <dd className="num text-hig-fg">{falsePositive.toLocaleString("ko-KR")}</dd>
+              </dl>
             </Panel>
 
             {/* TablePanel 이 아니라 Panel 이다 — TablePanel 안쪽 overflow-x-auto 가
@@ -555,9 +567,9 @@ export function BatchVerification() {
                     ? "opacity-60 transition-opacity"
                     : "transition-opacity"
               }
-              title="검출 대조"
+              title="유형별 검출"
               {...(progress?.status === "RUNNING"
-                ? { hint: "지금 잡히는 중" }
+                ? { hint: "수집 중" }
                 : inProgress
                   ? { hint: "이전 판정" }
                   : {})}
@@ -570,7 +582,7 @@ export function BatchVerification() {
               />
             </Panel>
 
-            <Panel title="훑은 양" {...(running ? { hint: "진행 중" } : {})}>
+            <Panel title="검사 데이터량" {...(running ? { hint: "수집 중" } : {})}>
               <p className={`t-hero num ${running ? "text-hig-fg" : ""}`}>
                 {scanRows === null ? (
                   <span className="text-hig-muted">—</span>
@@ -610,7 +622,7 @@ export function BatchVerification() {
                 <div className="mt-4">
                   <Bar ratio={scanProgress} tone="var(--hig-foreground)" />
                   <p className="t-caption mt-1.5 text-hig-muted">
-                    지난 실행이 훑은 양 기준 {Math.round(scanProgress * 100)}% · 어림이다
+                    직전 실행 데이터량 기준 {Math.round(scanProgress * 100)}% · 추정치
                   </p>
                 </div>
               )}
@@ -695,11 +707,11 @@ export function BatchVerification() {
           </TablePanel>
 
           <TablePanel
-            title="잡 실행"
+            title="배치 잡 이력"
             hint={
               idleJobs.length > 0
-                ? `아직 안 돈 잡 — ${idleJobs.map((j) => BATCH_JOB_LABEL[j.jobName]).join(" · ")}`
-                : "만료 · 정리 · 검증이 돌기는 돌았나"
+                ? `미실행 — ${idleJobs.map((j) => BATCH_JOB_LABEL[j.jobName]).join(" · ")}`
+                : "만료 · 정리 · 검증 실행 여부"
             }
           >
             <table className="ops-table">
@@ -732,7 +744,7 @@ export function BatchVerification() {
                               : "text-hig-secondary"
                       }
                     >
-                      {latest?.status ?? "안 돎"}
+                      {latest?.status ?? "미실행"}
                     </td>
                     <td className="num text-right text-hig-secondary">
                       {runCount === 0 ? <span className="text-hig-muted">0</span> : `${runCount}회`}
@@ -911,7 +923,7 @@ function SourceCard({
   const injected =
     manifest?.corruptionCount != null
       ? `오염 ${manifest.corruptionCount.toLocaleString("ko-KR")}건이 `
-      : "심은 오염이 ";
+      : "주입 오염이 ";
 
   return (
     <button
@@ -929,7 +941,7 @@ function SourceCard({
          * 않지만 <b>같은 이름 두 장</b>보다는 낫다. 서버가 이름을 주면 이 갈래는 사라진다.
          */}
         <span className="t-caption block text-hig-muted">
-          {corrupt ? "오염셋 · 정답을 심어 둔 시험" : "정상셋 · 평상시 도는 것"}
+          {corrupt ? "오염셋 · 주입 오염 대조" : "정상셋 · 무오염 데이터"}
           {ambiguous && run.datasetFingerprint && (
             <span className="num ml-1.5">· {run.datasetFingerprint.slice(0, 6)}</span>
           )}
@@ -947,13 +959,13 @@ function SourceCard({
           {!corrupt
             ? `검출 ${(run.findingCount ?? 0).toLocaleString("ko-KR")}건`
             : hit === expected
-              ? `${injected}낳는 위반 ${expected.toLocaleString("ko-KR")}건을 전부 잡음`
-              : `위반 ${expected.toLocaleString("ko-KR")}건 중 ${hit.toLocaleString("ko-KR")}건을 잡음`}
+              ? `${injected}유발한 위반 ${expected.toLocaleString("ko-KR")}건 전건 탐지`
+              : `위반 ${expected.toLocaleString("ko-KR")}건 중 ${hit.toLocaleString("ko-KR")}건 탐지`}
         </span>
         <span className="t-caption mt-1 block text-hig-secondary">
           {corrupt
-            ? `헛 잡은 것 ${(manifest?.unexpectedCount ?? 0).toLocaleString("ko-KR")}건`
-            : "헛경보 없음이 통과 조건"}
+            ? `오탐 ${(manifest?.unexpectedCount ?? 0).toLocaleString("ko-KR")}건`
+            : "오탐 0건이 통과 조건"}
         </span>
       </span>
       <span
