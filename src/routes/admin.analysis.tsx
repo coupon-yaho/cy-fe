@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { SeriesChart, SeriesLegend, type SeriesSpec } from "@/components/admin/charts";
+import { LiveBenchmarkList } from "@/components/admin/live-benchmarks";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
 import { PageHead } from "@/components/admin/shell";
 import { StateBadge } from "@/components/admin/state";
@@ -10,6 +11,7 @@ import {
   adminApi,
   type AdminBenchmarksResponse,
   type EngineVersion,
+  isLiveBenchmarkList,
 } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/analysis")({
@@ -36,7 +38,8 @@ function AnalysisScreen() {
       <PageHead
         title="성능 비교"
         controls={
-          data && (
+          data &&
+          !isLiveBenchmarkList(data) && (
             <span
               className={`t-caption font-semibold ${
                 data.conditionsMatch ? "text-positive" : "text-live"
@@ -53,6 +56,8 @@ function AnalysisScreen() {
           <Skeleton className="h-40 rounded-2xl" />
           <Skeleton className="h-72 rounded-2xl" />
         </div>
+      ) : isLiveBenchmarkList(data) ? (
+        <LiveBenchmarkList data={data} />
       ) : (
         <div className="space-y-4">
           <Verdicts data={data} />

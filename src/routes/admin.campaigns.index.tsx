@@ -592,12 +592,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 /* ── 분석 ────────────────────────────────────────── */
 
 function Analytics() {
+  const range = defaultAnalyticsRange(new Date());
   const { data } = useQuery({
-    queryKey: ["admin", "analytics"],
-    queryFn: () => adminApi.getAnalytics(),
+    queryKey: ["admin", "analytics", range.from, range.to],
+    queryFn: () => adminApi.getAnalytics(range),
   });
 
   if (!data) return <Skeleton className="h-96 rounded-2xl" />;
+
+  const hasActualValue =
+    data.brandTrend.months.length > 0 ||
+    data.funnel.length > 0 ||
+    data.heatmap.grid.some((row) => row.some((value) => value > 0));
+  if (data.sourceStates && !hasActualValue) return <AnalyticsUnavailable />;
 
   const trendSeries: SeriesSpec[] = data.brandTrend.series.map((s, i) => ({
     key: `b${s.brandId}`,
@@ -644,6 +651,29 @@ function Analytics() {
       </div>
     </div>
   );
+}
+
+export function AnalyticsUnavailable() {
+  return (
+    <Panel title="캠페인 분석" state="PENDING">
+      <p className="t-body-sm text-hig-muted">
+        분석 집계 원천이 아직 연결되지 않았습니다. 빈 차트를 실제 0건으로 표시하지 않으며 백엔드
+        후속 구현 이후 값을 표시합니다.
+      </p>
+    </Panel>
+  );
+}
+
+export function defaultAnalyticsRange(now: Date) {
+  const dateParam = (date: Date) =>
+    [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+      .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0"))
+      .join("-");
+  const from = new Date(now);
+  from.setFullYear(from.getFullYear() - 1);
+  // 백엔드는 양끝을 포함해 1년을 계산하므로 같은 월·일은 하루 초과입니다.
+  from.setDate(from.getDate() + 1);
+  return { from: dateParam(from), to: dateParam(now) };
 }
 
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"];
