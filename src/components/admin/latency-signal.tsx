@@ -142,9 +142,7 @@ export function LatencySignalPanel({
             ))}
           </dl>
         ) : (
-          <p className="t-body-sm text-hig-muted">
-            현재 연결된 의존성 지연 값이 없습니다.
-          </p>
+          <p className="t-body-sm text-hig-muted">현재 연결된 의존성 지연 값이 없습니다.</p>
         )}
       </Panel>
     </div>

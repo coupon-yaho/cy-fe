@@ -114,9 +114,7 @@ test("system signal navigation excludes the unsupported failure area", () => {
 
 test("overview initial failure renders an error and an explicit retry action", () => {
   assert.equal(typeof OverviewUnavailable, "function");
-  const html = renderToStaticMarkup(
-    createElement(OverviewUnavailable, { onRetry: () => {} }),
-  );
+  const html = renderToStaticMarkup(createElement(OverviewUnavailable, { onRetry: () => {} }));
 
   assert.match(html, /운영 현황을 불러오지 못했습니다/);
   assert.match(html, /다시 시도/);

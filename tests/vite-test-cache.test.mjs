@@ -16,6 +16,10 @@ const viteServerTests = [
 test("programmatic Vite test servers do not overwrite the development dependency cache", async () => {
   for (const filename of viteServerTests) {
     const source = await readFile(new URL(filename, import.meta.url), "utf8");
-    assert.match(source, /cacheDir:\s*["']\.vite-test["']/, `${filename} needs an isolated cacheDir`);
+    assert.match(
+      source,
+      /cacheDir:\s*["']\.vite-test["']/,
+      `${filename} needs an isolated cacheDir`,
+    );
   }
 });

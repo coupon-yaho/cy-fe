@@ -35,8 +35,8 @@ function clockMs(iso: string) {
 export function EventScopeNotice() {
   return (
     <p className="t-caption mb-3 text-hig-muted">
-      백엔드는 전체 회차 이벤트를 반환하고 이 화면에서 선택 회차만 표시합니다. 이벤트가 많으면
-      조회 범위 밖의 일부 이벤트가 보이지 않을 수 있습니다.
+      백엔드는 전체 회차 이벤트를 반환하고 이 화면에서 선택 회차만 표시합니다. 이벤트가 많으면 조회
+      범위 밖의 일부 이벤트가 보이지 않을 수 있습니다.
     </p>
   );
 }
