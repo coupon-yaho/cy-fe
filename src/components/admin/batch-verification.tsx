@@ -504,9 +504,8 @@ export function BatchVerification() {
         <>
           <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr_1fr]">
             <Panel
-              className={inProgress ? "opacity-60 transition-opacity" : "transition-opacity"}
               title={manifest?.present ? "재현율" : "오탐"}
-              {...(inProgress ? { hint: "이전 판정" } : {})}
+              {...(inProgress ? { hint: "판정 산출 중" } : {})}
             >
               {/*
                * <b>두 셋의 구조를 같게 둔다.</b> 예전에는 오염셋만 아래 세 줄이 있고 정상셋은
@@ -529,7 +528,9 @@ export function BatchVerification() {
                       : "text-viz-critical"
                 }`}
               >
-                {manifest?.present ? (
+                {inProgress ? (
+                  <Shimmer className="mt-2 h-[3.25rem] w-[68%]" />
+                ) : manifest?.present ? (
                   <>
                     {shownHitRate.toFixed(1)}
                     <span className="t-title"> %</span>
@@ -544,16 +545,34 @@ export function BatchVerification() {
               <dl className="t-body-sm mt-5 grid grid-cols-[4rem_1fr] gap-y-1.5 text-hig-secondary">
                 <dt>탐지</dt>
                 <dd className="num text-hig-fg">
-                  {detected.toLocaleString("ko-KR")}
-                  <span className="text-hig-secondary">
-                    {" / "}
-                    {expectedCount.toLocaleString("ko-KR")}
-                  </span>
+                  {inProgress ? (
+                    <Shimmer className="mt-1.5 h-3 w-20" />
+                  ) : (
+                    <>
+                      {detected.toLocaleString("ko-KR")}
+                      <span className="text-hig-secondary">
+                        {" / "}
+                        {expectedCount.toLocaleString("ko-KR")}
+                      </span>
+                    </>
+                  )}
                 </dd>
                 <dt>미탐</dt>
-                <dd className="num text-hig-fg">{missed.toLocaleString("ko-KR")}</dd>
+                <dd className="num text-hig-fg">
+                  {inProgress ? (
+                    <Shimmer className="mt-1.5 h-3 w-8" />
+                  ) : (
+                    missed.toLocaleString("ko-KR")
+                  )}
+                </dd>
                 <dt>오탐</dt>
-                <dd className="num text-hig-fg">{falsePositive.toLocaleString("ko-KR")}</dd>
+                <dd className="num text-hig-fg">
+                  {inProgress ? (
+                    <Shimmer className="mt-1.5 h-3 w-8" />
+                  ) : (
+                    falsePositive.toLocaleString("ko-KR")
+                  )}
+                </dd>
               </dl>
             </Panel>
 
@@ -988,6 +1007,25 @@ function SourceCard({
         {run.verdict ?? "진행 중"}
       </span>
     </button>
+  );
+}
+
+/**
+ * 값이 아직 없다는 표시. <b>낡은 값을 흐리게 두는 것과 다르다.</b>
+ *
+ * <p>배치가 도는 동안 재현율은 계산될 수 없다 — 정답 대조는 실행이 끝나야 한다. 그런데
+ * 예전에는 직전 판정을 흐리게만 두어서, 지금 값이 살짝 바랜 것처럼 보였다. 자리를 비우고
+ * 움직이면 "아직 안 나왔다" 로 읽힌다.
+ *
+ * <p>색은 게이지 트랙과 같은 토큰을 쓴다. 움직임을 줄여 달라고 한 사용자에게는 정지한
+ * 막대로 보인다({@code motion-safe}).
+ */
+function Shimmer({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`block rounded-full bg-fill motion-safe:animate-pulse ${className}`}
+      aria-hidden
+    />
   );
 }
 
