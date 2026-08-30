@@ -70,6 +70,20 @@ function buildWeeks(year: number, month: number): Date[][] {
   return weeks;
 }
 
+/**
+ * 달력 항목의 키. <b>{@code templateId} 만으로는 안 된다.</b>
+ *
+ * <p>한 브랜드가 한 달에 한 번만 열리던 때는 유일했는데, 회차가 늘면서 같은 템플릿이
+ * 여러 번 나온다 — 그때 React 가 같은 키를 둘 이상 만나 항목을 지우거나 겹쳐 그린다
+ * (실측: /events 에서 key 1·2 중복 경고).
+ *
+ * <p>{@code couponRoundId} 는 살아 있는 회차에만 있어서 단독으로 못 쓴다. 한 템플릿이
+ * 같은 시각에 두 번 열릴 수는 없으므로 여는 시각을 붙인다.
+ */
+function entryKey(e: CalendarEntry): string {
+  return `${e.templateId}-${e.openAt}`;
+}
+
 export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
   const today = useMemo(() => new Date(), []);
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -258,7 +272,7 @@ export function BrandCalendar({ grade }: { grade: MembershipGrade | null }) {
                     {/* 좁은 행이라 4개까지만. 6개를 다 그리면 카드 밖으로 넘칩니다. */}
                     <span className="ml-auto flex shrink-0 items-center gap-1">
                       {list.slice(0, 4).map((e) => (
-                        <BrandPlate key={e.templateId} brandId={e.brandId} size="sm" />
+                        <BrandPlate key={entryKey(e)} brandId={e.brandId} size="sm" />
                       ))}
                       {list.length > 4 && (
                         <span className="yh-num yh-small font-extrabold text-yh-ink-2">
@@ -362,7 +376,7 @@ function WeekRow({
 
             <span className="mt-1.5 flex flex-wrap items-center gap-1">
               {list.slice(0, 3).map((e) => (
-                <BrandPlate key={e.templateId} brandId={e.brandId} size="sm" />
+                <BrandPlate key={entryKey(e)} brandId={e.brandId} size="sm" />
               ))}
               {/* 칸이 좁아 3개까지만 보입니다 — 나머지를 숨기면 그날 회차 수를 오해합니다 */}
               {list.length > 3 && (
@@ -407,7 +421,7 @@ function DayPanel({
 
       <ul className="mt-4 grid gap-4 lg:grid-cols-2">
         {entries.map((e) => (
-          <li key={e.templateId}>
+          <li key={entryKey(e)}>
             <DayCard entry={e} grade={grade} />
           </li>
         ))}
