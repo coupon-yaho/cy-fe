@@ -6,6 +6,7 @@ import { SeriesChart, SeriesLegend, type SeriesSpec } from "@/components/admin/c
 import { Panel, TablePanel } from "@/components/admin/panel";
 import { PageHead, Segmented } from "@/components/admin/shell";
 import { BrandPlate } from "@/components/coupon/brand-plate";
+import { PageNavigation } from "@/components/coupon/page-navigation";
 import { formatClock } from "@/components/coupon/timer";
 import {
   Dialog,
@@ -100,72 +101,81 @@ function openShortLabel(iso: string): string {
 }
 
 function RoundTable() {
+  const [page, setPage] = useState(0);
   const { data, isLoading } = useQuery({
-    queryKey: ["rounds"],
-    queryFn: () => couponApi.listRounds(),
+    queryKey: ["rounds", "admin", page],
+    queryFn: () => couponApi.listRoundPage({ page, size: 10 }),
   });
 
   if (isLoading) return <Skeleton className="h-96 rounded-2xl" />;
 
   return (
-    <TablePanel title="쿠폰 회차" hint={`${data?.length ?? 0}건`}>
-      <table className="ops-table min-w-[860px]">
-        <thead>
-          <tr>
-            <th>브랜드 · 회차</th>
-            <th>정책</th>
-            <th>참여 등급</th>
-            <th className="text-right">재고</th>
-            <th>오픈</th>
-            <th>상태</th>
-            <th className="text-right">발급률</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data ?? []).map((r) => {
-            const remaining = remainingStock(r);
-            const issuedRatio = r.totalQuantity > 0 ? r.activeCount / r.totalQuantity : 0;
-            return (
-              <tr key={r.id}>
-                <td>
-                  <Link
-                    to="/admin/campaigns/$couponRoundId"
-                    params={{ couponRoundId: String(r.id) }}
-                    className="flex items-center gap-2 font-medium hover:underline"
-                  >
-                    <BrandPlate brandId={r.brandId} size="sm" />
-                    <span>
-                      {r.name}
-                      <span className="t-caption block text-hig-muted">
-                        {brandOf(r.brandId).name} · {openShortLabel(r.openAt)}
+    <>
+      <TablePanel title="쿠폰 회차" hint={`총 ${data?.totalElements ?? 0}건`}>
+        <table className="ops-table min-w-[860px]">
+          <thead>
+            <tr>
+              <th>브랜드 · 회차</th>
+              <th>정책</th>
+              <th>참여 등급</th>
+              <th className="text-right">재고</th>
+              <th>오픈</th>
+              <th>상태</th>
+              <th className="text-right">발급률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.content ?? []).map((r) => {
+              const remaining = remainingStock(r);
+              const issuedRatio = r.totalQuantity > 0 ? r.activeCount / r.totalQuantity : 0;
+              return (
+                <tr key={r.id}>
+                  <td>
+                    <Link
+                      to="/admin/campaigns/$couponRoundId"
+                      params={{ couponRoundId: String(r.id) }}
+                      className="flex items-center gap-2 font-medium hover:underline"
+                    >
+                      <BrandPlate brandId={r.brandId} size="sm" />
+                      <span>
+                        {r.name}
+                        <span className="t-caption block text-hig-muted">
+                          {brandOf(r.brandId).name} · {openShortLabel(r.openAt)}
+                        </span>
                       </span>
+                    </Link>
+                  </td>
+                  <td className="num">{discountHeadline(r)}</td>
+                  <td className="text-hig-secondary">{gradesLabel(r.eligibleGrades)}</td>
+                  <td className="num text-right">
+                    {remaining.toLocaleString("ko-KR")}
+                    <span className="text-hig-muted">
+                      {" "}
+                      / {r.totalQuantity.toLocaleString("ko-KR")}
                     </span>
-                  </Link>
-                </td>
-                <td className="num">{discountHeadline(r)}</td>
-                <td className="text-hig-secondary">{gradesLabel(r.eligibleGrades)}</td>
-                <td className="num text-right">
-                  {remaining.toLocaleString("ko-KR")}
-                  <span className="text-hig-muted">
-                    {" "}
-                    / {r.totalQuantity.toLocaleString("ko-KR")}
-                  </span>
-                </td>
-                <td className="num text-hig-secondary">{openShortLabel(r.openAt)}</td>
-                <td>{ROUND_STATUS_LABEL[r.status]}</td>
-                <td className="num text-right">
-                  {r.status === "SCHEDULED" ? (
-                    <span className="text-hig-muted">—</span>
-                  ) : (
-                    `${(issuedRatio * 100).toFixed(1)}%`
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </TablePanel>
+                  </td>
+                  <td className="num text-hig-secondary">{openShortLabel(r.openAt)}</td>
+                  <td>{ROUND_STATUS_LABEL[r.status]}</td>
+                  <td className="num text-right">
+                    {r.status === "SCHEDULED" ? (
+                      <span className="text-hig-muted">—</span>
+                    ) : (
+                      `${(issuedRatio * 100).toFixed(1)}%`
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </TablePanel>
+      <PageNavigation
+        page={data?.page ?? page}
+        totalPages={data?.totalPages ?? 0}
+        totalElements={data?.totalElements}
+        onChange={setPage}
+      />
+    </>
   );
 }
 
@@ -173,9 +183,10 @@ function RoundTable() {
 
 function TemplateTable({ onEdit }: { onEdit: (t: CouponTemplateDetail) => void }) {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(0);
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "templates"],
-    queryFn: () => couponApi.listTemplates({ size: 50 }),
+    queryKey: ["admin", "templates", page],
+    queryFn: () => couponApi.listTemplates({ page, size: 10 }),
   });
 
   const activation = useMutation({
@@ -191,90 +202,98 @@ function TemplateTable({ onEdit }: { onEdit: (t: CouponTemplateDetail) => void }
   if (isLoading) return <Skeleton className="h-96 rounded-2xl" />;
 
   return (
-    <TablePanel title="템플릿" hint="매월 반복 규칙">
-      <table className="ops-table min-w-[900px]">
-        <thead>
-          <tr>
-            <th>템플릿</th>
-            <th>정책</th>
-            <th>반복</th>
-            <th className="text-right">회차당 수량</th>
-            <th className="text-right">유효기간</th>
-            <th>참여 등급</th>
-            <th>활성</th>
-            <th>
-              <span className="sr-only">작업</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.content ?? []).map((t) => (
-            <tr key={t.id}>
-              <td>
-                <span className="flex items-center gap-2 font-medium">
-                  <BrandPlate brandId={t.brandId} size="sm" />
-                  <span>
-                    {t.name}
-                    <span className="t-caption block text-hig-muted">
-                      {brandOf(t.brandId).name}
+    <>
+      <TablePanel title="템플릿" hint={`매월 반복 규칙 · 총 ${data?.totalElements ?? 0}건`}>
+        <table className="ops-table min-w-[900px]">
+          <thead>
+            <tr>
+              <th>템플릿</th>
+              <th>정책</th>
+              <th>반복</th>
+              <th className="text-right">회차당 수량</th>
+              <th className="text-right">유효기간</th>
+              <th>참여 등급</th>
+              <th>활성</th>
+              <th>
+                <span className="sr-only">작업</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.content ?? []).map((t) => (
+              <tr key={t.id}>
+                <td>
+                  <span className="flex items-center gap-2 font-medium">
+                    <BrandPlate brandId={t.brandId} size="sm" />
+                    <span>
+                      {t.name}
+                      <span className="t-caption block text-hig-muted">
+                        {brandOf(t.brandId).name}
+                      </span>
                     </span>
                   </span>
-                </span>
-              </td>
-              <td className="num">{discountHeadline(t)}</td>
-              <td className="num text-hig-secondary">
-                {NTH_WEEK_LABEL[t.nthWeek]} {DAY_LABEL[t.dayOfWeek]} {trimSeconds(t.startTime)}
-                <span className="block text-hig-muted">{t.durationHours}시간</span>
-              </td>
-              <td className="num text-right">{t.stockPerOccurrence.toLocaleString("ko-KR")}</td>
-              <td className="num text-right text-hig-secondary">{t.validDays}일</td>
-              <td className="text-hig-secondary">{gradesLabel(t.eligibleGrades)}</td>
-              <td>
-                <button
-                  type="button"
-                  disabled={activation.isPending}
-                  onClick={() => activation.mutate({ id: t.id, active: !t.active })}
-                  className={`t-caption rounded-full px-2.5 py-1 font-semibold ${
-                    t.active ? "bg-positive/12 text-positive" : "bg-fill text-hig-muted"
-                  }`}
-                >
-                  {t.active ? "활성" : "비활성"}
-                </button>
-              </td>
-              <td className="text-right">
-                <span className="inline-flex items-center gap-3">
-                  {/* 예약은 별도 화면입니다. 다이얼로그에 넣었더니 그날 하루치만
-                      보여 줄 수 있었는데, 빈 자리는 주 단위로 봐야 고를 수 있습니다. */}
-                  {t.active ? (
-                    <Link
-                      to="/admin/campaigns/reserve"
-                      search={{ template: t.id }}
-                      className="t-body-sm text-hig-link hover:underline"
-                    >
-                      회차 예약
-                    </Link>
-                  ) : (
-                    <span
-                      className="t-body-sm text-hig-muted"
-                      title="비활성 템플릿으로는 회차를 예약할 수 없습니다"
-                    >
-                      회차 예약
-                    </span>
-                  )}
+                </td>
+                <td className="num">{discountHeadline(t)}</td>
+                <td className="num text-hig-secondary">
+                  {NTH_WEEK_LABEL[t.nthWeek]} {DAY_LABEL[t.dayOfWeek]} {trimSeconds(t.startTime)}
+                  <span className="block text-hig-muted">{t.durationHours}시간</span>
+                </td>
+                <td className="num text-right">{t.stockPerOccurrence.toLocaleString("ko-KR")}</td>
+                <td className="num text-right text-hig-secondary">{t.validDays}일</td>
+                <td className="text-hig-secondary">{gradesLabel(t.eligibleGrades)}</td>
+                <td>
                   <button
                     type="button"
-                    onClick={() => onEdit(t)}
-                    className="t-body-sm text-hig-link hover:underline"
+                    disabled={activation.isPending}
+                    onClick={() => activation.mutate({ id: t.id, active: !t.active })}
+                    className={`t-caption rounded-full px-2.5 py-1 font-semibold ${
+                      t.active ? "bg-positive/12 text-positive" : "bg-fill text-hig-muted"
+                    }`}
                   >
-                    수정
+                    {t.active ? "활성" : "비활성"}
                   </button>
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </TablePanel>
+                </td>
+                <td className="text-right">
+                  <span className="inline-flex items-center gap-3">
+                    {/* 예약은 별도 화면입니다. 다이얼로그에 넣었더니 그날 하루치만
+                      보여 줄 수 있었는데, 빈 자리는 주 단위로 봐야 고를 수 있습니다. */}
+                    {t.active ? (
+                      <Link
+                        to="/admin/campaigns/reserve"
+                        search={{ template: t.id }}
+                        className="t-body-sm text-hig-link hover:underline"
+                      >
+                        회차 예약
+                      </Link>
+                    ) : (
+                      <span
+                        className="t-body-sm text-hig-muted"
+                        title="비활성 템플릿으로는 회차를 예약할 수 없습니다"
+                      >
+                        회차 예약
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onEdit(t)}
+                      className="t-body-sm text-hig-link hover:underline"
+                    >
+                      수정
+                    </button>
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablePanel>
+      <PageNavigation
+        page={data?.page ?? page}
+        totalPages={data?.totalPages ?? 0}
+        totalElements={data?.totalElements}
+        onChange={setPage}
+      />
+    </>
   );
 }
 
@@ -349,7 +368,7 @@ function TemplateEditor({
       discountRate: policyType === "PERCENT_CAPPED" ? (f.discountRate ?? 20) : null,
       maxDiscountAmount: policyType === "PERCENT_CAPPED" ? (f.maxDiscountAmount ?? 10000) : null,
       discountAmount: policyType === "FIXED_AMOUNT" ? (f.discountAmount ?? 5000) : null,
-      dataGrantMb: policyType === "DATA_GRANT" ? (f.dataGrantMb ?? 1024) : null,
+      dataGrantMb: null,
     }));
 
   const toggleGrade = (g: MembershipGrade) =>
@@ -401,32 +420,26 @@ function TemplateEditor({
 
           <Field label="할인 정책">
             <div className="flex gap-2">
-              {
-                /* 정책은 세 종류입니다. 데이터가 빠져 있어서, 게임스테이션(1GB)처럼
-                   DATA_GRANT 로 만들어진 템플릿을 열면 정책이 둘 중 하나로 보이고
-                   그대로 저장하면 **원래 정책이 조용히 바뀌었습니다.** */
-                (
-                  [
-                    ["PERCENT_CAPPED", "정률 + 상한"],
-                    ["FIXED_AMOUNT", "정액"],
-                    ["DATA_GRANT", "데이터 제공"],
-                  ] as [CouponPolicyType, string][]
-                ).map(([v, label]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setPolicy(v)}
-                    aria-pressed={form.policyType === v}
-                    className={`t-body-sm rounded-full px-3.5 py-1.5 ${
-                      form.policyType === v
-                        ? "bg-hig-fg font-semibold text-hig-surface"
-                        : "bg-fill text-hig-secondary"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))
-              }
+              {(
+                [
+                  ["PERCENT_CAPPED", "정률 + 상한"],
+                  ["FIXED_AMOUNT", "정액"],
+                ] as [CouponPolicyType, string][]
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setPolicy(v)}
+                  aria-pressed={form.policyType === v}
+                  className={`t-body-sm rounded-full px-3.5 py-1.5 ${
+                    form.policyType === v
+                      ? "bg-hig-fg font-semibold text-hig-surface"
+                      : "bg-fill text-hig-secondary"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </Field>
 
@@ -449,15 +462,6 @@ function TemplateEditor({
                 />
               </Field>
             </div>
-          ) : form.policyType === "DATA_GRANT" ? (
-            <Field label="제공 데이터 (MB)">
-              <input
-                type="number"
-                value={form.dataGrantMb ?? 0}
-                onChange={(e) => set("dataGrantMb", Number(e.target.value))}
-                className="input-line num"
-              />
-            </Field>
           ) : (
             <Field label="할인 금액 (원)">
               <input

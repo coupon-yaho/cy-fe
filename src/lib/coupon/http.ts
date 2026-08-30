@@ -12,6 +12,7 @@
  */
 import { CouponApiError } from "./errors";
 import type { CouponApi, MemberContext } from "./contract";
+import { gradesToMask } from "./types";
 import type {
   BrandDay,
   CalendarEntry,
@@ -21,6 +22,7 @@ import type {
   CouponRoundReservation,
   CouponRoundReservationRequest,
   CouponRoundView,
+  CouponRoundStatus,
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
   CouponUseResponse,
@@ -32,65 +34,55 @@ import type {
   ResponseEnvelope,
 } from "./types";
 
-type PublicCouponRoundPage = {
-  content: {
-    couponRoundId: number;
-    templateId: number;
-    brandId: number;
-    name: string;
-    policyType: CouponRoundView["policyType"];
-    discountRate: number | null;
-    maxDiscountAmount: number | null;
-    discountAmount: number | null;
-    validDays: number;
-    eligibleGrades: CouponRoundView["eligibleGrades"];
-    openAt: string;
-    closeAt: string;
-    status: CouponRoundView["status"];
-    totalQuantity: number;
-    remainingQuantity: number;
-  }[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-};
-
-const GRADE_MASK = { WELCOME: 1, SILVER: 2, GOLD: 4, VIP: 8 } as const;
-
-function normalizePublicRound(
-  round: PublicCouponRoundPage["content"][number],
-): CouponRoundView {
-  return {
-    id: round.couponRoundId,
-    templateId: round.templateId,
-    brandId: round.brandId,
-    name: round.name,
-    policyType: round.policyType,
-    discountRate: round.discountRate,
-    maxDiscountAmount: round.maxDiscountAmount,
-    discountAmount: round.discountAmount,
-    dataGrantMb: null,
-    minOrderAmount: null,
-    validDays: round.validDays,
-    eligibleGradesMask: round.eligibleGrades.reduce(
-      (mask, grade) => mask | GRADE_MASK[grade],
-      0,
-    ),
-    eligibleGrades: round.eligibleGrades,
-    openAt: round.openAt,
-    closeAt: round.closeAt,
-    status: round.status,
-    totalQuantity: round.totalQuantity,
-    activeCount: Math.max(0, round.totalQuantity - round.remainingQuantity),
-    queueActive: false,
-  };
-}
-
 const MEMBER_ID = "X-Member-Id";
 const MEMBERSHIP_GRADE = "X-Membership-Grade";
 const USER_ROLE = "X-User-Role";
 const IDEMPOTENCY_KEY = "Idempotency-Key";
+
+type CouponRoundResponse = Omit<
+  CouponRoundView,
+  "id" | "dataGrantMb" | "minOrderAmount" | "eligibleGradesMask" | "activeCount" | "queueActive"
+> & {
+  couponRoundId: number;
+  remainingQuantity: number;
+};
+
+type CouponTemplateResponse = Omit<
+  CouponTemplateDetail,
+  "dataGrantMb" | "minOrderAmount" | "eligibleGradesMask"
+>;
+
+type MemberCouponResponse = Omit<MemberCoupon, "dataGrantMb" | "minOrderAmount">;
+
+function toCouponRound(response: CouponRoundResponse): CouponRoundView {
+  return {
+    ...response,
+    id: response.couponRoundId,
+    dataGrantMb: null,
+    minOrderAmount: null,
+    eligibleGradesMask: gradesToMask(response.eligibleGrades),
+    activeCount: Math.max(0, response.totalQuantity - response.remainingQuantity),
+    queueActive: false,
+  };
+}
+
+function toCouponTemplate(response: CouponTemplateResponse): CouponTemplateDetail {
+  return {
+    ...response,
+    dataGrantMb: null,
+    minOrderAmount: null,
+    eligibleGradesMask: gradesToMask(response.eligibleGrades),
+  };
+}
+
+function toMemberCoupon(response: MemberCouponResponse): MemberCoupon {
+  return { ...response, dataGrantMb: null, minOrderAmount: null };
+}
+
+function templateWriteBody(request: CouponTemplateWriteRequest) {
+  const { dataGrantMb: _dataGrantMb, minOrderAmount: _minOrderAmount, ...body } = request;
+  return body;
+}
 
 function memberHeaders(member: MemberContext): Record<string, string> {
   return {
@@ -159,23 +151,39 @@ export function createHttpApi(baseUrl: string): CouponApi {
 
   const admin = { [USER_ROLE]: "ADMIN" };
 
+  const listRoundPage = (
+    params: {
+      status?: CouponRoundStatus | null;
+      eligibleGrade?: MemberContext["grade"] | null;
+      page?: number;
+      size?: number;
+    } = {},
+  ) => {
+    const q = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+    });
+    if (params.status) q.set("status", params.status);
+    if (params.eligibleGrade) q.set("eligibleGrade", params.eligibleGrade);
+    return call<Page<CouponRoundResponse>>(`/api/v1/coupon-rounds/public?${q}`).then((page) => ({
+      ...page,
+      content: page.content.map(toCouponRound),
+    }));
+  };
+
   return {
     listBrandDays: () => call<BrandDay[]>("/api/v1/brand-days"),
 
-    // 사양서 U2 가 요구한 신규 엔드포인트. 백엔드 미구현이라 붙으면 그대로 동작합니다.
     listCalendar: (from, to) =>
       call<CalendarEntry[]>(
         `/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       ),
 
-    listRounds: async () => {
-      const page = await call<PublicCouponRoundPage>(
-        "/api/v1/coupon-rounds/public?page=0&size=100",
-      );
-      return page.content.map(normalizePublicRound);
-    },
+    listRounds: () => listRoundPage({ size: 100 }).then((page) => page.content),
+    listRoundPage,
 
-    getRound: (id) => call<CouponRoundView>(`/api/v1/coupon-rounds/${id}`),
+    getRound: async (id) =>
+      toCouponRound(await call<CouponRoundResponse>(`/api/v1/coupon-rounds/${id}`)),
 
     enterRound: (id, member) =>
       call<EntryResponse>(`/api/v1/coupons/${id}/entry`, {
@@ -195,11 +203,12 @@ export function createHttpApi(baseUrl: string): CouponApi {
         headers: memberHeaders(member),
       }),
 
-    issue: (couponRoundId, member, entryToken) =>
+    issue: (couponRoundId, member, idempotencyKey, entryToken) =>
       call<CouponIssueResponse>(`/api/v1/coupons/${couponRoundId}/issue`, {
         method: "POST",
         headers: {
           ...memberHeaders(member),
+          [IDEMPOTENCY_KEY]: idempotencyKey,
           ...(entryToken ? { "Entry-Token": entryToken } : {}),
         },
       }),
@@ -209,9 +218,9 @@ export function createHttpApi(baseUrl: string): CouponApi {
       if (params.status) q.set("status", params.status);
       q.set("page", String(params.page ?? 0));
       q.set("size", String(params.size ?? 20));
-      return call<Page<MemberCoupon>>(`/api/v1/coupons?${q}`, {
+      return call<Page<MemberCouponResponse>>(`/api/v1/coupons?${q}`, {
         headers: memberHeaders(member),
-      });
+      }).then((page) => ({ ...page, content: page.content.map(toMemberCoupon) }));
     },
 
     useCoupon: (issuanceId, member, body, idempotencyKey) =>
@@ -245,34 +254,44 @@ export function createHttpApi(baseUrl: string): CouponApi {
         page: String(params.page ?? 0),
         size: String(params.size ?? 20),
       });
-      return call<Page<CouponTemplateDetail>>(`/api/v1/admin/coupon-templates?${q}`, {
+      return call<Page<CouponTemplateResponse>>(`/api/v1/admin/coupon-templates?${q}`, {
         headers: admin,
-      });
+      }).then((page) => ({ ...page, content: page.content.map(toCouponTemplate) }));
     },
 
-    getTemplate: (id) =>
-      call<CouponTemplateDetail>(`/api/v1/admin/coupon-templates/${id}`, { headers: admin }),
+    getTemplate: async (id) =>
+      toCouponTemplate(
+        await call<CouponTemplateResponse>(`/api/v1/admin/coupon-templates/${id}`, {
+          headers: admin,
+        }),
+      ),
 
-    createTemplate: (request: CouponTemplateWriteRequest) =>
-      call<CouponTemplateDetail>("/api/v1/admin/coupon-templates", {
-        method: "POST",
-        headers: admin,
-        body: JSON.stringify(request),
-      }),
+    createTemplate: async (request: CouponTemplateWriteRequest) =>
+      toCouponTemplate(
+        await call<CouponTemplateResponse>("/api/v1/admin/coupon-templates", {
+          method: "POST",
+          headers: admin,
+          body: JSON.stringify(templateWriteBody(request)),
+        }),
+      ),
 
-    updateTemplate: (id, request) =>
-      call<CouponTemplateDetail>(`/api/v1/admin/coupon-templates/${id}`, {
-        method: "PUT",
-        headers: admin,
-        body: JSON.stringify(request),
-      }),
+    updateTemplate: async (id, request) =>
+      toCouponTemplate(
+        await call<CouponTemplateResponse>(`/api/v1/admin/coupon-templates/${id}`, {
+          method: "PUT",
+          headers: admin,
+          body: JSON.stringify(templateWriteBody(request)),
+        }),
+      ),
 
-    changeTemplateActivation: (id, active) =>
-      call<CouponTemplateDetail>(`/api/v1/admin/coupon-templates/${id}/activation`, {
-        method: "PATCH",
-        headers: admin,
-        body: JSON.stringify({ active }),
-      }),
+    changeTemplateActivation: async (id, active) =>
+      toCouponTemplate(
+        await call<CouponTemplateResponse>(`/api/v1/admin/coupon-templates/${id}/activation`, {
+          method: "PATCH",
+          headers: admin,
+          body: JSON.stringify({ active }),
+        }),
+      ),
   };
 }
 

@@ -7,12 +7,11 @@
  * 화면 코드는 여기서 나가는 `couponApi` 만 씁니다.
  */
 import { createHttpApi } from "./http";
-import { createMockApi } from "./mock";
 import type { CouponApi } from "./contract";
 
-const baseUrl = import.meta.env["VITE_API_BASE_URL"] as string | undefined;
+const baseUrl = (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "";
 
-export const couponApi: CouponApi = baseUrl ? createHttpApi(baseUrl) : createMockApi();
+export const couponApi: CouponApi = createHttpApi(baseUrl);
 
 export * from "./types";
 export * from "./errors";

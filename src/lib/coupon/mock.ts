@@ -261,6 +261,23 @@ export function createMockApi(): CouponApi {
         );
     },
 
+    async listRoundPage(params = {}) {
+      await wait(120);
+      const now = Date.now();
+      applyExpiry(now);
+      const rank: Record<CouponRoundStatus, number> = { OPEN: 0, SCHEDULED: 1, CLOSED: 2 };
+      const rows = listRoundStates(now)
+        .map((s) => s.round)
+        .filter((round) => !params.status || round.status === params.status)
+        .filter(
+          (round) => !params.eligibleGrade || round.eligibleGrades.includes(params.eligibleGrade),
+        )
+        .sort(
+          (a, b) => rank[a.status] - rank[b.status] || Date.parse(a.openAt) - Date.parse(b.openAt),
+        );
+      return paginate(rows, params.page ?? 0, params.size ?? 20);
+    },
+
     async getRound(couponRoundId) {
       await wait(90);
       return requireRound(couponRoundId, Date.now()).round;
@@ -446,13 +463,14 @@ export function createMockApi(): CouponApi {
         if (target.status !== "ISSUED") reject("COUPON-310");
         const state = findRoundState(target.couponRoundId, now);
         const discountAmount = state ? calcDiscount(state.round, body.orderAmount) : 0;
+        const orderId = now;
 
         target.status = "USED";
         target.usedAt = new Date(now).toISOString();
-        target.orderId = body.orderId;
+        target.orderId = orderId;
         target.discountAmount = discountAmount;
         target.usages.push({
-          orderId: body.orderId,
+          orderId,
           discountAmount,
           usedAt: target.usedAt,
           canceledAt: null,
@@ -462,7 +480,7 @@ export function createMockApi(): CouponApi {
         return {
           issuanceId,
           status: "USED" as IssuanceStatus,
-          orderId: body.orderId,
+          orderId,
           discountAmount,
           usedAt: target.usedAt,
         };

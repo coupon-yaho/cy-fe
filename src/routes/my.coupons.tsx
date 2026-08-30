@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { SectionHead } from "@/components/coupon/section-head";
 import { CouponTicket } from "@/components/coupon/ticket";
+import { PageNavigation } from "@/components/coupon/page-navigation";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ function MyCoupons() {
   const { notify } = useNotifications();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("ALL");
+  const [page, setPage] = useState(0);
   const [useTarget, setUseTarget] = useState<MemberCoupon | null>(null);
 
   const member: MemberContext | null = session
@@ -55,11 +57,21 @@ function MyCoupons() {
     : null;
 
   const coupons = useQuery({
-    queryKey: ["my-coupons", member?.memberId, tab],
+    queryKey: ["my-coupons", member?.memberId, tab, page],
     queryFn: () =>
-      couponApi.listMyCoupons(member!, { status: tab === "ALL" ? null : tab, size: 50 }),
+      couponApi.listMyCoupons(member!, {
+        status: tab === "ALL" ? null : tab,
+        page,
+        size: 10,
+      }),
     enabled: !!member,
   });
+
+  useEffect(() => {
+    const totalPages = coupons.data?.totalPages;
+    if (totalPages === undefined || page === 0 || page < totalPages) return;
+    setPage(Math.max(0, totalPages - 1));
+  }, [coupons.data?.totalPages, page]);
 
   const rounds = useQuery({
     queryKey: ["rounds"],
@@ -78,11 +90,11 @@ function MyCoupons() {
   };
 
   const useCoupon = useMutation({
-    mutationFn: (input: { coupon: MemberCoupon; orderId: number; orderAmount: number }) =>
+    mutationFn: (input: { coupon: MemberCoupon; orderAmount: number }) =>
       couponApi.useCoupon(
         input.coupon.issuanceId,
         member!,
-        { orderId: input.orderId, orderAmount: input.orderAmount },
+        { orderAmount: input.orderAmount },
         newIdempotencyKey(),
       ),
     onSuccess: (result, input) => {
@@ -91,7 +103,7 @@ function MyCoupons() {
       toast.success(`${result.discountAmount.toLocaleString("ko-KR")}원 깎았습니다`);
       notify(
         "used",
-        "쿠폰을 썼습니다",
+        "쿠폰이 사용되었습니다.",
         `${input.coupon.name} · ${result.discountAmount.toLocaleString("ko-KR")}원 할인 · 주문 ${result.orderId}`,
       );
     },
@@ -104,7 +116,11 @@ function MyCoupons() {
     onSuccess: (_, coupon) => {
       refresh();
       toast.success("사용을 취소했습니다");
-      notify("restored", "쿠폰이 되살아났습니다", `${coupon.name} · 사용 기한은 그대로입니다`);
+      notify(
+        "restored",
+        "쿠폰 사용이 취소되었습니다.",
+        `${coupon.name} · 사용 기한은 그대로입니다`,
+      );
     },
     onError: (error) => toast.error(errorLine(error)),
   });
@@ -140,7 +156,10 @@ function MyCoupons() {
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setPage(0);
+            }}
             aria-pressed={tab === t.key}
             className={`yh-body rounded-[3px] px-3.5 py-1.5 font-semibold transition-colors ${
               tab === t.key
@@ -162,65 +181,71 @@ function MyCoupons() {
       ) : rows.length === 0 ? (
         <EmptyWallet tab={tab} />
       ) : (
-        <ul className="mt-12 space-y-5">
-          {rows.map((c) => (
-            <li key={c.issuanceId}>
-              <CouponTicket
-                coupon={c}
-                brandId={brandByRound.get(c.couponRoundId) ?? 0}
-                dimmed={c.status === "EXPIRED" || c.status === "CANCELLED"}
-                actions={
-                  c.status === "ISSUED" ? (
-                    <>
+        <>
+          <ul className="mt-12 space-y-5">
+            {rows.map((c) => (
+              <li key={c.issuanceId}>
+                <CouponTicket
+                  coupon={c}
+                  brandId={brandByRound.get(c.couponRoundId) ?? 0}
+                  dimmed={c.status === "EXPIRED" || c.status === "CANCELLED"}
+                  actions={
+                    c.status === "ISSUED" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => cancelIssue.mutate(c)}
+                          className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
+                        >
+                          발급 취소
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setUseTarget(c)}
+                          className="yh-btn-sm"
+                        >
+                          사용하기
+                        </button>
+                      </>
+                    ) : c.status === "USED" ? (
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => cancelIssue.mutate(c)}
+                        onClick={() => cancelUse.mutate(c)}
                         className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
                       >
-                        발급 취소
+                        사용 취소
                       </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setUseTarget(c)}
-                        className="yh-btn-sm"
-                      >
-                        사용하기
-                      </button>
-                    </>
-                  ) : c.status === "USED" ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => cancelUse.mutate(c)}
-                      className="yh-small font-bold text-yh-ink-2 underline underline-offset-4 transition-colors hover:text-yh-accent disabled:opacity-40"
-                    >
-                      사용 취소
-                    </button>
-                  ) : null
-                }
-              />
-            </li>
-          ))}
-        </ul>
+                    ) : null
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+          <PageNavigation
+            page={coupons.data?.page ?? page}
+            totalPages={coupons.data?.totalPages ?? 0}
+            totalElements={coupons.data?.totalElements}
+            onChange={setPage}
+          />
+        </>
       )}
 
       <UseDialog
         coupon={useTarget}
         pending={useCoupon.isPending}
         onClose={() => setUseTarget(null)}
-        onSubmit={(orderId, orderAmount) =>
-          useCoupon.mutate({ coupon: useTarget!, orderId, orderAmount })
-        }
+        onSubmit={(orderAmount) => useCoupon.mutate({ coupon: useTarget!, orderAmount })}
       />
     </div>
   );
 }
 
 /* ── 사용 다이얼로그 ────────────────────────────────
-   실제 결제 연동이 없으므로 주문 번호와 결제 금액을 직접 넣습니다.
-   백엔드 CouponUseRequest 가 정확히 이 둘을 받습니다. */
+   실제 결제 연동이 없으므로 결제 금액을 직접 넣습니다.
+   주문 번호는 백엔드가 쿠폰 사용 처리 시 생성합니다. */
 
 function UseDialog({
   coupon,
@@ -231,15 +256,14 @@ function UseDialog({
   coupon: MemberCoupon | null;
   pending: boolean;
   onClose: () => void;
-  onSubmit: (orderId: number, orderAmount: number) => void;
+  onSubmit: (orderAmount: number) => void;
 }) {
-  const [orderId, setOrderId] = useState("88213");
   const [orderAmount, setOrderAmount] = useState("42000");
 
   const amount = Number(orderAmount) || 0;
   const discount = coupon ? calcDiscount(coupon, amount) : 0;
   const payable = Math.max(0, amount - discount);
-  const valid = Number(orderId) > 0 && amount > 0;
+  const valid = amount > 0;
 
   return (
     <Dialog open={!!coupon} onOpenChange={(o) => !o && onClose()}>
@@ -248,21 +272,11 @@ function UseDialog({
         <DialogHeader>
           <DialogTitle className="yh-sub">쿠폰 사용</DialogTitle>
           <DialogDescription className="yh-small text-yh-ink-2">
-            {coupon?.name} · 주문 번호와 결제 금액을 넣으면 할인액이 정해집니다.
+            {coupon?.name} · 결제 금액을 넣으면 할인액이 정해집니다.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          <label className="block">
-            <span className="yh-label">주문 번호</span>
-            <input
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value.replace(/\D/g, ""))}
-              inputMode="numeric"
-              className="yh-input yh-num mt-2"
-            />
-          </label>
-
           <label className="block">
             <span className="yh-label">결제 금액</span>
             <div className="yh-input mt-2 flex items-center p-0 focus-within:border-yh-navy">
@@ -305,7 +319,7 @@ function UseDialog({
           <button
             type="button"
             disabled={!valid || pending}
-            onClick={() => onSubmit(Number(orderId), amount)}
+            onClick={() => onSubmit(amount)}
             className="yh-btn"
           >
             {pending ? "처리 중" : "쿠폰 사용"}

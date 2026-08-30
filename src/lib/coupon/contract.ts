@@ -25,6 +25,7 @@ import type {
   CouponCancelUseResponse,
   CouponIssueResponse,
   CouponRoundView,
+  CouponRoundStatus,
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
   CouponUseResponse,
@@ -44,35 +45,26 @@ export interface MemberContext {
 
 export interface CouponApi {
   /**
-   * ⚠️ GET /api/v1/coupon-rounds — CouponRoundController
-   *
-   * 있지만 응답이 `IssuableCouponRoundResponse`(11개 필드)라 아래가 안 옵니다.
-   *   status · totalQuantity · queueActive · eligibleGradesMask ·
-   *   dataGrantMb · minOrderAmount · templateId
-   *
-   * status 가 없는 건 누락이 아니라 설계로 보입니다 — 이름이 **Issuable**CouponRound 이고
-   * 테스트가 "등급 제외 · 재고 소진 · 이미 종료 · 이미 발급" 을 전부 걸러 냅니다.
-   * 지금 발급 가능한 것만 주는 목록입니다. 그래서 화면의 "오픈 예정 / 마감" 배지는
-   * 이 엔드포인트로는 못 만듭니다. 필드를 더할지 별도 조회를 둘지 합의가 필요합니다.
-   * (status 자체는 DB 에 있고 CouponRoundLifecycleScheduler 가 실제로 전이시킵니다.)
+   * GET /api/v1/coupon-rounds/public
+   * 목록이 필요하지만 페이지를 직접 제어하지 않는 화면을 위한 편의 메서드입니다.
    */
   listRounds(): Promise<CouponRoundView[]>;
-  /** ❌ GET /api/v1/coupon-rounds/{couponRoundId} — 단건 조회가 없습니다 */
+  /** GET /api/v1/coupon-rounds/public — 상태·회원 등급·페이지 조건을 서버에 전달합니다. */
+  listRoundPage(params?: {
+    status?: CouponRoundStatus | null;
+    eligibleGrade?: MembershipGrade | null;
+    page?: number;
+    size?: number;
+  }): Promise<Page<CouponRoundView>>;
+  /** GET /api/v1/coupon-rounds/{couponRoundId} — 공개 쿠폰 회차 상세 */
   getRound(couponRoundId: number): Promise<CouponRoundView>;
 
-  /**
-   * ❌ GET /api/v1/brand-days — 브랜드별 반복 일정(매달 N번째 X요일)
-   *
-   * 사양서 U1 화면을 그리려고 **프론트가 정의한 경로**입니다. 백엔드와 합의된 적이
-   * 없고 어느 브랜치에도 없습니다. 남길지부터 정해야 합니다.
-   */
+  /** GET /api/v1/brand-days — 활성 템플릿의 브랜드 데이 반복 일정 */
   listBrandDays(): Promise<BrandDay[]>;
 
   /**
-   * ❌ GET /api/v1/calendar?from&to — 기간 내 브랜드 데이 회차
+   * GET /api/v1/calendar?from&to — 기간 내 브랜드 데이 일정
    * from · to 는 "YYYY-MM-DD" 입니다.
-   *
-   * 사양서 U2 달력을 그리려고 **프론트가 정의한 경로**입니다. brand-days 와 같은 처지입니다.
    */
   listCalendar(from: string, to: string): Promise<CalendarEntry[]>;
 
@@ -94,6 +86,7 @@ export interface CouponApi {
   issue(
     couponRoundId: number,
     member: MemberContext,
+    idempotencyKey: string,
     entryToken?: string | null,
   ): Promise<CouponIssueResponse>;
 
@@ -114,7 +107,7 @@ export interface CouponApi {
   useCoupon(
     issuanceId: number,
     member: MemberContext,
-    body: { orderId: number; orderAmount: number },
+    body: { orderAmount: number },
     idempotencyKey: string,
   ): Promise<CouponUseResponse>;
 

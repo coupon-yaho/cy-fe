@@ -20,6 +20,7 @@ import {
   isCouponApiError,
   isRetryable,
   gradesLabel,
+  newIdempotencyKey,
   remainingStock,
   type CouponIssueResponse,
   type CouponRoundView,
@@ -48,6 +49,9 @@ type Phase =
 
 /** PRD — entryToken TTL 180초. 서버가 expiresIn 을 주면 그 값이 우선입니다. */
 const ENTRY_TTL_SECONDS = 180;
+
+/* 대기열 API는 v2/v3 담당 범위입니다. 현재 백엔드는 발급 API를 직접 제공합니다. */
+const QUEUE_API_ENABLED = false;
 
 /* 대기 중 새로고침해도 순번이 유지되게 토큰을 남깁니다.
    PRD 설계 규칙 5 — "/entry 중복 호출은 기존 queueToken 반환(멱등).
@@ -95,6 +99,7 @@ function RoundDetail() {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const issueKeyRef = useRef(newIdempotencyKey());
 
   const { data: round, isLoading } = useQuery({
     queryKey: ["round", roundId],
@@ -115,7 +120,7 @@ function RoundDetail() {
     async (member: MemberContext, entryToken: string | null, fromQueue = false) => {
       setPhase({ kind: "issuing", fromQueue });
       try {
-        const issuance = await couponApi.issue(roundId, member, entryToken);
+        const issuance = await couponApi.issue(roundId, member, issueKeyRef.current, entryToken);
         clearQueue();
         setPhase({ kind: "done", issuance });
         notify(
@@ -173,6 +178,10 @@ function RoundDetail() {
      따라가고, 그 사이 순서가 왔으면 admitted 로 바로 들어갑니다. */
   const resumedRef = useRef(false);
   useEffect(() => {
+    if (!QUEUE_API_ENABLED) {
+      clearQueue();
+      return;
+    }
     if (resumedRef.current || !session) return;
     const saved = loadQueue();
     if (!saved || saved.roundId !== roundId || saved.memberId !== session.memberId) return;
@@ -214,6 +223,11 @@ function RoundDetail() {
     if (!session) return;
     const member: MemberContext = { memberId: session.memberId, grade: session.grade };
     setPhase({ kind: "entering" });
+
+    if (!QUEUE_API_ENABLED) {
+      await runIssue(member, null);
+      return;
+    }
 
     try {
       const entry = await couponApi.enterRound(roundId, member);
