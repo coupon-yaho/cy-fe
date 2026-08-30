@@ -28,6 +28,11 @@ function localEnv(key: string): string {
 const apiOrigin = process.env["API_ORIGIN"] || localEnv("API_ORIGIN") || "http://localhost:8080";
 const batchOrigin =
   process.env["BATCH_ORIGIN"] || localEnv("BATCH_ORIGIN") || "http://localhost:9091";
+
+// 대조군 배치. **배치 한 대는 DB 하나만 본다**(DB_NAME) — 오염셋과 정상셋은 서로 다른
+// DB 에 있으므로 둘을 나란히 보여 주려면 배치가 두 대여야 한다. 안 띄웠으면 이 값을
+// 비워 두면 되고, 그때 화면은 지금까지처럼 한 셋만 그린다.
+const batchAltOrigin = process.env["BATCH_ALT_ORIGIN"] || localEnv("BATCH_ALT_ORIGIN");
 const batchToken = process.env["BATCH_ADMIN_TOKEN"] || localEnv("BATCH_ADMIN_TOKEN");
 
 type ProxyLike = {
@@ -58,6 +63,23 @@ export default defineConfig({
             });
           },
         },
+        // 대조군 배치. 토큰은 같은 것을 쓴다 — 같은 사람이 띄운 같은 규약의 배치다.
+        // 안 띄웠으면 이 프록시가 502 를 내고, 화면이 그 셋을 조용히 뺀다.
+        ...(batchAltOrigin
+          ? {
+              "/batch-alt-api": {
+                target: batchAltOrigin,
+                changeOrigin: true,
+                rewrite: (path: string) => path.replace(/^\/batch-alt-api/, ""),
+                configure: (proxy: ProxyLike) => {
+                  proxy.on("proxyReq", (proxyReq) => {
+                    const token = batchToken;
+                    if (token) proxyReq.setHeader("X-Batch-Admin-Token", token);
+                  });
+                },
+              },
+            }
+          : {}),
       },
     },
   },

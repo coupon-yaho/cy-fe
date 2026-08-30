@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Panel, TablePanel } from "@/components/admin/panel";
 import {
@@ -25,20 +25,73 @@ import {
  * 그래서 여기만 체크섬이 있다 — 같은 {@code asOf} 로 다시 돌려 같은 값이 나오는 것이
  * "이 판정을 믿어도 된다" 의 근거다.
  */
-/** 폴링 간격. 오염셋이 20초 안쪽이라 이 정도면 끝나는 순간을 놓치지 않는다. */
-const RERUN_POLL_MS = 2000;
+/**
+ * 도는 중일 때 폴링 간격. 훑은 행 수가 <b>진짜로 이 주기에 맞춰 올라간다</b> —
+ * 실측으로 10초 동안 0 → 24,000 → 100,000 → … → 600,200 이었다.
+ */
+const LIVE_POLL_MS = 1000;
 
 /**
- * 폴링을 접는 시각. 정상셋 실측이 177초라 그 배 이상을 준다 —
- * 짧게 잡으면 <b>돌고 있는 검증을 실패로 적는다.</b>
+ * 도는 것이 없을 때 간격. 아주 끄지는 않는다 — 검증을 다른 사람이나 스케줄러가
+ * 시작할 수도 있고, 그때도 이 화면이 알아서 살아나야 한다.
  */
-const RERUN_TIMEOUT_MS = 6 * 60 * 1000;
+const IDLE_POLL_MS = 5000;
 
 type RerunState =
   | { phase: "idle" }
   | { phase: "requesting" }
-  | { phase: "running"; executionId: number; attempt: number; since: number }
+  | { phase: "accepted"; attempt: number }
   | { phase: "error"; message: string };
+
+/**
+ * 숫자를 목표값까지 굴린다.
+ *
+ * <p>훑은 행 수는 1초마다 24,000 → 100,000 처럼 뛰어서 들어온다. 그대로 찍으면
+ * 값이 <b>툭툭 갈아 끼워지지</b> 실시간으로 안 읽힌다. 사이를 메워야 "지금 훑고 있다" 가
+ * 눈에 보인다. 움직임을 줄여 달라고 한 사용자에게는 굴리지 않고 바로 세운다.
+ */
+function useCountUp(target: number, resetKey?: string | number): number {
+  const [shown, setShown] = useState(target);
+  const shownRef = useRef(target);
+  const keyRef = useRef(resetKey);
+
+  useEffect(() => {
+    shownRef.current = shown;
+  }, [shown]);
+
+  useEffect(() => {
+    // 다른 실행으로 바뀌었으면 굴리지 않고 바로 세운다. 앞 실행이 60만 행이었는데
+    // 새 실행이 5만 행에서 시작하면, 굴림이 **거꾸로 내려가** 되감기처럼 보인다.
+    if (keyRef.current !== resetKey) {
+      keyRef.current = resetKey;
+      shownRef.current = target;
+      setShown(target);
+      return;
+    }
+    const from = shownRef.current;
+    if (from === target) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setShown(target);
+      return;
+    }
+    const started = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - started) / COUNT_UP_MS);
+      // 끝에서 부드럽게 선다. 선형이면 마지막 숫자가 툭 멈춰 어색하다.
+      const eased = 1 - (1 - p) ** 3;
+      setShown(from + (target - from) * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, resetKey]);
+
+  return shown;
+}
+
+/** 폴링 간격보다 조금 짧게. 다음 값이 올 때 앞 굴림이 이미 서 있어야 안 밀린다. */
+const COUNT_UP_MS = 800;
 
 export function BatchVerification() {
   const [report, setReport] = useState<VerifyReport>();
@@ -68,14 +121,44 @@ export function BatchVerification() {
     return standings;
   }, []);
 
+  /**
+   * <b>계속 되읽는다.</b> 도는 중이면 1초, 아니면 5초.
+   *
+   * <p>한 번만 읽고 마는 화면이면 재검증을 눌러도 다 끝난 뒤에야 결과가 바뀐다.
+   * 그런데 이 배치는 <b>도는 동안 훑은 행 수가 실제로 올라간다</b>(실측). 그것을
+   * 그대로 내보내면 "지금 검증하고 있다" 가 화면에서 보인다.
+   *
+   * <p>도는 것을 <b>내 클릭이 아니라 잡 상태로</b> 판단한다. 그래야 스케줄러가
+   * 시작했거나 다른 사람이 눌렀을 때도 이 화면이 같이 살아난다.
+   */
   useEffect(() => {
     const ac = new AbortController();
-    void load(ac.signal);
-    return () => ac.abort();
+    let timer = 0;
+    let stopped = false;
+
+    const cycle = async () => {
+      const standings = await load(ac.signal);
+      if (stopped || ac.signal.aborted) return;
+      const live = standings?.find((j) => j.jobName === "verifyJob")?.latest?.status === "STARTED";
+      timer = window.setTimeout(() => void cycle(), live ? LIVE_POLL_MS : IDLE_POLL_MS);
+    };
+
+    void cycle();
+    return () => {
+      stopped = true;
+      ac.abort();
+      window.clearTimeout(timer);
+    };
   }, [load]);
 
   const [rerun, setRerun] = useState<RerunState>({ phase: "idle" });
   const [now, setNow] = useState(() => Date.now());
+
+  /** 지금 도는 검증 잡. 있으면 화면 전체가 "검증 중" 으로 바뀐다. */
+  const running = useMemo(() => {
+    const latest = jobs.find((j) => j.jobName === "verifyJob")?.latest;
+    return latest && latest.status === "STARTED" ? latest : null;
+  }, [jobs]);
 
   /** 다시 돌릴 근거가 되는 실행. 여기 값을 그대로 되돌려 보내므로 화면이 값을 안 만든다. */
   const source = report?.run;
@@ -87,20 +170,15 @@ export function BatchVerification() {
     source && source.dataset === "CORRUPT" && source.seedRunId === null
       ? "정답 묶음(seedRunId)이 없는 실행이라 다시 돌릴 수 없습니다."
       : undefined;
-  const busy = rerun.phase === "requesting" || rerun.phase === "running";
+  const busy = rerun.phase === "requesting" || running !== null;
 
   const startRerun = useCallback(async () => {
     if (!source || blocked) return;
     setRerun({ phase: "requesting" });
     try {
       const accepted = await rerunVerify(source);
-      setRerun({
-        phase: "running",
-        executionId: accepted.executionId,
-        attempt: accepted.attempt,
-        since: Date.now(),
-      });
-      setNow(Date.now());
+      // 여기서 "도는 중" 으로 바꾸지 않는다 — 그 판단은 폴링이 잡 상태로 한다.
+      setRerun({ phase: "accepted", attempt: accepted.attempt });
     } catch (e) {
       setRerun({
         phase: "error",
@@ -113,54 +191,37 @@ export function BatchVerification() {
 
   /** 도는 동안 초를 센다. 17초든 3분이든 "멈춘 게 아니다" 를 화면이 말해야 한다. */
   useEffect(() => {
-    if (rerun.phase !== "running") return;
+    if (!running) return;
+    setNow(Date.now());
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [rerun.phase]);
+  }, [running]);
 
   /**
-   * 접수는 202 라 결과가 즉시 안 온다. 끝날 때까지 화면 전체를 다시 읽는다 —
-   * 이력 표에 줄이 하나 쌓이고 같은 체크섬 칩이 붙는 것이 이 버튼의 목적이다.
-   *
-   * <p>완료 판정은 <b>실행 이력이 아니라 잡 실행</b>으로 한다. 실행 행({@code runId})은
-   * 잡이 가드를 다 통과한 뒤에야 생겨서, 그전에 죽으면 영영 안 나타난다. 잡 실행은
-   * 접수 즉시 존재하므로 실패도 같이 잡힌다.
+   * 경과 초. <b>서버의 {@code startedAt} 으로 재면 안 된다</b> — 존이 없는 문자열이라
+   * 브라우저가 지역시각으로 읽는데 배치는 UTC 라 아홉 시간이 밀린다. 그래서 이 화면이
+   * 그 실행을 <b>처음 본 시각</b>부터 잰다. 도중에 페이지를 연 경우 실제보다 짧게 나오지만,
+   * 여기서 필요한 것은 정확한 소요가 아니라 "멈춘 게 아니다" 라는 신호다.
+   * (확정 소요는 실행이 끝난 뒤 이력 표가 서버 값으로 적는다.)
    */
+  const [seenAt, setSeenAt] = useState<{ executionId: number; at: number } | null>(null);
   useEffect(() => {
-    if (rerun.phase !== "running") return;
-    const ac = new AbortController();
-    let timer = 0;
-    let stopped = false;
+    if (!running) {
+      setSeenAt(null);
+      return;
+    }
+    setSeenAt((prev) =>
+      prev && prev.executionId === running.executionId
+        ? prev
+        : { executionId: running.executionId, at: Date.now() },
+    );
+  }, [running]);
+  const elapsedSeconds = seenAt ? Math.max(0, Math.round((now - seenAt.at) / 1000)) : 0;
 
-    const step = async () => {
-      const standings = await load(ac.signal);
-      if (stopped || ac.signal.aborted) return;
-      const latest = standings?.find((j) => j.jobName === "verifyJob")?.latest;
-      if (latest && latest.executionId === rerun.executionId && latest.status !== "STARTED") {
-        setRerun(
-          latest.status === "COMPLETED"
-            ? { phase: "idle" }
-            : { phase: "error", message: `검증 잡이 ${latest.status} 로 끝났습니다.` },
-        );
-        return;
-      }
-      if (Date.now() - rerun.since > RERUN_TIMEOUT_MS) {
-        setRerun({
-          phase: "error",
-          message: "제한 시간 안에 안 끝났습니다. 배치 로그를 확인하십시오.",
-        });
-        return;
-      }
-      timer = window.setTimeout(() => void step(), RERUN_POLL_MS);
-    };
-
-    timer = window.setTimeout(() => void step(), RERUN_POLL_MS);
-    return () => {
-      stopped = true;
-      ac.abort();
-      window.clearTimeout(timer);
-    };
-  }, [rerun, load]);
+  /** 접수 안내는 실제로 돌기 시작하면 치운다 — 그때부터는 진행 상황이 말해 준다. */
+  useEffect(() => {
+    if (running && rerun.phase === "accepted") setRerun({ phase: "idle" });
+  }, [running, rerun.phase]);
 
   /**
    * 같은 {@code asOf} 로 두 번 이상 돌았고 체크섬이 전부 같은가.
@@ -227,6 +288,33 @@ export function BatchVerification() {
     return latest && latest.startedAt === report?.run.startedAt ? latest : null;
   }, [jobs, report]);
 
+  /**
+   * 화면에 적을 행 수. <b>도는 중이면 지금 도는 실행의 값</b>이다 — 배치가 청크를
+   * 커밋할 때마다 실제로 올라가므로(실측) 그대로 내보내면 진행이 눈에 보인다.
+   * 도는 것이 없으면 이 판정을 만든 실행의 값이고, 못 짝지으면 안 적는다.
+   */
+  const scanRows = running ? (running.stepReadTotal ?? 0) : (scanJob?.stepReadTotal ?? null);
+  const shownRows = useCountUp(scanRows ?? 0, (running ?? scanJob)?.executionId);
+
+  /**
+   * 진행률의 분모 — <b>지난 완료 실행이 훑은 총 행수</b>다.
+   *
+   * <p>서버가 "이번에 몇 행을 훑을 예정" 을 안 알려 준다. 그런데 같은 asOf·같은 데이터면
+   * 훑는 양이 같으므로(그게 이 패널이 증명하는 것이다) 지난 실행 값이 좋은 어림이다.
+   * 어림인 것을 화면에도 적는다 — 100% 에서 잠깐 멈춰 서는 일이 있을 수 있다.
+   */
+  const lastCompletedRows = useRef<number | null>(null);
+  useEffect(() => {
+    if (!running && scanJob?.stepReadTotal) lastCompletedRows.current = scanJob.stepReadTotal;
+  }, [running, scanJob]);
+  const progress =
+    running && lastCompletedRows.current
+      ? Math.min(1, (running.stepReadTotal ?? 0) / lastCompletedRows.current)
+      : null;
+
+  /** 적중률도 굴린다 — 100.0 이 툭 나타나는 것보다 차오르는 편이 읽힌다. */
+  const shownHitRate = useCountUp(hitRate ?? 0, report?.run.id);
+
   /** 아직 한 번도 안 돈 잡. 표 위 문구가 그것부터 말하게 한다. */
   const idleJobs = useMemo(() => jobs.filter((j) => j.runCount === 0), [jobs]);
 
@@ -254,24 +342,29 @@ export function BatchVerification() {
               그대로 가져오고 attempt 는 서버가 정한다. 누를 것만 남긴다. */}
           <button
             type="button"
-            className="btn-compact"
+            className="inline-flex size-9 items-center justify-center rounded-full border border-hairline text-hig-secondary transition-colors hover:bg-fill disabled:opacity-40"
             onClick={() => void startRerun()}
             disabled={!source || blocked !== undefined || busy}
-            {...(blocked ? { title: blocked } : {})}
+            title={blocked ?? "같은 asOf 로 다시 검증"}
+            aria-label="같은 asOf 로 다시 검증"
           >
-            {rerun.phase === "requesting"
-              ? "접수 중…"
-              : rerun.phase === "running"
-                ? `검증 중 · ${Math.max(0, Math.round((now - rerun.since) / 1000))}초`
-                : "같은 asOf 로 다시 검증"}
+            <RefreshIcon spinning={busy} />
           </button>
         </div>
       </header>
 
-      {rerun.phase === "running" && (
+      {running && (
+        <p className="surface-card t-body-sm flex flex-wrap items-center gap-x-2 px-5 py-3 text-hig-secondary">
+          <span className="font-semibold text-hig-fg">검증 중</span>
+          <span className="num">{elapsedSeconds}초</span>
+          <span>· 끝나면 이력에 줄이 하나 쌓입니다 — 재현이라면 체크섬이 위와 같습니다.</span>
+        </p>
+      )}
+
+      {!running && rerun.phase === "accepted" && (
         <p className="surface-card t-body-sm px-5 py-3 text-hig-secondary">
-          attempt <span className="num font-semibold">{rerun.attempt}</span> 로 접수했습니다. 끝나면
-          이력에 줄이 하나 쌓입니다 — 같은 판정이라면 체크섬이 위와 같아야 합니다.
+          attempt <span className="num font-semibold">{rerun.attempt}</span> 로 접수했습니다. 곧
+          시작합니다.
         </p>
       )}
 
@@ -300,13 +393,20 @@ export function BatchVerification() {
         <>
           <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr_1fr]">
             <Panel
+              className={running ? "opacity-60 transition-opacity" : "transition-opacity"}
               title={manifest?.present ? "적중률" : "검출"}
-              hint={manifest?.present ? "심은 것을 그대로 잡았나" : "정상셋은 0이 정답"}
+              hint={
+                running
+                  ? "이전 판정 · 새 검증이 도는 중"
+                  : manifest?.present
+                    ? "심은 것을 그대로 잡았나"
+                    : "정상셋은 0이 정답"
+              }
             >
               {manifest?.present ? (
                 <>
                   <p className={`t-hero num ${matched ? "text-hig-fg" : "text-viz-critical"}`}>
-                    {(hitRate ?? 0).toFixed(1)}
+                    {shownHitRate.toFixed(1)}
                     <span className="t-title"> %</span>
                   </p>
                   <div className="mt-3">
@@ -359,37 +459,66 @@ export function BatchVerification() {
             {/* TablePanel 이 아니라 Panel 이다 — TablePanel 안쪽 overflow-x-auto 가
                 세로까지 잘라서 조각 위에 뜨는 말풍선이 잘린다. */}
             <Panel
+              className={running ? "opacity-60 transition-opacity" : "transition-opacity"}
               title="검출 대조"
-              hint={manifest?.present ? "규칙별 비중" : "여섯 규칙 전부 0이어야 한다"}
+              hint={
+                running
+                  ? "이전 판정"
+                  : manifest?.present
+                    ? "규칙별 비중"
+                    : "여섯 규칙 전부 0이어야 한다"
+              }
             >
               <FindingDonut byType={report.byType} total={total} />
             </Panel>
 
-            <Panel title="훑은 양" hint="이 판정이 본 범위">
-              <p className="t-hero num">
-                {scanJob ? (
+            <Panel title="훑은 양" hint={running ? "지금 훑는 중" : "이 판정이 본 범위"}>
+              <p className={`t-hero num ${running ? "text-hig-fg" : ""}`}>
+                {scanRows === null ? (
+                  <span className="text-hig-muted">—</span>
+                ) : (
                   <>
-                    {(scanJob.stepReadTotal ?? 0).toLocaleString("ko-KR")}
+                    {Math.round(shownRows).toLocaleString("ko-KR")}
                     <span className="t-title"> 행</span>
                   </>
-                ) : (
-                  <span className="text-hig-muted">—</span>
                 )}
               </p>
               <dl className="t-body-sm mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-hig-secondary">
-                <dt>asOf</dt>
+                {/* "asOf" 는 화면 밖 사람에게 아무 뜻이 없다. 무엇인지 먼저 적고
+                    서버 파라미터 이름을 작게 곁들인다. */}
+                <dt>
+                  기준 시각 <span className="num t-caption text-hig-muted">asOf</span>
+                </dt>
                 <dd className="num text-hig-fg">{report.run.asOf.replace("T", " ")}</dd>
                 <dt>소요</dt>
                 <dd className="num text-hig-fg">
-                  {elapsed(report.run.startedAt, report.run.finishedAt)}
+                  {running
+                    ? `${elapsedSeconds}초 째`
+                    : elapsed(report.run.startedAt, report.run.finishedAt)}
                 </dd>
                 <dt>체크섬</dt>
                 <dd className="num text-hig-fg">
-                  {report.run.findingsChecksum ? report.run.findingsChecksum.slice(0, 12) : "—"}
+                  {running ? (
+                    <span className="text-hig-muted">계산 중</span>
+                  ) : report.run.findingsChecksum ? (
+                    report.run.findingsChecksum.slice(0, 12)
+                  ) : (
+                    "—"
+                  )}
                 </dd>
               </dl>
+              {progress !== null && (
+                <div className="mt-4">
+                  <Bar ratio={progress} tone="var(--hig-foreground)" />
+                  <p className="t-caption mt-1.5 text-hig-muted">
+                    지난 실행이 훑은 양 기준 {Math.round(progress * 100)}% · 어림이다
+                  </p>
+                </div>
+              )}
               <p className="t-caption mt-3 text-hig-muted">
-                같은 asOf 로 다시 돌리면 이 체크섬이 같아야 한다.
+                {running
+                  ? "이 시각까지의 이력만 접는다. 그래서 몇 번을 돌려도 답이 같다."
+                  : "같은 기준 시각으로 다시 돌리면 이 체크섬이 같아야 한다."}
               </p>
             </Panel>
           </div>
@@ -410,7 +539,7 @@ export function BatchVerification() {
                   <th>run</th>
                   <th>판정</th>
                   <th>셋</th>
-                  <th>asOf</th>
+                  <th>기준 시각</th>
                   <th className="text-right">검출</th>
                   <th className="text-right">소요</th>
                   <th>체크섬</th>
@@ -571,6 +700,7 @@ function FindingDonut({
     value: byType[type] ?? 0,
   }));
   const drawn = slices.filter((s) => s.value > 0);
+  const shownTotal = useCountUp(total);
 
   return (
     <div className="flex flex-col">
@@ -602,7 +732,9 @@ function FindingDonut({
           </ResponsiveContainer>
           {/* 가운데는 합계다. 조각을 다 더하면 얼마인지가 원형에서 안 읽힌다. */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="t-tile num font-semibold">{total.toLocaleString("ko-KR")}</span>
+            <span className="t-tile num font-semibold">
+              {Math.round(shownTotal).toLocaleString("ko-KR")}
+            </span>
             <span className="t-caption -mt-0.5 text-hig-muted">건</span>
           </div>
         </div>
@@ -647,6 +779,28 @@ function FindingDonut({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * 새로고침 아이콘. 다른 서비스들이 쓰는 그 원형 화살표다 — 라벨 없이도 뜻이 통한다.
+ * 도는 동안 같이 돌려서 "누른 게 먹었다" 를 즉시 알린다.
+ */
+function RefreshIcon({ spinning }: { spinning: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`size-4 ${spinning ? "animate-spin" : ""}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M13.4 8a5.4 5.4 0 1 1-1.63-3.86" />
+      <path d="M13.6 2.2v2.6h-2.6" />
+    </svg>
   );
 }
 
