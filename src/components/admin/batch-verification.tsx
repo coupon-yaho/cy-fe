@@ -400,7 +400,7 @@ export function BatchVerification() {
           {/* 패널마다 붙어 있던 설명을 여기 한 줄로 모았다 — 카드마다 회색 문장이
               달려 있으면 화면이 값보다 말로 읽힌다. */}
           <p className="t-body-sm mt-1.5 text-hig-secondary">
-            같은 기준 시각으로 다시 돌리면 체크섬이 같아야 한다.
+            같은 기준 시각으로 재실행하면 체크섬이 같아야 한다.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -635,8 +635,8 @@ export function BatchVerification() {
               determinism.conflicting > 0
                 ? `같은 기준 시각이 다른 체크섬을 냈다 — ${determinism.conflicting}건`
                 : determinism.repeats > 0
-                  ? `같은 체크섬이 ${determinism.repeats}회 재현됐다`
-                  : "같은 기준 시각은 같은 체크섬이어야 한다"
+                  ? `같은 체크섬 ${determinism.repeats}회 재현`
+                  : "같은 기준 시각 → 같은 체크섬"
             }
           >
             <table className="ops-table">
