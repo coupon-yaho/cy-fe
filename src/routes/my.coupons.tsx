@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { SectionHead } from "@/components/coupon/section-head";
 import { CouponTicket } from "@/components/coupon/ticket";
@@ -66,6 +66,12 @@ function MyCoupons() {
       }),
     enabled: !!member,
   });
+
+  useEffect(() => {
+    const totalPages = coupons.data?.totalPages;
+    if (totalPages === undefined || page === 0 || page < totalPages) return;
+    setPage(Math.max(0, totalPages - 1));
+  }, [coupons.data?.totalPages, page]);
 
   const rounds = useQuery({
     queryKey: ["rounds"],

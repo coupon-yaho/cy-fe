@@ -174,7 +174,6 @@ export function createHttpApi(baseUrl: string): CouponApi {
   return {
     listBrandDays: () => call<BrandDay[]>("/api/v1/brand-days"),
 
-    // 사양서 U2 가 요구한 신규 엔드포인트. 백엔드 미구현이라 붙으면 그대로 동작합니다.
     listCalendar: (from, to) =>
       call<CalendarEntry[]>(
         `/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
