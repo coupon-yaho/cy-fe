@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SeriesChart, SeriesLegend, UtilBar, type SeriesSpec } from "@/components/admin/charts";
+import { BatchVerification } from "@/components/admin/batch-verification";
 import { ConsistencyStatus } from "@/components/admin/consistency-status";
 import { LatencySignalPanel } from "@/components/admin/latency-signal";
 import { Panel, TablePanel, Tile } from "@/components/admin/panel";
@@ -149,7 +150,14 @@ function SystemConsole() {
           <KpiRow data={data} onJump={setSignal} />
           <SystemSignalNavigation data={data} signal={signal} onSelect={setSignal} />
 
-          {signal === "C" && <ConsistencySignal data={data} />}
+          {signal === "C" && (
+            <>
+              <ConsistencySignal data={data} />
+              {/* 실시간 격차 아래에 확정 판정을 붙인다 — 같은 "정합성" 질문에
+                  부하 중 관측과 사후 리플레이 두 답을 나란히 두려는 배치다. */}
+              <BatchVerification />
+            </>
+          )}
           {signal === "L" && (
             <LatencySignalPanel latency={data.latency} dependencies={data.dependencies} />
           )}
