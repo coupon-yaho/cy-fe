@@ -2,21 +2,12 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { LiveCampaignDetail } from "@/components/admin/live-campaign-detail";
-import { SeriesChart, SeriesLegend, type SeriesSpec } from "@/components/admin/charts";
-import { Panel, TablePanel, Tile } from "@/components/admin/panel";
+import { TablePanel } from "@/components/admin/panel";
 import { MetaChips, PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
-import { StateBadge, StatedValue, Value } from "@/components/admin/state";
+import { StateBadge } from "@/components/admin/state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
-import {
-  ENGINE_LABEL,
-  adminApi,
-  type CouponMetricsResponse,
-  isLiveAdminOverview,
-  isLiveCouponMetrics,
-  type MetricsWindow,
-  type Point,
-} from "@/lib/admin";
+import { adminApi, type MetricsWindow, type Point } from "@/lib/admin";
 import { appendTransitionSample } from "@/lib/admin/transition-series";
 import { mergeEventPoll } from "@/lib/admin/event-poll-state";
 
@@ -93,7 +84,7 @@ function CampaignDetail() {
   const visibleEvents = eventStream ?? events.data;
   const transitionKey = `${roundId}:${window}`;
   useEffect(() => {
-    if (!d || !isLiveCouponMetrics(d) || !d.transitionRate.value) return;
+    if (!d || !d.transitionRate.value) return;
     setTransitionHistory((previous) => ({
       key: transitionKey,
       points: appendTransitionSample(
@@ -107,19 +98,13 @@ function CampaignDetail() {
   const overview = useQuery({
     queryKey: ["admin", "overview", "detail-label", roundId],
     queryFn: ({ signal }) => adminApi.getOverview({}, signal),
-    enabled: !!d && isLiveCouponMetrics(d),
+    enabled: !!d,
     staleTime: 30_000,
   });
-  const liveCouponName =
-    overview.data && isLiveAdminOverview(overview.data)
-      ? overview.data.couponRounds.value?.find((couponRound) => couponRound.couponId === roundId)
-          ?.couponName
-      : undefined;
-  const campaignTitle = !d
-    ? `회차 #${roundId}`
-    : isLiveCouponMetrics(d)
-      ? (liveCouponName ?? `회차 #${d.couponId}`)
-      : d.campaign;
+  const couponName = overview.data?.couponRounds.value?.find(
+    (couponRound) => couponRound.couponId === roundId,
+  )?.couponName;
+  const campaignTitle = d ? (couponName ?? `회차 #${d.couponId}`) : `회차 #${roundId}`;
   // 셋 중 하나만 멈춰도 이 화면의 숫자는 서로 다른 시각의 값이 섞입니다.
   const stale = metrics.isStale || events.isStale || histories.isStale;
 
@@ -136,20 +121,12 @@ function CampaignDetail() {
       <PageHead
         title={campaignTitle}
         meta={
-          d && isLiveCouponMetrics(d) ? (
+          d ? (
             <MetaChips
               items={[
                 ["회차", `#${d.couponId}`],
                 ["상태", d.couponRound?.status ?? "—"],
                 ["구간", d.window],
-              ]}
-            />
-          ) : d ? (
-            <MetaChips
-              items={[
-                ["engine", ENGINE_LABEL.v3],
-                ["queue", "ADAPTIVE"],
-                ["상태", d.roundStatus.value?.status ?? "—"],
               ]}
             />
           ) : null
@@ -161,9 +138,7 @@ function CampaignDetail() {
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}
-              snapshotAt={
-                d ? (isLiveCouponMetrics(d) ? d.snapshotAt : d.meta.snapshotAt) : undefined
-              }
+              snapshotAt={d?.snapshotAt}
             />
           </>
         }
@@ -180,23 +155,11 @@ function CampaignDetail() {
         </div>
       ) : (
         <div className="space-y-4">
-          {isLiveCouponMetrics(d) ? (
-            <LiveCampaignDetail
-              data={d}
-              {...(liveCouponName ? { couponName: liveCouponName } : {})}
-              transitionSeries={transitionSeries}
-            />
-          ) : (
-            <>
-              <Tiles data={d} />
-
-              <div className="grid gap-4 xl:grid-cols-3">
-                <StatusBreakdown data={d} />
-                <NotificationPanel data={d} />
-                <TransitionRate data={d} />
-              </div>
-            </>
-          )}
+          <LiveCampaignDetail
+            data={d}
+            {...(couponName ? { couponName } : {})}
+            transitionSeries={transitionSeries}
+          />
 
           <div className="grid gap-4 xl:grid-cols-2">
             <TablePanel
@@ -278,149 +241,5 @@ function CampaignDetail() {
         </div>
       )}
     </>
-  );
-}
-
-function Tiles({ data }: { data: CouponMetricsResponse }) {
-  const stock = data.remainingStock.value;
-  const progress = data.progress.value;
-  const rate = data.issueRate.value;
-  const queue = data.queue.value;
-
-  return (
-    <div className="grid gap-4 md:grid-cols-3 2xl:grid-cols-6">
-      <Tile
-        label="잔여 재고"
-        sub={stock ? `전체 ${stock.total.toLocaleString("ko-KR")}` : undefined}
-      >
-        <Value source={data.remainingStock} render={(v) => v.remaining.toLocaleString("ko-KR")} />
-      </Tile>
-      <Tile
-        label="발급 진행률"
-        sub={progress ? `${progress.issued.toLocaleString("ko-KR")}장` : undefined}
-      >
-        <Value source={data.progress} render={(v) => `${(v.ratio * 100).toFixed(1)}%`} />
-      </Tile>
-      <Tile label="초당 발급" sub={rate ? `peak ${rate.peak.toLocaleString("ko-KR")}` : undefined}>
-        <StatedValue source={data.issueRate} render={(v) => v.current.toLocaleString("ko-KR")} />
-      </Tile>
-      <Tile
-        label="대기 인원"
-        sub={
-          queue
-            ? queue.etaSeconds === null
-              ? "예상 대기 계산 불가"
-              : `예상 ${queue.etaSeconds}초`
-            : undefined
-        }
-      >
-        <Value source={data.queue} render={(v) => v.waiting.toLocaleString("ko-KR")} />
-      </Tile>
-      <Tile
-        label="캠페인 상태"
-        sub={data.roundStatus.value?.openAt ? `${data.roundStatus.value.openAt} 오픈` : undefined}
-      >
-        <Value source={data.roundStatus} render={(v) => v.status} />
-      </Tile>
-      <Tile label="사용률" sub="발급 수 대비">
-        <Value source={data.usageRate} render={(v) => `${(v * 100).toFixed(1)}%`} />
-      </Tile>
-    </div>
-  );
-}
-
-const BREAKDOWN_LABEL: Record<string, string> = {
-  ISSUED: "보유",
-  USED: "사용",
-  CANCELLED: "취소",
-  EXPIRED: "만료",
-};
-
-function StatusBreakdown({ data }: { data: CouponMetricsResponse }) {
-  const b = data.statusBreakdown.value;
-  const total = b ? b.ISSUED + b.USED + b.CANCELLED + b.EXPIRED : 0;
-  const steps = [
-    "var(--viz-seq-250)",
-    "var(--viz-seq-450)",
-    "var(--viz-seq-350)",
-    "var(--viz-seq-650)",
-  ];
-
-  return (
-    <Panel title="상태별 보유량" state={data.statusBreakdown.state}>
-      {!b ? (
-        <p className="t-body-sm text-hig-muted">—</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {(Object.keys(BREAKDOWN_LABEL) as (keyof typeof b)[]).map((k, i) => (
-            <li key={k}>
-              <div className="flex items-baseline justify-between">
-                <span className="t-body-sm">{BREAKDOWN_LABEL[k]}</span>
-                <span className="num t-body-sm font-semibold">{b[k].toLocaleString("ko-KR")}</span>
-              </div>
-              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-fill">
-                <span
-                  className="block h-full rounded-full"
-                  style={{ width: `${total ? (b[k] / total) * 100 : 0}%`, background: steps[i] }}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
-  );
-}
-
-function NotificationPanel({ data }: { data: CouponMetricsResponse }) {
-  const n = data.notification.value;
-  return (
-    <Panel title="알림 발송" hint="오픈 T-5분">
-      {!n ? (
-        <p className="t-body-sm text-hig-muted">—</p>
-      ) : (
-        <>
-          <p className="t-tile num">{(n.sentRate * 100).toFixed(1)}%</p>
-          <p className="t-caption mt-1 text-hig-secondary">
-            {n.sent.toLocaleString("ko-KR")} / {n.total.toLocaleString("ko-KR")}
-          </p>
-          <dl className="t-body-sm mt-4 space-y-1">
-            {(
-              [
-                ["잔여", n.pending, false],
-                ["실패", n.failed, n.failed > 0],
-                ["DLQ", n.dlq, n.dlq > 0],
-              ] as [string, number, boolean][]
-            ).map(([label, v, alert]) => (
-              <div key={label} className="hairline-row flex justify-between py-1">
-                <dt className="text-hig-secondary">{label}</dt>
-                <dd className={`num font-semibold ${alert ? "text-attention" : ""}`}>
-                  {v.toLocaleString("ko-KR")}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </>
-      )}
-    </Panel>
-  );
-}
-
-const TRANSITION_SERIES: SeriesSpec[] = [
-  { key: "USE", label: "사용", color: "var(--viz-1)" },
-  { key: "CANCEL_USE", label: "사용 취소", color: "var(--viz-3)" },
-  { key: "CANCEL", label: "발급 취소", color: "var(--viz-4)" },
-  { key: "EXPIRE", label: "만료", color: "var(--viz-2)" },
-];
-
-function TransitionRate({ data }: { data: CouponMetricsResponse }) {
-  const series = data.transitionRate.value ?? [];
-  return (
-    <Panel title="상태 변경 추이">
-      <SeriesLegend series={TRANSITION_SERIES} />
-      <div className="mt-3">
-        <SeriesChart data={series} series={TRANSITION_SERIES} height={150} />
-      </div>
-    </Panel>
   );
 }

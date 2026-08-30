@@ -2,28 +2,22 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { MiniSeries } from "@/components/admin/charts";
 import { LiveOverview } from "@/components/admin/live-overview";
-import { Panel, TablePanel, Tile } from "@/components/admin/panel";
+import { Panel } from "@/components/admin/panel";
 import { PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
-import { StateBadge, StatedValue } from "@/components/admin/state";
+import { StateBadge } from "@/components/admin/state";
 import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
 import {
-  ACTION_SEVERITY_LABEL,
-  CAMPAIGN_OPS_LABEL,
   QUEUE_MODE_LABEL,
   QUEUE_MODE_NOTE,
   adminApi,
   type QueueMode,
-  type ActionSeverity,
   type AdminOverviewQuery,
-  type AdminOverviewResponse,
-  isLiveAdminOverview,
   type MemberInquiryResponse,
 } from "@/lib/admin";
-import { BRANDS, brandOf, couponApi } from "@/lib/coupon";
+import { couponApi } from "@/lib/coupon";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "운영 현황 — 쿠폰 야~호 관리자" }] }),
@@ -40,72 +34,41 @@ const FILTERS: { value: NonNullable<AdminOverviewQuery["filter"]>; label: string
 function OperationsOverview() {
   const [interval, setInterval] = useState<PollInterval>(1000);
   const [filter, setFilter] = useState<NonNullable<AdminOverviewQuery["filter"]>>("ALL");
-  const [brandId, setBrandId] = useState<number | null>(null);
   const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   const query = useAdminPolling({
-    pollKey: ["admin", "overview", filter, brandId, retryToken],
-    queryFn: (signal) => adminApi.getOverview({ filter, brandId }, signal),
+    pollKey: ["admin", "overview", filter, retryToken],
+    queryFn: (signal) => adminApi.getOverview({ filter }, signal),
     intervalMs: interval,
   });
 
   const data = query.data;
-  const liveData = data && isLiveAdminOverview(data) ? data : null;
-  const snapshotAt = data
-    ? isLiveAdminOverview(data)
-      ? data.snapshotAt
-      : data.meta.snapshotAt
-    : undefined;
-
   return (
     <>
       <PageHead
         title="운영 현황"
         controls={
           <>
-            {liveData ? (
-              <>
-                <select
-                  aria-label="회차 선택"
-                  value={selectedCouponId ?? ""}
-                  onChange={(e) =>
-                    setSelectedCouponId(e.target.value ? Number(e.target.value) : null)
-                  }
-                  className="t-caption max-w-72 rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
-                >
-                  <option value="">전체 회차</option>
-                  {(liveData.couponRounds.value ?? []).map((couponRound) => (
-                    <option key={couponRound.couponId} value={couponRound.couponId}>
-                      #{couponRound.couponId} {couponRound.couponName}
-                    </option>
-                  ))}
-                </select>
-                <Segmented value={filter} options={FILTERS} onChange={setFilter} />
-              </>
-            ) : (
-              <>
-                <select
-                  aria-label="브랜드 필터"
-                  value={brandId ?? ""}
-                  onChange={(e) => setBrandId(e.target.value ? Number(e.target.value) : null)}
-                  className="t-caption rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
-                >
-                  <option value="">전체 브랜드</option>
-                  {BRANDS.map((b) => (
-                    <option key={b.brandId} value={b.brandId}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-                <Segmented value={filter} options={FILTERS} onChange={setFilter} />
-              </>
-            )}
+            <select
+              aria-label="회차 선택"
+              value={selectedCouponId ?? ""}
+              onChange={(e) => setSelectedCouponId(e.target.value ? Number(e.target.value) : null)}
+              className="t-caption max-w-72 rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
+            >
+              <option value="">전체 회차</option>
+              {(data?.couponRounds.value ?? []).map((couponRound) => (
+                <option key={couponRound.couponId} value={couponRound.couponId}>
+                  #{couponRound.couponId} {couponRound.couponName}
+                </option>
+              ))}
+            </select>
+            <Segmented value={filter} options={FILTERS} onChange={setFilter} />
             {query.isStale && <StateBadge state="STALE" />}
             <RefreshControl
               interval={interval}
               onIntervalChange={setInterval}
-              snapshotAt={snapshotAt}
+              snapshotAt={data?.snapshotAt}
             />
           </>
         }
@@ -115,7 +78,7 @@ function OperationsOverview() {
         <OverviewUnavailable onRetry={() => setRetryToken((value) => value + 1)} />
       ) : !data ? (
         <Loading />
-      ) : isLiveAdminOverview(data) ? (
+      ) : (
         <LiveOverview
           data={data}
           selectedCouponId={selectedCouponId}
@@ -123,31 +86,6 @@ function OperationsOverview() {
           queueControl={<QueueControl />}
           inquiryPanel={<InquiryPanel />}
         />
-      ) : (
-        <div className="space-y-4">
-          <Counts data={data} />
-          <Actions data={data} />
-          <CampaignTable data={data} />
-
-          <div className="grid gap-4 2xl:grid-cols-2">
-            <FlowPanel data={data} />
-            <QueuePanel data={data} />
-          </div>
-
-          <QueueControl />
-
-          <OutcomePanel data={data} />
-
-          <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-            <StockPanel data={data} />
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <StatusSummaryPanel data={data} />
-              <NotificationPanel data={data} />
-            </div>
-          </div>
-
-          <InquiryPanel />
-        </div>
       )}
     </>
   );
@@ -179,392 +117,6 @@ function Loading() {
     </div>
   );
 }
-
-function Counts({ data }: { data: AdminOverviewResponse }) {
-  const c = data.counts;
-  return (
-    <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-5">
-      <Tile label="조치 필요" sub={c.actionRequiredDetail} alert={c.actionRequired > 0}>
-        {c.actionRequired}
-      </Tile>
-      <Tile label="30분 내 오픈" sub={c.openingSoonDetail}>
-        {c.openingSoon}
-      </Tile>
-      <Tile label="대기 기준 초과" sub={c.waitOverThresholdDetail} alert={c.waitOverThreshold > 0}>
-        {c.waitOverThreshold}
-      </Tile>
-      <Tile label="소진 임박" sub={c.stockAtRiskDetail}>
-        {c.stockAtRisk}
-      </Tile>
-      <Tile label="데이터" sub="누락 · 지연 없음">
-        {data.dataStatus === "VALID" ? "최신" : <StateBadge state={data.dataStatus} />}
-      </Tile>
-    </div>
-  );
-}
-
-const SEVERITY_DOT: Record<ActionSeverity, string> = {
-  URGENT: "bg-viz-critical",
-  WARNING: "bg-viz-serious",
-  READY: "bg-hig-muted",
-};
-
-function Actions({ data }: { data: AdminOverviewResponse }) {
-  if (data.actions.length === 0) {
-    return (
-      <Panel title="조치 필요">
-        <p className="t-body-sm text-hig-muted">조치할 항목이 없습니다.</p>
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel title="조치 필요" hint="지속 시간 순" bodyClassName="px-0 pb-0">
-      <ul>
-        {data.actions.map((a) => (
-          <li key={a.couponRoundId} className="hairline-row px-5 py-3 last:border-0">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="flex w-16 shrink-0 items-center gap-2">
-                <span className={`size-2 rounded-full ${SEVERITY_DOT[a.severity]}`} aria-hidden />
-                <span className="t-caption font-semibold">{ACTION_SEVERITY_LABEL[a.severity]}</span>
-              </span>
-              <BrandPlate brandId={a.brandId} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="t-body-sm font-semibold">
-                  {a.campaign}
-                  <span className="t-caption ml-2 font-normal text-hig-muted">{a.phase}</span>
-                </p>
-                <p className="t-body-sm text-hig-secondary">{a.impact}</p>
-              </div>
-              <span className="num t-caption shrink-0 text-hig-muted">{a.duration}</span>
-              <Link
-                to={a.link === "system" ? "/admin/system" : "/admin/campaigns/$couponRoundId"}
-                {...(a.link === "system"
-                  ? {}
-                  : { params: { couponRoundId: String(a.couponRoundId) } })}
-                className="btn-compact shrink-0"
-              >
-                {a.linkLabel}
-              </Link>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Panel>
-  );
-}
-
-function CampaignTable({ data }: { data: AdminOverviewResponse }) {
-  return (
-    <TablePanel title="캠페인" hint="조치 우선순위 순">
-      {data.campaigns.length === 0 ? (
-        <p className="t-body-sm py-2 text-hig-muted">조건에 맞는 캠페인이 없습니다.</p>
-      ) : (
-        <table className="ops-table min-w-[900px]">
-          <thead>
-            <tr>
-              <th className="w-8">
-                <span className="sr-only">우선순위</span>
-              </th>
-              <th>캠페인</th>
-              <th>상태</th>
-              <th>오픈 · 종료</th>
-              <th className="text-right">잔여 재고</th>
-              <th>발급</th>
-              <th className="text-right">대기</th>
-              <th>고객 영향</th>
-              <th>다음 행동</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.campaigns.map((c) => (
-              <tr key={c.couponRoundId}>
-                <td className="num text-hig-muted">{c.priority}</td>
-                <td>
-                  <Link
-                    to="/admin/campaigns/$couponRoundId"
-                    params={{ couponRoundId: String(c.couponRoundId) }}
-                    className="flex items-center gap-2 font-medium hover:underline"
-                  >
-                    <BrandPlate brandId={c.brandId} size="sm" />
-                    <span>
-                      {c.campaign}
-                      <span className="t-caption block text-hig-muted">
-                        {brandOf(c.brandId).name}
-                      </span>
-                    </span>
-                  </Link>
-                </td>
-                <td className="text-hig-secondary">{c.phase}</td>
-                <td className="num text-hig-secondary">
-                  {c.openAt}
-                  <span className="block text-hig-muted">{c.closeAt ?? "종료 미지정"}</span>
-                </td>
-                <td className="num text-right">
-                  {c.remaining.toLocaleString("ko-KR")}
-                  <span className="text-hig-muted"> / {c.total.toLocaleString("ko-KR")}</span>
-                </td>
-                <td className={c.opsState === "ADMISSION_STALLED" ? "font-semibold text-live" : ""}>
-                  {CAMPAIGN_OPS_LABEL[c.opsState]}
-                </td>
-                <td className="num text-right">
-                  <StatedValue source={c.waiting} render={(v) => v.toLocaleString("ko-KR")} />
-                </td>
-                <td className="text-hig-secondary">
-                  {c.customerImpact}
-                  <span className="t-caption block text-hig-muted">{c.etaText ?? "계산 불가"}</span>
-                </td>
-                <td className="text-hig-secondary">{c.nextAction}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </TablePanel>
-  );
-}
-
-function FlowPanel({ data }: { data: AdminOverviewResponse }) {
-  return (
-    <Panel title="발급 속도" hint="최근 10분">
-      <ul className="space-y-3">
-        {data.flow.map((f) => {
-          const stalled = f.perMinute.value === 0;
-          return (
-            <li
-              key={f.couponRoundId}
-              className="grid grid-cols-[1fr_auto_110px] items-center gap-4"
-            >
-              <div className="min-w-0">
-                <p className="t-body-sm truncate font-medium">{f.campaign}</p>
-                <p
-                  className={`t-caption ${stalled ? "font-semibold text-live" : "text-hig-muted"}`}
-                >
-                  {f.verdict}
-                </p>
-              </div>
-              <p className="num t-body-sm text-right font-semibold">
-                <StatedValue source={f.perMinute} render={(v) => v.toLocaleString("ko-KR")} />
-                <span className="t-caption ml-1 font-normal text-hig-muted">건/분</span>
-              </p>
-              <MiniSeries
-                data={f.series}
-                color={stalled ? "var(--viz-critical)" : "var(--viz-1)"}
-              />
-            </li>
-          );
-        })}
-      </ul>
-    </Panel>
-  );
-}
-
-function QueuePanel({ data }: { data: AdminOverviewResponse }) {
-  return (
-    <TablePanel title="대기 현황">
-      <table className="ops-table min-w-[520px]">
-        <thead>
-          <tr>
-            <th>캠페인</th>
-            <th className="text-right">대기</th>
-            <th className="text-right">추세</th>
-            <th className="text-right">분당 입장 수</th>
-            <th>예상 대기</th>
-            <th>판정</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.queues.map((q) => (
-            <tr key={q.couponRoundId}>
-              <td className="font-medium">{q.campaign}</td>
-              <td className="num text-right">
-                <StatedValue source={q.waiting} render={(v) => v.toLocaleString("ko-KR")} />
-              </td>
-              <td className="num text-right text-hig-secondary">
-                {q.trendPerMinute === 0
-                  ? "—"
-                  : `${q.trendPerMinute > 0 ? "+" : "−"}${Math.abs(q.trendPerMinute)}`}
-              </td>
-              <td className="num text-right">
-                <StatedValue
-                  source={q.admittedPerMinute}
-                  render={(v) => v.toLocaleString("ko-KR")}
-                />
-              </td>
-              <td
-                className={
-                  q.etaSeconds === null ? "font-medium text-attention" : "text-hig-secondary"
-                }
-              >
-                {q.etaSeconds === null
-                  ? "계산 불가"
-                  : q.etaSeconds === 0
-                    ? "대기 없음"
-                    : `약 ${q.etaSeconds}초`}
-              </td>
-              <td className={q.healthy ? "text-hig-secondary" : "font-semibold text-live"}>
-                {q.verdict}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </TablePanel>
-  );
-}
-
-function OutcomePanel({ data }: { data: AdminOverviewResponse }) {
-  return (
-    <Panel
-      title="고객이 받은 결과"
-      hint="최근 10분"
-      action={
-        <Link to="/admin/system" className="t-caption text-hig-link hover:underline">
-          시스템 관제
-        </Link>
-      }
-    >
-      <ul className="grid gap-3 sm:grid-cols-4 xl:grid-cols-7">
-        {data.outcomes.map((o) => (
-          <li key={o.key} className={o.isFailure ? "rounded-xl bg-live/8 p-3" : "p-3 pl-0"}>
-            <p
-              className={`t-caption ${o.isFailure ? "font-semibold text-live" : "text-hig-muted"}`}
-            >
-              {o.label}
-            </p>
-            <p className={`t-body num mt-1 font-semibold ${o.isFailure ? "text-live" : ""}`}>
-              {o.count.toLocaleString("ko-KR")}
-              <span
-                className={`t-caption ml-1.5 font-normal ${
-                  o.isFailure ? "text-hig-secondary" : "text-hig-muted"
-                }`}
-              >
-                {(o.ratio * 100).toFixed(1)}%
-              </span>
-            </p>
-          </li>
-        ))}
-      </ul>
-    </Panel>
-  );
-}
-
-function StockPanel({ data }: { data: AdminOverviewResponse }) {
-  return (
-    <TablePanel title="재고와 소진 예상">
-      <table className="ops-table min-w-[600px]">
-        <thead>
-          <tr>
-            <th>캠페인</th>
-            <th className="text-right">잔여 / 전체</th>
-            <th className="w-32">비율</th>
-            <th className="text-right">발급 속도</th>
-            <th>예상 소진</th>
-            <th>다음 행동</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.stock.map((s) => {
-            const ratio = s.total > 0 ? s.remaining / s.total : 0;
-            const critical = ratio <= 0.1;
-            return (
-              <tr key={s.couponRoundId}>
-                <td className="font-medium">{s.campaign}</td>
-                <td className="num text-right">
-                  {s.remaining.toLocaleString("ko-KR")}
-                  <span className="text-hig-muted"> / {s.total.toLocaleString("ko-KR")}</span>
-                </td>
-                <td>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-fill">
-                    <span
-                      className="block h-full rounded-full"
-                      style={{
-                        width: `${Math.max(1.5, ratio * 100)}%`,
-                        background: critical ? "var(--viz-serious)" : "var(--hig-foreground)",
-                      }}
-                    />
-                  </div>
-                  <span className="num t-caption text-hig-muted">{Math.round(ratio * 100)}%</span>
-                </td>
-                <td className="num text-right">
-                  <StatedValue
-                    source={s.ratePerMinute}
-                    render={(v) => `${v.toLocaleString("ko-KR")}/분`}
-                  />
-                </td>
-                <td className={s.exhaustEtaMinutes === null ? "text-attention" : ""}>
-                  {s.exhaustEtaMinutes === null ? "계산 불가" : `약 ${s.exhaustEtaMinutes}분 후`}
-                </td>
-                <td className="text-hig-secondary">{s.nextAction}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </TablePanel>
-  );
-}
-
-function StatusSummaryPanel({ data }: { data: AdminOverviewResponse }) {
-  const s = data.statusSummary;
-  const rows: [string, number, boolean][] = [
-    ["사용 완료", s.used, false],
-    ["사용 취소", s.cancelUse, false],
-    ["발급 취소", s.cancelIssue, false],
-    ["만료", s.expired, false],
-    ["재고 복원", s.stockRestored, false],
-    ["처리 실패", s.failed, s.failed > 0],
-  ];
-
-  return (
-    <Panel title="상태 변경" hint="최근 30분">
-      <dl className="grid grid-cols-2 gap-x-5">
-        {rows.map(([label, v, alert]) => (
-          <div key={label} className="hairline-row flex items-baseline justify-between py-1.5">
-            <dt className="t-body-sm text-hig-secondary">{label}</dt>
-            <dd className={`num t-body-sm font-semibold ${alert ? "text-live" : ""}`}>
-              {v.toLocaleString("ko-KR")}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {s.batches.map((b) => (
-        <p key={b.at} className="t-caption mt-3 text-hig-muted">
-          <span className="num mr-1.5 font-semibold text-hig-secondary">{b.at}</span>
-          {b.title} · {b.detail}
-        </p>
-      ))}
-    </Panel>
-  );
-}
-
-function NotificationPanel({ data }: { data: AdminOverviewResponse }) {
-  const n = data.notifications;
-  return (
-    <Panel title="알림 발송" hint="최근 30분">
-      <dl className="space-y-1">
-        {(
-          [
-            ["발송 완료", n.sent, false],
-            ["발송 대기", n.pending, false],
-            ["발송 실패", n.failed, n.failed > 0],
-          ] as [string, number, boolean][]
-        ).map(([label, v, alert]) => (
-          <div key={label} className="hairline-row flex items-baseline justify-between py-1.5">
-            <dt className="t-body-sm text-hig-secondary">{label}</dt>
-            <dd className={`num t-body-sm font-semibold ${alert ? "text-live" : ""}`}>
-              {v.toLocaleString("ko-KR")}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </Panel>
-  );
-}
-
-/* ── 대기열 제어 ─────────────────────────────────────
-   설정을 바꾸면 고객 화면의 발급 흐름이 바로 달라집니다.
-   그래서 어떤 회차에 실제로 걸리는지 옆에 같이 보여 줍니다. */
 
 const MODES: { value: QueueMode; label: string }[] = [
   { value: "OFF", label: QUEUE_MODE_LABEL.OFF },

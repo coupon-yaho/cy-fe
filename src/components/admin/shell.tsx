@@ -2,7 +2,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { POLL_OPTIONS, type PollInterval } from "@/hooks/use-admin-polling";
-import { isMockAdmin } from "@/lib/admin";
 
 const NAV = [
   { to: "/admin", label: "운영 현황" },
@@ -46,7 +45,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <Link to="/" className="t-body-sm text-hig-link hover:underline">
             서비스 화면
           </Link>
-          {isMockAdmin && <p className="t-caption mt-2 text-hig-muted">샘플 데이터</p>}
         </div>
       </aside>
 

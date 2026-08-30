@@ -8,7 +8,6 @@ const viteServerTests = [
   "consistency-status.test.mjs",
   "latency-view.test.mjs",
   "latency-panel.test.mjs",
-  "latency-mock.test.mjs",
   "admin-http-metrics.test.mjs",
   "admin-live-contract.test.mjs",
 ];

@@ -24,7 +24,7 @@ export const GRADES: MembershipGrade[] = ["WELCOME", "SILVER", "GOLD", "VIP"];
  * 등급 비트 — `grades.bit_value` 와 같은 값입니다.
  *
  * 회차의 참여 등급은 DB 에 `eligible_grades_mask tinyint` 하나로 들어 있습니다.
- * 화면은 배열이 편하고 계약은 마스크라, **어댑터(mock · http)에서 한 번만 풉니다.**
+ * 화면은 배열이 편하고 계약은 마스크라, **HTTP 어댑터에서 한 번만 풉니다.**
  * 두 표현이 코드 여기저기서 섞이면 어느 쪽이 진짜인지 알 수 없게 됩니다.
  */
 export const GRADE_BIT: Record<MembershipGrade, number> = {

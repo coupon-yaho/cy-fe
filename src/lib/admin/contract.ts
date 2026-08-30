@@ -1,7 +1,7 @@
 /**
  * 관리자 관제 API 계약.
  *
- * 화면은 이 인터페이스만 압니다. 실서버 어댑터와 목 어댑터가 같은 계약을 구현합니다.
+ * 화면은 이 인터페이스만 알고 HTTP 어댑터가 백엔드 계약을 구현합니다.
  * 폴링 주기는 AB 설계도 기준입니다 — overview·coupon-metrics·metrics 는 1초,
  * benchmarks·analytics 는 정적(폴링 없음).
  *
@@ -12,11 +12,11 @@
 import type { QueueSettings } from "@/lib/runtime-config";
 import type {
   AdminAnalyticsResponse,
-  AdminBenchmarksApiResponse,
+  LiveBenchmarkListResponse,
   AdminMetricsResponse,
   AdminOverviewQuery,
-  AdminOverviewApiResponse,
-  CouponMetricsApiResponse,
+  LiveAdminOverviewResponse,
+  LiveCouponMetricsResponse,
   EventSlice,
   HistorySlice,
   MemberInquiryResponse,
@@ -25,14 +25,14 @@ import type {
 
 export interface AdminApi {
   /** GET /api/v1/admin/overview — 1초 */
-  getOverview(query?: AdminOverviewQuery, signal?: AbortSignal): Promise<AdminOverviewApiResponse>;
+  getOverview(query?: AdminOverviewQuery, signal?: AbortSignal): Promise<LiveAdminOverviewResponse>;
 
   /** GET /api/v1/admin/coupon-metrics — 1초 */
   getCouponMetrics(
     couponRoundId: number,
     window: MetricsWindow,
     signal?: AbortSignal,
-  ): Promise<CouponMetricsApiResponse>;
+  ): Promise<LiveCouponMetricsResponse>;
 
   /** GET /api/v1/admin/events — 커서. 이벤트 커서와 DB 커서는 분리합니다 */
   getEvents(
@@ -58,7 +58,7 @@ export interface AdminApi {
   getMetrics(window: MetricsWindow, signal?: AbortSignal): Promise<AdminMetricsResponse>;
 
   /** GET /api/v1/admin/benchmarks — 정적 */
-  getBenchmarks(): Promise<AdminBenchmarksApiResponse>;
+  getBenchmarks(): Promise<LiveBenchmarkListResponse>;
 
   /** GET /api/v1/admin/analytics — 정적 */
   getAnalytics(query: { from: string; to: string }): Promise<AdminAnalyticsResponse>;

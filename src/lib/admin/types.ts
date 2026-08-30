@@ -11,8 +11,7 @@
  *   A-11  GET /api/v1/admin/analytics             26~28 (캠페인 관리 기획 참고)
  *   A-07  GET /api/v1/admin/members/issuance-inquiries
  *
- * 백엔드 미구현입니다. 목 어댑터가 같은 계약으로 응답하고,
- * 컨트롤러가 붙으면 http 어댑터만 켜면 됩니다.
+ * 백엔드 관리자 API 응답을 화면 계약으로 옮깁니다.
  */
 
 /* ── 값 상태 계약 7종 (AB-G0 · G0-05 SourceStatus) ─────────
@@ -127,157 +126,7 @@ export interface Point {
 
 /* ══ 운영 현황 (A-06) ══════════════════════════════ */
 
-export type ActionSeverity = "URGENT" | "WARNING" | "READY";
-
-export const ACTION_SEVERITY_LABEL: Record<ActionSeverity, string> = {
-  URGENT: "긴급",
-  WARNING: "주의",
-  READY: "준비",
-};
-
-/** 조치 필요 항목 — 지속 시간이 긴 것이 위로 올라옵니다. */
-export interface OverviewAction {
-  couponRoundId: number;
-  severity: ActionSeverity;
-  campaign: string;
-  brandId: number;
-  /** 진행 중 · 13:40 오픈 */
-  phase: string;
-  /** 고객에게 어떤 영향이 있는지 한 문장 */
-  impact: string;
-  /** 얼마나 오래 지속됐는지 */
-  duration: string;
-  /** 이동할 화면 */
-  link: "detail" | "system";
-  linkLabel: string;
-}
-
-export type CampaignOpsState =
-  "ADMISSION_STALLED" | "ISSUING" | "PREPARING" | "SOLD_OUT" | "CLOSED";
-
-export const CAMPAIGN_OPS_LABEL: Record<CampaignOpsState, string> = {
-  ADMISSION_STALLED: "입장 처리 중단",
-  ISSUING: "정상 발급 중",
-  PREPARING: "준비 확인 필요",
-  SOLD_OUT: "재고 소진",
-  CLOSED: "마감",
-};
-
-/** 캠페인 운영 상태 한 줄 — 장애 심각도가 아니라 조치 우선순위 순입니다. */
-export interface OverviewCampaign {
-  priority: number;
-  couponRoundId: number;
-  campaign: string;
-  brandId: number;
-  phase: string;
-  openAt: string;
-  closeAt: string | null;
-  remaining: number;
-  total: number;
-  opsState: CampaignOpsState;
-  waiting: SourceValue<number>;
-  /** 예상 고객 영향 — 계산할 수 없으면 null 로 두고 추정하지 않습니다 */
-  etaText: string | null;
-  customerImpact: string;
-  nextAction: string;
-}
-
-/** O1 캠페인 발급 흐름 */
-export interface FlowItem {
-  couponRoundId: number;
-  campaign: string;
-  perMinute: SourceValue<number>;
-  verdict: string;
-  series: Point[];
-}
-
-/** O2 캠페인 대기 상태 — 대기 인원이 많은 것 자체는 장애가 아닙니다 */
-export interface QueueItem {
-  couponRoundId: number;
-  campaign: string;
-  waiting: SourceValue<number>;
-  trendPerMinute: number;
-  admittedPerMinute: SourceValue<number>;
-  /** 처리율이 0이면 null — 임의로 추정하지 않습니다 */
-  etaSeconds: number | null;
-  verdict: string;
-  healthy: boolean;
-}
-
-export type OutcomeKey =
-  | "ISSUED"
-  | "QUEUE_ACCEPTED"
-  | "ALREADY_ISSUED"
-  | "SOLD_OUT"
-  | "NOT_ELIGIBLE"
-  | "ENTRY_EXPIRED"
-  | "SYSTEM_FAILURE";
-
-/** O3 고객이 받은 결과 — 정책 결과와 장애를 색으로 구분합니다 */
-export interface OutcomeItem {
-  key: OutcomeKey;
-  label: string;
-  count: number;
-  ratio: number;
-  /** 장애 색은 시스템 문제에만 씁니다 */
-  isFailure: boolean;
-}
-
-/** O4 재고와 소진 예상 */
-export interface StockItem {
-  couponRoundId: number;
-  campaign: string;
-  remaining: number;
-  total: number;
-  ratePerMinute: SourceValue<number>;
-  /** 발급 속도를 쓸 수 없으면 null — 계산 불가로 둡니다 */
-  exhaustEtaMinutes: number | null;
-  nextAction: string;
-}
-
-/** O6 상태 변경 요약 */
-export interface StatusSummary {
-  used: number;
-  cancelUse: number;
-  cancelIssue: number;
-  expired: number;
-  stockRestored: number;
-  failed: number;
-  /** 같은 시각 대량 배치 이벤트는 한 줄로 묶습니다 */
-  batches: { at: string; title: string; detail: string }[];
-}
-
-/** O7 고객 알림 발송 */
-export interface NotificationSummary {
-  sent: number;
-  pending: number;
-  failed: number;
-}
-
-export interface AdminOverviewResponse {
-  meta: ResponseMeta;
-  dataStatus: SourceState;
-  counts: {
-    actionRequired: number;
-    actionRequiredDetail: string;
-    openingSoon: number;
-    openingSoonDetail: string;
-    waitOverThreshold: number;
-    waitOverThresholdDetail: string;
-    stockAtRisk: number;
-    stockAtRiskDetail: string;
-  };
-  actions: OverviewAction[];
-  campaigns: OverviewCampaign[];
-  flow: FlowItem[];
-  queues: QueueItem[];
-  outcomes: OutcomeItem[];
-  stock: StockItem[];
-  statusSummary: StatusSummary;
-  notifications: NotificationSummary;
-}
-
-/** 실제 GET /api/v1/admin/overview 응답. 기존 프론트 Mock 화면 계약과 섞지 않습니다. */
+/** GET /api/v1/admin/overview 응답. */
 export interface LiveAdminOverviewResponse {
   snapshotAt: string;
   overallStatus: "COMPLETE" | "PARTIAL" | "UNAVAILABLE";
@@ -391,14 +240,6 @@ export interface LiveCampaignOverview {
   recommendedAction?: LiveRecommendedAction | null;
 }
 
-export type AdminOverviewApiResponse = AdminOverviewResponse | LiveAdminOverviewResponse;
-
-export function isLiveAdminOverview(
-  response: AdminOverviewApiResponse,
-): response is LiveAdminOverviewResponse {
-  return "overallStatus" in response && "snapshotAt" in response;
-}
-
 export interface AdminOverviewQuery {
   brandId?: number | null;
   filter?: "ALL" | "ACTION" | "OPENING" | "RUNNING";
@@ -406,42 +247,7 @@ export interface AdminOverviewQuery {
 
 /* ══ D1 캠페인 상세 (A-10) ═════════════════════════ */
 
-export interface CouponMetricsResponse {
-  meta: ResponseMeta;
-  couponRoundId: number;
-  campaign: string;
-  brandId: number;
-  /** 1 잔여 재고 */
-  remainingStock: SourceValue<{ remaining: number; total: number }>;
-  /** 2 발급 진행률 */
-  progress: SourceValue<{ issued: number; total: number; ratio: number }>;
-  /** 3 초당 발급 — Micrometer 는 B 영역이지만 A 의 API 가 값만 받아 서빙합니다 */
-  issueRate: SourceValue<{ current: number; peak: number }>;
-  /** 4 대기 인원 */
-  queue: SourceValue<{ waiting: number; etaSeconds: number | null }>;
-  roundStatus: SourceValue<{ status: string; openAt: string }>;
-  usageRate: SourceValue<number>;
-  /** 5 상태별 보유량 */
-  statusBreakdown: SourceValue<{
-    ISSUED: number;
-    USED: number;
-    CANCELLED: number;
-    EXPIRED: number;
-  }>;
-  /** 6 알림 발송 — 오픈 T-5분 */
-  notification: SourceValue<{
-    sentRate: number;
-    sent: number;
-    total: number;
-    pending: number;
-    failed: number;
-    dlq: number;
-  }>;
-  /** 7 상태 전이 rate — 만료 배치가 스파이크를 만듭니다 */
-  transitionRate: SourceValue<Point[]>;
-}
-
-/** 실제 GET /api/v1/admin/coupon-metrics 응답. Mock 상세 계약과 섞지 않습니다. */
+/** GET /api/v1/admin/coupon-metrics 응답. */
 export interface LiveCouponMetricsResponse {
   couponId: number;
   snapshotAt: string;
@@ -473,14 +279,6 @@ export interface LiveCouponMetricsResponse {
     cancelPerSecond: number;
     expirePerSecond: number;
   }>;
-}
-
-export type CouponMetricsApiResponse = CouponMetricsResponse | LiveCouponMetricsResponse;
-
-export function isLiveCouponMetrics(
-  response: CouponMetricsApiResponse,
-): response is LiveCouponMetricsResponse {
-  return "snapshotAt" in response && "stock" in response;
 }
 
 /* ══ 스트림 (OBS-15 · A-08) ════════════════════════ */
@@ -792,54 +590,6 @@ export const KPI_TARGET = { issueP99Ms: 100, systemFailurePct: 0.1, breakerPct: 
 
 /* ══ D3 분석·비교 (OBS-14b) ════════════════════════ */
 
-export interface BenchmarkCondition {
-  version: EngineVersion;
-  runId: string;
-  stock: number;
-  vu: number;
-  rampSeconds: number;
-  instances: number;
-  queueMode: QueueMode;
-  repeats: string;
-  dataset: string;
-}
-
-export interface BenchmarkVerdict {
-  version: EngineVersion;
-  verdict: "PASS" | "PENDING" | "FAIL";
-  overIssued: number;
-  note: string;
-}
-
-export interface ComparisonRow {
-  metric: string;
-  values: Record<EngineVersion, { text: string; state?: SourceState }>;
-  delta: string;
-}
-
-export interface AdminBenchmarksResponse {
-  meta: ResponseMeta;
-  conditionsMatch: boolean;
-  conditions: BenchmarkCondition[];
-  verdicts: BenchmarkVerdict[];
-  comparison: { group: string; rows: ComparisonRow[] }[];
-  /** 22 재고 소진 곡선 — 가로축 로그 */
-  stockCurve: Point[];
-  /** 23 p99 추이 — 세로축 로그, 가로축 진행률 */
-  p99Curve: Point[];
-  /** 24 병목 자원 — 버전마다 병목이 다릅니다 */
-  bottleneck: { version: EngineVersion; resource: string; peak: number; series: Point[] }[];
-  /** ⑤ 대기열 모드 비교 — v3 고정 */
-  queueModes: {
-    mode: QueueMode;
-    exhaustSeconds: number;
-    p99Ms: number;
-    inFlightMax: number;
-    rejected: number;
-    note: string;
-  }[];
-}
-
 /** 실제 GET /api/v1/admin/benchmarks 목록 응답. */
 export interface LiveBenchmarkListResponse {
   items: {
@@ -852,14 +602,6 @@ export interface LiveBenchmarkListResponse {
   }[];
   nextBeforeCursor?: string | null;
   hasOlder: boolean;
-}
-
-export type AdminBenchmarksApiResponse = AdminBenchmarksResponse | LiveBenchmarkListResponse;
-
-export function isLiveBenchmarkList(
-  response: AdminBenchmarksApiResponse,
-): response is LiveBenchmarkListResponse {
-  return "items" in response && Array.isArray(response.items);
 }
 
 /* ══ 기획 참고 (A-11) ══════════════════════════════ */

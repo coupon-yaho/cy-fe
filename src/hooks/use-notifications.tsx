@@ -16,7 +16,7 @@ export type NotificationKind = "issued" | "used" | "restored" | "canceled";
 
 const KINDS: NotificationKind[] = ["issued", "used", "restored", "canceled"];
 
-export interface MockNotification {
+export interface NotificationItem {
   id: string;
   kind: NotificationKind;
   title: string;
@@ -25,7 +25,7 @@ export interface MockNotification {
 }
 
 interface NotificationValue {
-  items: MockNotification[];
+  items: NotificationItem[];
   unread: number;
   notify: (kind: NotificationKind, title: string, body: string) => void;
   markAllRead: () => void;
@@ -43,7 +43,7 @@ const KEY = "coupon-yaho.notifications.v1";
 const LIMIT = 30;
 
 interface Slot {
-  items: MockNotification[];
+  items: NotificationItem[];
   /** 이 시각 이전 것은 읽은 것으로 봅니다. 개수로 세면 목록이 잘릴 때 어긋납니다. */
   seenAt: number;
 }
@@ -67,7 +67,7 @@ function readSlot(memberId: number): Slot {
   const slot = readStore()[String(memberId)];
   if (!slot || !Array.isArray(slot.items)) return { items: [], seenAt: 0 };
   const items = slot.items.filter(
-    (n): n is MockNotification =>
+    (n): n is NotificationItem =>
       !!n &&
       typeof n.id === "string" &&
       typeof n.title === "string" &&
@@ -93,7 +93,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const { session, ready } = useAuth();
   const memberId = session?.memberId ?? null;
 
-  const [items, setItems] = useState<MockNotification[]>([]);
+  const [items, setItems] = useState<NotificationItem[]>([]);
   const [seenAt, setSeenAt] = useState(0);
 
   /* 저장은 notify·markAllRead 를 부른 뒤에만 합니다. 회원이 바뀔 때도 아래 effect 가

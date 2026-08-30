@@ -241,16 +241,13 @@ test("metrics HTTP adapter converts backend latency groups into the locked scree
   ]);
 });
 
-test("metrics-live sends only system metrics to HTTP and keeps overview on the frontend mock", async () => {
+test("admin API entry point always sends overview requests to HTTP", async () => {
   requestedUrl = undefined;
-  const api = createAdminApi("metrics-live", baseUrl);
+  const api = createAdminApi(baseUrl);
 
   const overview = await api.getOverview();
-  assert.equal(requestedUrl, undefined);
-  assert.equal(typeof overview.meta.snapshotAt, "string");
-
-  await api.getMetrics("1m");
-  assert.equal(requestedUrl, "/api/v1/admin/metrics/series?window=1m");
+  assert.equal(requestedUrl, "/api/v1/admin/overview");
+  assert.equal(overview.snapshotAt, "2026-08-28T00:00:00Z");
 });
 
 test("live overview does not send unsupported coupon and filter query parameters", async () => {
