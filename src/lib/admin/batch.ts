@@ -109,7 +109,29 @@ export type BatchRun = {
   stepWriteTotal: number | null;
 };
 
-type Envelope<T> = { success: boolean; data: T | null; error: unknown };
+type Envelope<T> = { success: boolean; data: T | null; error: ErrorBody | null };
+
+/** 서버 오류 봉투. 문구는 서버 카탈로그 것이라 화면이 다시 쓰지 않는다. */
+type ErrorBody = { status: number; code: string; message: string };
+
+/**
+ * 배치 API 오류. <b>서버가 준 문구를 그대로 들고 다닌다.</b>
+ *
+ * <p>이 API 의 거절은 대부분 "왜 안 되는지" 가 본문에 있다 — 만료가 도는 중이라거나,
+ * 같은 파라미터가 이미 돌았다거나. 화면이 "실패했습니다" 로 뭉개면 그 이유가 사라지고,
+ * 시연 중에는 그게 곧 원인 불명이 된다.
+ */
+export class BatchApiError extends Error {
+  readonly status: number;
+  readonly code: string | undefined;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "BatchApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
 type Page<T> = {
   items: T[];
   /** 필터에 걸린 전체 개수. `limit` 로 자르기 전 값이라 "몇 번 돌았나" 는 여기서 읽는다. */
@@ -118,20 +140,33 @@ type Page<T> = {
   nextAnchor?: number | null;
 };
 
-async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function request<T>(path: string, method: "GET" | "POST", signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BATCH_ROOT}${path}`, {
+    method,
     // signal 을 undefined 로 넘기면 오버로드가 안 맞는다 — 있을 때만 싣는다.
     ...(signal ? { signal } : {}),
     headers: { Accept: "application/json" },
   });
   const text = await res.text();
+  let envelope: Envelope<T> | undefined;
+  try {
+    envelope = text ? (JSON.parse(text) as Envelope<T>) : undefined;
+  } catch {
+    // 이 컨트롤러가 못 잡는 4xx 는 스프링 기본 형식으로 나간다 — 봉투가 아닐 수 있다.
+  }
   if (!res.ok) {
     // 401 은 토큰이 안 붙은 것이다 — 개발 서버를 껐거나 `.env.local` 이 없다.
-    throw new Error(`배치 API ${res.status}`);
+    const body = envelope?.error;
+    throw new BatchApiError(body?.message ?? `배치 API ${res.status}`, res.status, body?.code);
   }
-  const envelope = JSON.parse(text) as Envelope<T>;
-  if (!envelope.success || envelope.data === null) throw new Error("배치 API 응답이 비었습니다.");
+  if (!envelope?.success || envelope.data === null) {
+    throw new BatchApiError("배치 API 응답이 비었습니다.", res.status);
+  }
   return envelope.data;
+}
+
+function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, "GET", signal);
 }
 
 /** 최신 확정 판정 하나. 아직 한 번도 안 돌았으면 404 라 호출부가 빈 화면을 그린다. */
@@ -202,4 +237,40 @@ export async function getLatestReport(signal?: AbortSignal): Promise<VerifyRepor
   const latest = page.items[0];
   if (!latest) return null;
   return getVerifyReport(latest.dataset, latest.scope, signal);
+}
+
+/** 접수 응답. `runId` 가 아니라 `executionId` 다 — 실행 행은 가드를 다 통과한 뒤에 생긴다. */
+export type TriggerAccepted = {
+  executionId: number;
+  asOf: string;
+  dataset: Dataset;
+  scope: Scope;
+  attempt: number;
+};
+
+/**
+ * 같은 {@code asOf} 로 검증을 다시 돌린다. <b>재현성을 눈앞에서 만드는 버튼이다.</b>
+ *
+ * <p><b>{@code attempt} 를 안 보낸다.</b> 선택 파라미터이고, 생략하면 서버가
+ * {@code nextAttempt(asOf, dataset, scope)} 로 정한다(컨트롤러 실측). 화면이 계산하면
+ * 손에 든 목록이 최근 몇 줄뿐이라 최대 attempt 를 놓칠 수 있고, 두 사람이 동시에 누르면
+ * 같은 번호를 만든다 — 그 판단은 전부를 보는 쪽이 해야 한다.
+ *
+ * <p><b>{@code asOf} 는 서버가 준 문자열을 그대로 돌려보낸다.</b> JS 에서 만들면 안 된다 —
+ * {@code toISOString()} 은 항상 {@code Z} 를 붙이는데 스키마 시각은 지역시각이라 아홉 시간이
+ * 밀리고, 조용한 시각이면 가드를 다 통과해 <b>틀린 시점으로 PASS 가 남는다.</b>
+ * 서버 포맷은 {@code yyyy-MM-dd'T'HH:mm[:ss]} 이고 오프셋을 아예 안 받는다.
+ */
+export function rerunVerify(run: VerifyRun, signal?: AbortSignal): Promise<TriggerAccepted> {
+  const query = new URLSearchParams({
+    asOf: run.asOf,
+    dataset: run.dataset,
+    scope: run.scope,
+  });
+  // CORRUPT 는 정답 묶음을 명시해야 한다. 안 주면 서버가 접수 단계에서 거절한다 —
+  // 묶음이 둘 이상인 DB 에서 기본값을 두면 낡은 묶음과 조용히 대조하기 때문이다.
+  if (run.dataset === "CORRUPT" && run.seedRunId !== null) {
+    query.set("seedRunId", String(run.seedRunId));
+  }
+  return request<TriggerAccepted>(`/verify?${query.toString()}`, "POST", signal);
 }
