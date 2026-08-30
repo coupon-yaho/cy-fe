@@ -234,7 +234,7 @@ test("metrics HTTP adapter converts backend latency groups into the locked scree
     "/api/v1/admin/metrics/series?window=1m",
   ]);
   assert.equal(requestedHeaders["x-user-role"], "ADMIN");
-  assert.equal(requestedHeaders["x-user-id"], "1");
+  assert.equal(requestedHeaders["x-member-id"], "1");
   assert.deepEqual(response.latency.groups, [
     {
       group: "ISSUE",
