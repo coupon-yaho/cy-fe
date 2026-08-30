@@ -75,9 +75,9 @@ function OperationsOverview() {
                   className="t-caption max-w-72 rounded-lg border border-hairline bg-hig-surface px-2.5 py-1.5"
                 >
                   <option value="">전체 회차</option>
-                  {(liveData.campaigns.value ?? []).map((campaign) => (
-                    <option key={campaign.couponId} value={campaign.couponId}>
-                      #{campaign.couponId} {campaign.campaignName}
+                  {(liveData.couponRounds.value ?? []).map((couponRound) => (
+                    <option key={couponRound.couponId} value={couponRound.couponId}>
+                      #{couponRound.couponId} {couponRound.couponName}
                     </option>
                   ))}
                 </select>

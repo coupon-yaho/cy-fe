@@ -313,7 +313,7 @@ export interface LiveAdminOverviewResponse {
     windowStart: string;
     windowEnd: string;
   }>;
-  campaignStatusSummary: SourceValue<{
+  couponRoundStatusSummary: SourceValue<{
     openCount: number;
     scheduledCount: number;
     closedCount: number;
@@ -322,7 +322,7 @@ export interface LiveAdminOverviewResponse {
     totalCount: number;
     topItems: LiveOperationActionItem[];
   }>;
-  campaigns: SourceValue<LiveCampaignOverview[]>;
+  couponRounds: SourceValue<LiveCampaignOverview[]>;
   customerOutcomes: SourceValue<{
     windowStart: string;
     windowEnd: string;
@@ -344,7 +344,7 @@ export interface LiveRecommendedAction {
 
 export interface LiveOperationActionItem {
   couponId: number;
-  campaignName: string;
+  couponName: string;
   opensAt?: string | null;
   severity: string;
   customerImpact: string;
@@ -357,7 +357,7 @@ export interface LiveOperationActionItem {
 export interface LiveCampaignOverview {
   priority: number;
   couponId: number;
-  campaignName: string;
+  couponName: string;
   brandName: string;
   status: string;
   opensAt: string;
@@ -371,7 +371,7 @@ export interface LiveCampaignOverview {
     state: string;
     stateDuration?: string | null;
   }>;
-  campaignQueueStatus: SourceValue<{
+  couponRoundQueueStatus: SourceValue<{
     waitingCount: number;
     trend: string;
     waitingDeltaPerMinute: number;
@@ -459,7 +459,7 @@ export interface LiveCouponMetricsResponse {
     waitingCount: SourceValue<number>;
     estimatedWaitMillis: SourceValue<number>;
   };
-  campaign: { status: string; opensAt: string } | null;
+  couponRound: { status: string; opensAt: string } | null;
   usageRatio: SourceValue<number>;
   holdingCounts: SourceValue<{
     unusedCount: number;

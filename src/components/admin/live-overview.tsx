@@ -43,7 +43,7 @@ function visibleCampaigns(
   couponId: number | null,
   filter: NonNullable<AdminOverviewQuery["filter"]>,
 ) {
-  return (data.campaigns.value ?? []).filter((campaign) => {
+  return (data.couponRounds.value ?? []).filter((campaign) => {
     if (couponId != null && campaign.couponId !== couponId) return false;
     if (filter === "ACTION") {
       return campaign.severity !== "NONE" || campaign.recommendedAction != null;
@@ -98,7 +98,7 @@ export function LiveOverview({
       </div>
 
       <Actions actions={actions} state={data.actionItems.state} />
-      <CampaignTable campaigns={campaigns} state={data.campaigns.state} />
+      <CampaignTable campaigns={campaigns} state={data.couponRounds.state} />
 
       <div className="grid gap-4 2xl:grid-cols-2">
         <FlowPanel campaigns={campaigns} aggregate={data.aggregateIssuanceRate} />
@@ -115,7 +115,7 @@ export function LiveOverview({
       <OutcomePanel outcomes={outcomes} state={data.customerOutcomes.state} />
 
       <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-        <StockPanel campaigns={campaigns} state={data.campaigns.state} />
+        <StockPanel campaigns={campaigns} state={data.couponRounds.state} />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
           <CampaignStatusPanel data={data} />
           <Panel title="알림 발송" hint="최근 30분" state="N_A">
@@ -160,7 +160,7 @@ function Actions({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="t-caption w-16 shrink-0 font-semibold">{action.severity}</span>
               <div className="min-w-0 flex-1">
-                <p className="t-body-sm font-semibold">{action.campaignName}</p>
+                <p className="t-body-sm font-semibold">{action.couponName}</p>
                 <p className="t-body-sm text-hig-secondary">
                   {action.customerImpactText ?? action.recommendedAction?.displayText ?? "—"}
                 </p>
@@ -216,7 +216,7 @@ function CampaignTable({
                     href={`/admin/campaigns/${campaign.couponId}`}
                     className="font-medium hover:underline"
                   >
-                    {campaign.campaignName}
+                    {campaign.couponName}
                     <span className="t-caption block text-hig-muted">
                       {campaign.brandName} · 회차 #{campaign.couponId}
                     </span>
@@ -241,14 +241,14 @@ function CampaignTable({
                 </td>
                 <td className="text-right">
                   <StatedValue
-                    source={select(campaign.campaignQueueStatus, (value) => value.waitingCount)}
+                    source={select(campaign.couponRoundQueueStatus, (value) => value.waitingCount)}
                     suffix="명"
                   />
                 </td>
                 <td className="text-hig-secondary">
                   {campaign.customerImpactText ?? campaign.customerImpact}
                   <span className="t-caption block text-hig-muted">
-                    {campaign.campaignQueueStatus.value?.estimatedWait ?? "계산 불가"}
+                    {campaign.couponRoundQueueStatus.value?.estimatedWait ?? "계산 불가"}
                   </span>
                 </td>
                 <td className="text-hig-secondary">
@@ -289,7 +289,7 @@ function FlowPanel({
               className="grid grid-cols-[1fr_auto_110px] items-center gap-4"
             >
               <div className="min-w-0">
-                <p className="t-body-sm truncate font-medium">{campaign.campaignName}</p>
+                <p className="t-body-sm truncate font-medium">{campaign.couponName}</p>
                 <p className="t-caption text-hig-muted">
                   {campaign.issuanceFlow.value?.state ?? (
                     <StateBadge state={campaign.issuanceFlow.state} />
@@ -337,10 +337,10 @@ function QueuePanel({
           </thead>
           <tbody>
             {campaigns.map((campaign) => {
-              const queue = campaign.campaignQueueStatus;
+              const queue = campaign.couponRoundQueueStatus;
               return (
                 <tr key={campaign.couponId}>
-                  <td className="font-medium">{campaign.campaignName}</td>
+                  <td className="font-medium">{campaign.couponName}</td>
                   <td className="num text-right">
                     <StatedValue source={select(queue, (value) => value.waitingCount)} />
                   </td>
@@ -428,7 +428,7 @@ function StockPanel({
               const ratio = campaign.stockForecast.value?.remainingRatio ?? 0;
               return (
                 <tr key={campaign.couponId}>
-                  <td className="font-medium">{campaign.campaignName}</td>
+                  <td className="font-medium">{campaign.couponName}</td>
                   <td className="num text-right">
                     <StatedValue
                       source={select(
@@ -478,7 +478,7 @@ function StockPanel({
 }
 
 function CampaignStatusPanel({ data }: { data: LiveAdminOverviewResponse }) {
-  const summary = data.campaignStatusSummary;
+  const summary = data.couponRoundStatusSummary;
   const rows = summary.value
     ? ([
         ["진행 중", summary.value.openCount],

@@ -110,15 +110,15 @@ function CampaignDetail() {
     enabled: !!d && isLiveCouponMetrics(d),
     staleTime: 30_000,
   });
-  const liveCampaignName =
+  const liveCouponName =
     overview.data && isLiveAdminOverview(overview.data)
-      ? overview.data.campaigns.value?.find((campaign) => campaign.couponId === roundId)
-          ?.campaignName
+      ? overview.data.couponRounds.value?.find((couponRound) => couponRound.couponId === roundId)
+          ?.couponName
       : undefined;
   const campaignTitle = !d
     ? `회차 #${roundId}`
     : isLiveCouponMetrics(d)
-      ? (liveCampaignName ?? `회차 #${d.couponId}`)
+      ? (liveCouponName ?? `회차 #${d.couponId}`)
       : d.campaign;
   // 셋 중 하나만 멈춰도 이 화면의 숫자는 서로 다른 시각의 값이 섞입니다.
   const stale = metrics.isStale || events.isStale || histories.isStale;
@@ -140,7 +140,7 @@ function CampaignDetail() {
             <MetaChips
               items={[
                 ["회차", `#${d.couponId}`],
-                ["상태", d.campaign?.status ?? "—"],
+                ["상태", d.couponRound?.status ?? "—"],
                 ["구간", d.window],
               ]}
             />
@@ -183,7 +183,7 @@ function CampaignDetail() {
           {isLiveCouponMetrics(d) ? (
             <LiveCampaignDetail
               data={d}
-              {...(liveCampaignName ? { campaignName: liveCampaignName } : {})}
+              {...(liveCouponName ? { couponName: liveCouponName } : {})}
               transitionSeries={transitionSeries}
             />
           ) : (

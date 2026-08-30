@@ -175,7 +175,7 @@ after(async () => {
   await viteServer?.close();
 });
 
-test("live overview renders backend campaign and stock without inventing pending values", () => {
+test("live overview renders the backend coupon round contract without inventing pending values", () => {
   const html = renderToStaticMarkup(
     createElement(LiveOverview, {
       queueControl: createElement("div", null, "대기열 설정 live control"),
@@ -193,24 +193,46 @@ test("live overview renders backend campaign and stock without inventing pending
         aggregateIssuanceRate: { state: "PENDING" },
         aggregateQueue: { state: "PENDING" },
         latencySummary: { state: "PENDING" },
-        campaignStatusSummary: {
+        couponRoundStatusSummary: {
           value: { openCount: 1, scheduledCount: 0, closedCount: 0 },
           state: "VALID",
         },
-        actionItems: { state: "PENDING" },
-        campaigns: {
+        actionItems: {
+          value: {
+            totalCount: 1,
+            topItems: [
+              {
+                couponId: 1,
+                couponName: "CY-794 Action Coupon",
+                opensAt: "2026-08-28T01:07:24Z",
+                severity: "WARN",
+                customerImpact: "LIMITED",
+                customerImpactText: "쿠폰 회차 준비 확인 필요",
+                detectedAt: "2026-08-28T01:40:00Z",
+                duration: "PT9M33S",
+                recommendedAction: {
+                  code: "COUPON_ROUND_NOT_READY",
+                  displayText: "쿠폰 회차 상세 확인",
+                  targetScreen: "COUPON_ROUND_DETAIL",
+                },
+              },
+            ],
+          },
+          state: "VALID",
+        },
+        couponRounds: {
           value: [
             {
               priority: 1,
               couponId: 1,
-              campaignName: "CY-685 Local Coupon",
+              couponName: "CY-685 Local Coupon",
               brandName: "CY-685 Local Brand",
               status: "OPEN",
               opensAt: "2026-08-28T01:07:24Z",
               closesAt: "2026-08-28T03:17:24Z",
               severity: "NONE",
               issuanceFlow: { state: "PENDING" },
-              campaignQueueStatus: { state: "PENDING" },
+              couponRoundQueueStatus: { state: "PENDING" },
               stockForecast: {
                 value: { remainingQuantity: 99, totalQuantity: 100, remainingRatio: 0.99 },
                 state: "VALID",
@@ -240,7 +262,7 @@ test("live overview renders backend campaign and stock without inventing pending
   assert.match(html, /99 \/ 100/);
   assert.match(html, /href="\/admin\/campaigns\/1"/);
   assert.match(html, /집계 전/);
-  assert.match(html, /조치 필요<\/p>[^]*?>—<\/span>/);
+  assert.match(html, /CY-794 Action Coupon/);
   assert.match(html, /발급 속도/);
   assert.match(html, /고객이 받은 결과/);
   assert.match(html, /재고와 소진 예상/);
@@ -266,7 +288,7 @@ test("live coupon detail renders the actual backend coupon metrics contract", ()
           waitingCount: { state: "PENDING" },
           estimatedWaitMillis: { state: "PENDING" },
         },
-        campaign: { status: "OPEN", opensAt: "2026-08-28T02:00:00Z" },
+        couponRound: { status: "OPEN", opensAt: "2026-08-28T02:00:00Z" },
         usageRatio: { value: 0, state: "VALID", observedAt: "2026-08-28T02:44:35Z" },
         holdingCounts: {
           value: { unusedCount: 600, usedCount: 0, cancelledCount: 0, expiredCount: 0 },
@@ -279,7 +301,7 @@ test("live coupon detail renders the actual backend coupon metrics contract", ()
           observedAt: "2026-08-28T02:44:35Z",
         },
       },
-      campaignName: "CY-685 20 RPS 검증 회차",
+      couponName: "CY-685 20 RPS 검증 회차",
       transitionSeries: [
         {
           t: Date.parse("2026-08-28T02:44:35Z"),

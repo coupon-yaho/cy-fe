@@ -38,11 +38,11 @@ function select<T, U>(source: SourceValue<T>, pick: (value: T) => U): SourceValu
 
 export function LiveCampaignDetail({
   data,
-  campaignName,
+  couponName,
   transitionSeries = [],
 }: {
   data: LiveCouponMetricsResponse;
-  campaignName?: string;
+  couponName?: string;
   transitionSeries?: Point[];
 }) {
   const holdings = data.holdingCounts.value;
@@ -51,7 +51,7 @@ export function LiveCampaignDetail({
     : 0;
 
   return (
-    <div className="space-y-4" aria-label={campaignName ?? `회차 #${data.couponId}`}>
+    <div className="space-y-4" aria-label={couponName ?? `회차 #${data.couponId}`}>
       <div className="grid gap-4 md:grid-cols-3 2xl:grid-cols-6">
         <Tile
           label="잔여 재고"
@@ -100,8 +100,8 @@ export function LiveCampaignDetail({
             render={(value) => value.toLocaleString("ko-KR")}
           />
         </Tile>
-        <Tile label="캠페인 상태" sub={dateTime(data.campaign?.opensAt)}>
-          {data.campaign?.status ?? "—"}
+        <Tile label="쿠폰 회차 상태" sub={dateTime(data.couponRound?.opensAt)}>
+          {data.couponRound?.status ?? "—"}
         </Tile>
         <Tile label="사용률" sub="발급 완료 수 대비">
           <StatedValue
