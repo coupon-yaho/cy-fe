@@ -594,6 +594,14 @@ export function BatchVerification() {
                 )}
               </p>
               <dl className="t-body-sm mt-4 grid grid-cols-[5.5rem_1fr] gap-y-1.5 text-hig-secondary">
+                {/* 어느 DB 를 본 판정인지. 셋이 여럿일 때 카드만으로는 안 남아서 여기 적는다.
+                    서버가 안 주는 판(옛 배치)에서는 줄 자체가 안 생긴다. */}
+                {report.schema && (
+                  <>
+                    <dt>스키마</dt>
+                    <dd className="num text-hig-fg">{report.schema}</dd>
+                  </>
+                )}
                 {/* "asOf" 는 서버 파라미터 이름이지 화면 말이 아니다. 뜻을 옮겨 적고,
                     그것만으로 안 통하는 사람을 위해 한 줄 설명을 마우스에 물려 둔다.
                     본문으로 내면 카드마다 회색 문장이 다시 생긴다. */}
