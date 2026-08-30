@@ -140,12 +140,8 @@ type BackendMetricsSeriesResponse = {
 type BackendAnalyticsResponse = {
   range: { from: string; to: string };
   brands: { brandId: number; brandName: string }[];
-  brandTrends: SourceValue<
-    { periodStart: string; brandId: number; issueCount: number }[]
-  >;
-  hourlyHeatmap: SourceValue<
-    { dayOfWeek: number; hour: number; issueCount: number }[]
-  >;
+  brandTrends: SourceValue<{ periodStart: string; brandId: number; issueCount: number }[]>;
+  hourlyHeatmap: SourceValue<{ dayOfWeek: number; hour: number; issueCount: number }[]>;
   issuanceStatusDistribution: SourceValue<{
     totalIssued: number;
     currentlyIssued: number;
@@ -304,7 +300,27 @@ export function createHttpAdminApi(baseUrl: string): AdminApi {
         headers: {
           Accept: "application/json",
           "X-User-Role": "ADMIN",
-          ...(session ? { "X-User-Id": String(session.memberId) } : {}),
+          /*
+           * <b>회원 식별 헤더를 두 이름으로 보낸다.</b> 서버가 관리자 경로에서는
+           * {@code X-User-Id} 를, 쿠폰 경로에서는 {@code X-Member-Id} 를 읽어 왔는데
+           * (CY-790) 관리자 쪽을 {@code X-Member-Id} 로 통일하는 변경이 폴백 없이
+           * 들어온다. 그날 이 줄이 옛 이름만 보내고 있으면 관리자 화면이 통째로 400 이
+           * 된다 — {@code Caller} 가 안 심기고 컨트롤러 상당수가 그것을 raw 로 받는다.
+           *
+           * <p><b>미리 새 이름으로만 바꿔도 안 된다.</b> 서버가 아직 옛 이름만 읽으므로
+           * 바꾸는 순간부터 깨진다(실측: X-Member-Id 만 보내면 지금 400). 창이 양쪽으로
+           * 열려 있어서, 배포 순서를 맞추지 않아도 되는 유일한 방법이 둘 다 보내는 것이다.
+           *
+           * <p>서버는 어느 쪽이든 <b>한 이름만</b> 읽으므로 서버에 폴백을 두는 것과 다르다.
+           * 실측으로 둘 다 보낼 때 관리자·쿠폰 경로 모두 200 이다.
+           * CY-790 이 머지되면 {@code X-User-Id} 줄만 지운다.
+           */
+          ...(session
+            ? {
+                "X-User-Id": String(session.memberId),
+                "X-Member-Id": String(session.memberId),
+              }
+            : {}),
           ...(init.body ? { "Content-Type": "application/json" } : {}),
         },
       });
