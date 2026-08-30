@@ -11,12 +11,14 @@ import {
   discoverSources,
   getJobStandings,
   getLatestReport,
+  getVerifyProgress,
   getVerifyRuns,
   rerunVerify,
   type BatchRoot,
   type BatchSource,
   type FindingType,
   type JobStanding,
+  type VerifyProgress,
   type VerifyReport,
   type VerifyRunRow,
 } from "@/lib/admin/batch";
@@ -132,6 +134,25 @@ export function BatchVerification() {
       ]);
       if (signal.aborted) return null;
       if (d.status === "fulfilled" && d.value) setSources(d.value);
+
+      /*
+       * 판정이 안 난 최신 실행이 있으면 그 실행의 중간 상태를 따로 묻는다(CY-784).
+       * <b>내 클릭이 아니라 이력에서 찾는다</b> — 스케줄러나 다른 사람이 돌린 것도 같이
+       * 살아난다. 트리거가 주는 executionId 는 여기 못 쓴다(잡 실행 번호라 404 다).
+       */
+      const inFlight =
+        v.status === "fulfilled" ? (v.value.items.find((x) => x.verdict === null) ?? null) : null;
+      if (!inFlight) {
+        setProgress(null);
+      } else {
+        try {
+          const p = await getVerifyProgress(root, inFlight.runId, signal);
+          if (!signal.aborted) setProgress(p.status === "DONE" ? null : p);
+        } catch {
+          // 진행 조회가 없는 배치(옛 판)여도 나머지 화면은 그대로 그린다.
+          if (!signal.aborted) setProgress(null);
+        }
+      }
       // 실패했을 때 이전 판정을 지우지 않는다. 재검증이 도는 동안 리포트 조회가 한 번
       // 흔들리면 패널이 통째로 사라지는데, 확정 판정은 다음 판정이 날 때까지 여전히 참이다.
       if (r.status === "fulfilled" && r.value) setReport(r.value);
@@ -178,14 +199,25 @@ export function BatchVerification() {
     };
   }, [load]);
 
+  const [progress, setProgress] = useState<VerifyProgress | null>(null);
   const [rerun, setRerun] = useState<RerunState>({ phase: "idle" });
   const [now, setNow] = useState(() => Date.now());
 
-  /** 지금 도는 검증 잡. 있으면 화면 전체가 "검증 중" 으로 바뀐다. */
+  /**
+   * 지금 도는 검증 잡. 있으면 화면 전체가 "검증 중" 으로 바뀐다.
+   *
+   * <p>훑은 행 수는 <b>잡 실행</b>에서만 나오므로 이 값이 따로 필요하다. 검출 수는
+   * {@link progress} 가 답한다 — 둘의 출처가 다르다.
+   */
   const running = useMemo(() => {
     const latest = jobs.find((j) => j.jobName === "verifyJob")?.latest;
     return latest && latest.status === "STARTED" ? latest : null;
   }, [jobs]);
+
+  /** 판정 없이 너무 오래된 실행. 더 기다려도 안 끝나므로 폴링을 접고 그렇게 적는다. */
+  const stale = progress?.status === "STALE" ? progress : null;
+  /** 도는 중이거나(잡) 중간 상태가 잡히면(실행 행) 화면을 진행 중으로 본다. */
+  const inProgress = running !== null || progress?.status === "RUNNING";
 
   /** 다시 돌릴 근거가 되는 실행. 여기 값을 그대로 되돌려 보내므로 화면이 값을 안 만든다. */
   const source = report?.run;
@@ -197,7 +229,7 @@ export function BatchVerification() {
     source && source.dataset === "CORRUPT" && source.seedRunId === null
       ? "정답 묶음(seedRunId)이 없는 실행이라 다시 돌릴 수 없습니다."
       : undefined;
-  const busy = rerun.phase === "requesting" || running !== null;
+  const busy = rerun.phase === "requesting" || inProgress;
 
   const startRerun = useCallback(async () => {
     if (!source || blocked) return;
@@ -334,7 +366,7 @@ export function BatchVerification() {
   useEffect(() => {
     if (!running && scanJob?.stepReadTotal) lastCompletedRows.current = scanJob.stepReadTotal;
   }, [running, scanJob]);
-  const progress =
+  const scanProgress =
     running && lastCompletedRows.current
       ? Math.min(1, (running.stepReadTotal ?? 0) / lastCompletedRows.current)
       : null;
@@ -402,15 +434,27 @@ export function BatchVerification() {
         </div>
       )}
 
-      {running && (
+      {inProgress && (
         <p className="surface-card t-body-sm flex flex-wrap items-center gap-x-2 px-5 py-3 text-hig-secondary">
           <span className="font-semibold text-hig-fg">검증 중</span>
           <span className="num">{elapsedSeconds}초</span>
+          {progress?.status === "RUNNING" && (
+            <span className="num">· 검출 {progress.findingCount.toLocaleString("ko-KR")}건</span>
+          )}
           <span>· 끝나면 이력에 줄이 하나 쌓입니다 — 재현이라면 체크섬이 위와 같습니다.</span>
         </p>
       )}
 
-      {!running && rerun.phase === "accepted" && (
+      {/* 판정 없이 임계(기본 30분)를 넘긴 실행. 얼림 가드나 역전 검사로 죽으면 그 행을
+          닫아 주는 경로가 없어서, 이 값이 없으면 화면이 영원히 기다린다. */}
+      {stale && (
+        <p className="surface-card t-body-sm px-5 py-3 text-viz-critical">
+          run <span className="num font-semibold">{stale.runId}</span> 이 판정 없이 너무 오래 열려
+          있습니다. 끝나지 않을 실행으로 보고 기다리지 않습니다 — 배치 로그를 확인하십시오.
+        </p>
+      )}
+
+      {!inProgress && rerun.phase === "accepted" && (
         <p className="surface-card t-body-sm px-5 py-3 text-hig-secondary">
           attempt <span className="num font-semibold">{rerun.attempt}</span> 로 접수했습니다. 곧
           시작합니다.
@@ -442,9 +486,13 @@ export function BatchVerification() {
         <>
           <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr_1fr]">
             <Panel
-              className={running ? "opacity-60 transition-opacity" : "transition-opacity"}
+              className={inProgress ? "opacity-60 transition-opacity" : "transition-opacity"}
               title={manifest?.present ? "적중률" : "검출"}
-              {...(running ? { hint: "이전 판정" } : manifest?.present ? {} : { hint: "0이 정답" })}
+              {...(inProgress
+                ? { hint: "이전 판정" }
+                : manifest?.present
+                  ? {}
+                  : { hint: "0이 정답" })}
             >
               {manifest?.present ? (
                 <>
@@ -496,11 +544,26 @@ export function BatchVerification() {
             {/* TablePanel 이 아니라 Panel 이다 — TablePanel 안쪽 overflow-x-auto 가
                 세로까지 잘라서 조각 위에 뜨는 말풍선이 잘린다. */}
             <Panel
-              className={running ? "opacity-60 transition-opacity" : "transition-opacity"}
+              className={
+                progress?.status === "RUNNING"
+                  ? "transition-opacity"
+                  : inProgress
+                    ? "opacity-60 transition-opacity"
+                    : "transition-opacity"
+              }
               title="검출 대조"
-              {...(running ? { hint: "이전 판정" } : {})}
+              {...(progress?.status === "RUNNING"
+                ? { hint: "지금 잡히는 중" }
+                : inProgress
+                  ? { hint: "이전 판정" }
+                  : {})}
             >
-              <FindingDonut byType={report.byType} total={total} />
+              {/* 도는 중이면 지금 쌓이는 검출을 그린다 — 실행 행에서 직접 센 값이라
+                  규칙 Step 이 커밋할 때마다 늘어난다(실측 0 → 11 → 166 → 800). */}
+              <FindingDonut
+                byType={progress?.status === "RUNNING" ? progress.byType : report.byType}
+                total={progress?.status === "RUNNING" ? progress.findingCount : total}
+              />
             </Panel>
 
             <Panel title="훑은 양" {...(running ? { hint: "진행 중" } : {})}>
@@ -539,11 +602,11 @@ export function BatchVerification() {
                   )}
                 </dd>
               </dl>
-              {progress !== null && (
+              {scanProgress !== null && (
                 <div className="mt-4">
-                  <Bar ratio={progress} tone="var(--hig-foreground)" />
+                  <Bar ratio={scanProgress} tone="var(--hig-foreground)" />
                   <p className="t-caption mt-1.5 text-hig-muted">
-                    지난 실행이 훑은 양 기준 {Math.round(progress * 100)}% · 어림이다
+                    지난 실행이 훑은 양 기준 {Math.round(scanProgress * 100)}% · 어림이다
                   </p>
                 </div>
               )}

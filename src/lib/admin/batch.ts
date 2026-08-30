@@ -21,7 +21,7 @@
  * <p>두 번째는 없을 수 있다. 개발 서버가 {@code BATCH_ALT_ORIGIN} 을 안 받으면 프록시
  * 자체가 안 생기고, 그때는 화면이 한 쪽만 그린다.
  */
-export const BATCH_ROOTS = ["/batch-api", "/batch-alt-api"] as const;
+export const BATCH_ROOTS = ["/batch-api", "/batch-alt-api", "/batch-app-api"] as const;
 export type BatchRoot = (typeof BATCH_ROOTS)[number];
 
 const API_PATH = "/api/v1/admin";
@@ -340,4 +340,39 @@ export function rerunVerify(
     query.set("seedRunId", String(run.seedRunId));
   }
   return request<TriggerAccepted>(root, `/verify?${query.toString()}`, "POST", signal);
+}
+
+/** 진행 조회의 상태. 배치 잡 상태가 아니라 <b>실행 행에서 파생</b>한 값이다. */
+export type ProgressStatus = "RUNNING" | "STALE" | "DONE";
+
+/**
+ * 진행 중인 검증 실행의 중간 상태(CY-784).
+ *
+ * <p><b>{@code findingCount} 가 진행 중에도 찬다.</b> 실행 행의 {@code finding_count} 는
+ * 판정 Step 이 마감할 때 한 번 쓰이지만, 이 응답은 검출 테이블을 직접 세므로 규칙 Step 이
+ * 커밋할 때마다 늘어난다 — 실측으로 0 → 11 → 56 → 166 → 300 → 800 이었다.
+ */
+export type VerifyProgress = {
+  runId: number;
+  dataset: Dataset;
+  scope: Scope;
+  attempt: number;
+  asOf: string;
+  status: ProgressStatus;
+  verdict: Verdict | null;
+  findingCount: number;
+  byType: Partial<Record<FindingType, number>>;
+  startedAt: string;
+  finishedAt: string | null;
+};
+
+/**
+ * 실행 하나의 진행 상태.
+ *
+ * <p><b>{@code runId} 지 {@code executionId} 가 아니다.</b> 트리거 응답이 주는 것은 배치 잡
+ * 실행 번호라 여기 넣으면 404 다 — 서버 주석이 실측으로 {@code executionId=15} 일 때
+ * {@code runId=17} 이었다고 적는다. 그래서 화면은 이력의 최신 행에서 {@code runId} 를 집는다.
+ */
+export function getVerifyProgress(root: string, runId: number, signal?: AbortSignal) {
+  return get<VerifyProgress>(root, `/verify/runs/${runId}/progress`, signal);
 }
