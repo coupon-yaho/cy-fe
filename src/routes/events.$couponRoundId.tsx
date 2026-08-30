@@ -548,9 +548,7 @@ function Ready({
   return (
     <div>
       <p className="yh-body text-yh-ink-2">
-        {round.queueActive
-          ? "지금은 순서대로 내보내고 있습니다. 누르면 순번을 받고, 차례가 오면 알아서 발급됩니다."
-          : "한 사람당 한 장입니다. 발급받은 쿠폰은 쿠폰함에서 확인하세요."}
+        한 사람당 한 장입니다. 발급을 진행하면 서버가 즉시 입장 또는 대기 순번을 결정합니다.
       </p>
 
       <button type="button" onClick={onStart} disabled={busy} className="yh-btn-live mt-6 w-full">
@@ -558,9 +556,7 @@ function Ready({
           ? "순번 확인 중"
           : phase.kind === "issuing"
             ? "발급 처리 중"
-            : round.queueActive
-              ? "대기열 입장"
-              : "발급받기"}
+            : "발급 진행"}
       </button>
     </div>
   );

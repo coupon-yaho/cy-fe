@@ -306,8 +306,6 @@ const EMPTY: CouponTemplateWriteRequest = {
   discountRate: 20,
   maxDiscountAmount: 10000,
   discountAmount: null,
-  dataGrantMb: null,
-  minOrderAmount: null,
   validDays: 14,
   nthWeek: 1,
   dayOfWeek: "TUE",
@@ -368,7 +366,6 @@ function TemplateEditor({
       discountRate: policyType === "PERCENT_CAPPED" ? (f.discountRate ?? 20) : null,
       maxDiscountAmount: policyType === "PERCENT_CAPPED" ? (f.maxDiscountAmount ?? 10000) : null,
       discountAmount: policyType === "FIXED_AMOUNT" ? (f.discountAmount ?? 5000) : null,
-      dataGrantMb: null,
     }));
 
   const toggleGrade = (g: MembershipGrade) =>

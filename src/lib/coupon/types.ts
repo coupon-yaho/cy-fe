@@ -12,7 +12,7 @@
 /* ── 열거형 ─────────────────────────────────────────── */
 
 export type MembershipGrade = "WELCOME" | "SILVER" | "GOLD" | "VIP";
-export type CouponPolicyType = "PERCENT_CAPPED" | "FIXED_AMOUNT" | "DATA_GRANT";
+export type CouponPolicyType = "PERCENT_CAPPED" | "FIXED_AMOUNT";
 export type IssuanceStatus = "ISSUED" | "USED" | "CANCELLED" | "EXPIRED";
 export type IssuanceEventType = "ISSUE" | "USE" | "CANCEL_USE" | "CANCEL" | "EXPIRE";
 export type CouponRoundStatus = "SCHEDULED" | "OPEN" | "CLOSED";
@@ -86,10 +86,6 @@ export interface CouponTemplateDetail {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
-  /** DATA_GRANT 전용. coupon_templates.data_grant_mb */
-  dataGrantMb: number | null;
-  /** 이 금액 미만 주문에는 쓸 수 없습니다. coupon_templates.min_order_amount */
-  minOrderAmount: number | null;
   validDays: number;
   nthWeek: number;
   dayOfWeek: CouponDayOfWeek;
@@ -111,8 +107,6 @@ export interface CouponTemplateWriteRequest {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
-  dataGrantMb: number | null;
-  minOrderAmount: number | null;
   validDays: number;
   nthWeek: number;
   dayOfWeek: CouponDayOfWeek;
@@ -170,8 +164,6 @@ export interface MemberCoupon {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
-  dataGrantMb: number | null;
-  minOrderAmount: number | null;
   issuedAt: string;
   expiresAt: string;
   /** 활성 사용 시각. 쓰지 않았으면 null */
@@ -223,8 +215,6 @@ export interface CouponRoundView {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
-  dataGrantMb: number | null;
-  minOrderAmount: number | null;
   validDays: number;
   /** 계약 필드 — coupons.eligible_grades_mask */
   eligibleGradesMask: number;
@@ -237,8 +227,6 @@ export interface CouponRoundView {
   totalQuantity: number;
   /** coupon_stocks.active_count — 점유된 재고 */
   activeCount: number;
-  /** 대기열이 켜져 있는 회차입니다. 꺼져 있으면 바로 발급됩니다. */
-  queueActive: boolean;
 }
 
 /** 대기열에서 보여 줄 값 한 벌 */
@@ -284,7 +272,6 @@ export interface CalendarEntry {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
-  dataGrantMb: number | null;
   eligibleGradesMask: number;
   eligibleGrades: MembershipGrade[];
   /** ISO-8601 */
@@ -363,20 +350,11 @@ interface DiscountLike {
   discountRate: number | null;
   maxDiscountAmount: number | null;
   discountAmount: number | null;
-  dataGrantMb?: number | null;
-}
-
-/** 1024MB → "1GB", 500MB → "500MB" — 통신사 표기 관례를 따릅니다 */
-function formatData(mb: number): string {
-  if (mb >= 1024 && mb % 1024 === 0) return `${mb / 1024}GB`;
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)}GB`;
-  return `${mb}MB`;
 }
 
 /** "40%" / "5,000원" — 자막에 크게 박히는 숫자 */
 export function discountHeadline(c: DiscountLike): string {
   if (c.policyType === "PERCENT_CAPPED") return `${c.discountRate ?? 0}%`;
-  if (c.policyType === "DATA_GRANT") return formatData(c.dataGrantMb ?? 0);
   return `${(c.discountAmount ?? 0).toLocaleString("ko-KR")}원`;
 }
 
@@ -385,15 +363,11 @@ export function discountDetail(c: DiscountLike): string {
   if (c.policyType === "PERCENT_CAPPED") {
     return `최대 ${(c.maxDiscountAmount ?? 0).toLocaleString("ko-KR")}원 할인`;
   }
-  // 데이터는 깎는 게 아니라 얹어 주는 것이라 "할인" 이라고 쓰지 않습니다.
-  if (c.policyType === "DATA_GRANT") return "데이터 제공";
   return "결제 금액에서 바로 할인";
 }
 
 /** 실제 할인액 — PERCENT_CAPPED 는 상한을 넘지 않습니다 */
 export function calcDiscount(c: DiscountLike, orderAmount: number): number {
-  // 데이터 제공은 결제 금액을 깎지 않습니다 — 0 원 할인입니다.
-  if (c.policyType === "DATA_GRANT") return 0;
   if (c.policyType === "FIXED_AMOUNT") {
     return Math.min(c.discountAmount ?? 0, orderAmount);
   }

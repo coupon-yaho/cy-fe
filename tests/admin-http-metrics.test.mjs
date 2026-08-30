@@ -319,6 +319,9 @@ test("coupon round list uses the public page and returns its content", async () 
   assert.equal(rounds[0].id, 7);
   assert.equal(rounds[0].activeCount, 20);
   assert.deepEqual(rounds[0].eligibleGrades, ["WELCOME"]);
+  assert.equal(Object.hasOwn(rounds[0], "dataGrantMb"), false);
+  assert.equal(Object.hasOwn(rounds[0], "minOrderAmount"), false);
+  assert.equal(Object.hasOwn(rounds[0], "queueActive"), false);
 });
 
 test("analytics sends a concrete date range and normalizes the observed backend response", async () => {

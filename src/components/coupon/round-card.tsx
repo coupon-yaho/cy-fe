@@ -54,7 +54,7 @@ export function RoundCard({
         {round.status === "OPEN" ? (
           <span className="flex items-center gap-2.5">
             <LiveLabel />
-            {round.queueActive && <span className="yh-small text-yh-ink-3">대기열</span>}
+            <span className="yh-small text-yh-ink-3">입장 시 확인</span>
           </span>
         ) : (
           <span className="yh-label">{ROUND_STATUS_LABEL[round.status]}</span>
@@ -198,13 +198,13 @@ export function RoundRow({
         )}
       </span>
 
-      {/* 대기열 표시를 배지 옆에 두면 그만큼 배지가 왼쪽으로 밀려 행마다 오른쪽 끝이
+      {/* 입장 상태 안내를 배지 옆에 두면 그만큼 배지가 왼쪽으로 밀려 행마다 오른쪽 끝이
           어긋납니다. 아래 줄로 내려서 오른쪽 기준선을 지킵니다. */}
       <span className="col-start-2 -col-end-1 justify-self-start sm:col-auto sm:justify-self-end sm:text-right">
         {round.status === "OPEN" ? (
           <>
             <LiveLabel />
-            {round.queueActive && <span className="yh-small mt-1 block text-yh-ink-3">대기열</span>}
+            <span className="yh-small mt-1 block text-yh-ink-3">입장 시 확인</span>
           </>
         ) : (
           <span className="yh-label">{ROUND_STATUS_LABEL[round.status]}</span>

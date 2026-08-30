@@ -39,49 +39,27 @@ const MEMBERSHIP_GRADE = "X-Membership-Grade";
 const USER_ROLE = "X-User-Role";
 const IDEMPOTENCY_KEY = "Idempotency-Key";
 
-type CouponRoundResponse = Omit<
-  CouponRoundView,
-  "id" | "dataGrantMb" | "minOrderAmount" | "eligibleGradesMask" | "activeCount" | "queueActive"
-> & {
+type CouponRoundResponse = Omit<CouponRoundView, "id" | "eligibleGradesMask" | "activeCount"> & {
   couponRoundId: number;
   remainingQuantity: number;
 };
 
-type CouponTemplateResponse = Omit<
-  CouponTemplateDetail,
-  "dataGrantMb" | "minOrderAmount" | "eligibleGradesMask"
->;
-
-type MemberCouponResponse = Omit<MemberCoupon, "dataGrantMb" | "minOrderAmount">;
+type CouponTemplateResponse = Omit<CouponTemplateDetail, "eligibleGradesMask">;
 
 function toCouponRound(response: CouponRoundResponse): CouponRoundView {
   return {
     ...response,
     id: response.couponRoundId,
-    dataGrantMb: null,
-    minOrderAmount: null,
     eligibleGradesMask: gradesToMask(response.eligibleGrades),
     activeCount: Math.max(0, response.totalQuantity - response.remainingQuantity),
-    queueActive: false,
   };
 }
 
 function toCouponTemplate(response: CouponTemplateResponse): CouponTemplateDetail {
   return {
     ...response,
-    dataGrantMb: null,
-    minOrderAmount: null,
     eligibleGradesMask: gradesToMask(response.eligibleGrades),
   };
-}
-
-function toMemberCoupon(response: MemberCouponResponse): MemberCoupon {
-  return { ...response, dataGrantMb: null, minOrderAmount: null };
-}
-
-function templateWriteBody(request: CouponTemplateWriteRequest) {
-  const { dataGrantMb: _dataGrantMb, minOrderAmount: _minOrderAmount, ...body } = request;
-  return body;
 }
 
 function memberHeaders(member: MemberContext): Record<string, string> {
@@ -218,9 +196,9 @@ export function createHttpApi(baseUrl: string): CouponApi {
       if (params.status) q.set("status", params.status);
       q.set("page", String(params.page ?? 0));
       q.set("size", String(params.size ?? 20));
-      return call<Page<MemberCouponResponse>>(`/api/v1/coupons?${q}`, {
+      return call<Page<MemberCoupon>>(`/api/v1/coupons?${q}`, {
         headers: memberHeaders(member),
-      }).then((page) => ({ ...page, content: page.content.map(toMemberCoupon) }));
+      });
     },
 
     useCoupon: (issuanceId, member, body, idempotencyKey) =>
@@ -271,7 +249,7 @@ export function createHttpApi(baseUrl: string): CouponApi {
         await call<CouponTemplateResponse>("/api/v1/admin/coupon-templates", {
           method: "POST",
           headers: admin,
-          body: JSON.stringify(templateWriteBody(request)),
+          body: JSON.stringify(request),
         }),
       ),
 
@@ -280,7 +258,7 @@ export function createHttpApi(baseUrl: string): CouponApi {
         await call<CouponTemplateResponse>(`/api/v1/admin/coupon-templates/${id}`, {
           method: "PUT",
           headers: admin,
-          body: JSON.stringify(templateWriteBody(request)),
+          body: JSON.stringify(request),
         }),
       ),
 

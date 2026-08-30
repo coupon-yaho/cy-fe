@@ -4,17 +4,8 @@
  * HTTP 어댑터가 이 인터페이스를 구현합니다.
  * 화면은 이 인터페이스만 알고, 어느 쪽이 붙었는지 모릅니다.
  *
- * ── 표시 (2026-08-24 실측) ──────────────────────────
- * 기준: cy-be `origin/feature/CY-1` a74cb0f. 컨트롤러·DTO 소스를 직접 읽었고,
- * "없음" 은 원격 브랜치 전체를 훑어 확인했습니다. origin/main 에는 쿠폰 컨트롤러가
- * 하나도 없고 CY-1 은 아직 main 에 머지되지 않았습니다 — 지금은 CY-1 이 통합 지점입니다.
- *
- *   ✅ 구현됨. 붙이면 그대로 동작합니다.
- *   ⚠️ 구현됐지만 **응답 필드가 모자랍니다.** 붙이면 화면 일부가 빕니다.
- *   ❌ 백엔드에 없습니다. 목만 응답합니다.
- *
- * ⚠️ 스키마에 테이블이 있다고 API 가 있는 것은 아닙니다. 한동안 이 파일이
- * 그렇게 적혀 있었습니다 — 표시를 고칠 때는 컨트롤러를 열어 보고 고치세요.
+ * 백엔드에 없는 대기열 API도 HTTP 요청만 보냅니다. 실패했을 때 프론트 응답으로
+ * 대체하지 않으므로, 서버가 구현되기 전에는 해당 화면이 실제 HTTP 오류를 표시합니다.
  */
 import type {
   BrandDay,
@@ -71,18 +62,18 @@ export interface CouponApi {
   /* 대기열 3종 — PRD 에는 있으나 어느 브랜치에도 구현이 없습니다.
      프론트가 지어낸 계약이 아니라 백엔드 일감이 남은 것입니다. */
 
-  /** ❌ POST /api/v1/coupons/{couponRoundId}/entry */
+  /** 미구현: POST /api/v1/coupons/{couponRoundId}/entry */
   enterRound(couponRoundId: number, member: MemberContext): Promise<EntryResponse>;
-  /** ❌ GET /api/v1/coupons/{couponRoundId}/queue */
+  /** 미구현: GET /api/v1/coupons/{couponRoundId}/queue */
   pollQueue(
     couponRoundId: number,
     member: MemberContext,
     queueToken: string,
   ): Promise<QueueResponse>;
-  /** ❌ DELETE /api/v1/coupons/{couponRoundId}/queue — 대기를 취소하고 자리를 반납합니다 */
+  /** 미구현: DELETE /api/v1/coupons/{couponRoundId}/queue — 대기를 취소하고 자리를 반납합니다 */
   leaveQueue(couponRoundId: number, member: MemberContext): Promise<void>;
 
-  /** ✅ POST /api/v1/coupons/{couponRoundId}/issue → 201 */
+  /** POST /api/v1/coupons/{couponRoundId}/issue → 201 */
   issue(
     couponRoundId: number,
     member: MemberContext,
@@ -90,14 +81,7 @@ export interface CouponApi {
     entryToken?: string | null,
   ): Promise<CouponIssueResponse>;
 
-  /**
-   * ⚠️ GET /api/v1/coupons?status=&page=&size= — MemberCouponController
-   *
-   * 있지만 응답이 `MemberCouponResponse`(11개 필드)라 아래가 안 옵니다.
-   *   usedAt · usedDiscountAmount · orderId · dataGrantMb · minOrderAmount
-   *
-   * 앞의 셋이 없으면 쿠폰함의 "사용 2026.08.23 / 할인 10,000원 / 주문 88001" 세 줄이 빕니다.
-   */
+  /** GET /api/v1/coupons?status=&page=&size= — MemberCouponController */
   listMyCoupons(
     member: MemberContext,
     params?: { status?: IssuanceStatus | null; page?: number; size?: number },
@@ -126,7 +110,7 @@ export interface CouponApi {
   ): Promise<CouponCancelResponse>;
 
   /**
-   * ✅ POST /api/v1/admin/coupon-templates/{couponTemplateId}/rounds → 201
+   * POST /api/v1/admin/coupon-templates/{couponTemplateId}/rounds → 201
    *
    * 템플릿에서 회차 한 건을 예약합니다. 평소에는 배치
    * (CouponRoundGenerationScheduler)가 규칙대로 미리 찍어 두고,
@@ -137,18 +121,18 @@ export interface CouponApi {
     request: CouponRoundReservationRequest,
   ): Promise<CouponRoundReservation>;
 
-  /** ✅ GET /api/v1/admin/coupon-templates */
+  /** GET /api/v1/admin/coupon-templates */
   listTemplates(params?: { page?: number; size?: number }): Promise<Page<CouponTemplateDetail>>;
-  /** ✅ GET /api/v1/admin/coupon-templates/{id} */
+  /** GET /api/v1/admin/coupon-templates/{id} */
   getTemplate(couponTemplateId: number): Promise<CouponTemplateDetail>;
-  /** ✅ POST /api/v1/admin/coupon-templates → 201 */
+  /** POST /api/v1/admin/coupon-templates → 201 */
   createTemplate(request: CouponTemplateWriteRequest): Promise<CouponTemplateDetail>;
-  /** ✅ PUT /api/v1/admin/coupon-templates/{id} */
+  /** PUT /api/v1/admin/coupon-templates/{id} */
   updateTemplate(
     couponTemplateId: number,
     request: CouponTemplateWriteRequest,
   ): Promise<CouponTemplateDetail>;
-  /** ✅ PATCH /api/v1/admin/coupon-templates/{id}/activation */
+  /** PATCH /api/v1/admin/coupon-templates/{id}/activation */
   changeTemplateActivation(
     couponTemplateId: number,
     active: boolean,

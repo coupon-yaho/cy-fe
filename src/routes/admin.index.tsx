@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -6,7 +6,6 @@ import { LiveOverview } from "@/components/admin/live-overview";
 import { Panel } from "@/components/admin/panel";
 import { PageHead, RefreshControl, Segmented } from "@/components/admin/shell";
 import { StateBadge } from "@/components/admin/state";
-import { BrandPlate } from "@/components/coupon/brand-plate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminPolling, type PollInterval } from "@/hooks/use-admin-polling";
 import {
@@ -17,7 +16,6 @@ import {
   type AdminOverviewQuery,
   type MemberInquiryResponse,
 } from "@/lib/admin";
-import { couponApi } from "@/lib/coupon";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "운영 현황 — 쿠폰 야~호 관리자" }] }),
@@ -130,11 +128,6 @@ function QueueControl() {
     queryKey: ["admin", "queue-settings"],
     queryFn: () => adminApi.getQueueSettings(),
   });
-  const rounds = useQuery({
-    queryKey: ["rounds"],
-    queryFn: () => couponApi.listRounds(),
-  });
-
   const [threshold, setThreshold] = useState("");
 
   // 서버 값이 바뀌면 입력칸도 따라갑니다.
@@ -158,8 +151,6 @@ function QueueControl() {
   });
 
   const current = settings.data;
-  const queued = (rounds.data ?? []).filter((r) => r.queueActive);
-  const open = (rounds.data ?? []).filter((r) => r.status === "OPEN");
   const thresholdChanged =
     !!current && Number(threshold) !== current.adaptiveThresholdPerMinute && Number(threshold) > 0;
 
@@ -233,29 +224,11 @@ function QueueControl() {
           </div>
 
           <div className="min-w-0">
-            <p className="t-caption text-hig-muted">
-              지금 대기열이 걸린 회차 {queued.length} / 발급 중 {open.length}
+            <p className="t-caption text-hig-muted">회차별 적용 상태</p>
+            <p className="t-body-sm mt-2 text-hig-secondary">
+              회차별 대기열 적용 여부는 고객의 입장 요청에 대한 서버 응답으로 확인됩니다. 공개 회차
+              응답에는 이 상태가 포함되지 않습니다.
             </p>
-            {queued.length === 0 ? (
-              <p className="t-body-sm mt-2 text-hig-secondary">
-                대기열 없이 모든 회차가 바로 발급되고 있습니다.
-              </p>
-            ) : (
-              <ul className="mt-2 space-y-1.5">
-                {queued.map((r) => (
-                  <li key={r.id} className="t-body-sm flex items-center gap-2">
-                    <BrandPlate brandId={r.brandId} size="sm" />
-                    <Link
-                      to="/admin/campaigns/$couponRoundId"
-                      params={{ couponRoundId: String(r.id) }}
-                      className="font-medium hover:underline"
-                    >
-                      {r.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </div>
       )}
