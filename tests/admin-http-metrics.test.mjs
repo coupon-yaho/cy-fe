@@ -13,7 +13,7 @@ let baseUrl;
 let requestedUrl;
 let requestedUrls;
 let requestedHeaders;
-let failMetricsSeries = false;
+let forcedFailure = null;
 
 before(async () => {
   httpServer = createHttpServer((request, response) => {
@@ -21,7 +21,7 @@ before(async () => {
     requestedUrls ??= [];
     requestedUrls.push(request.url);
     requestedHeaders = request.headers;
-    if (failMetricsSeries && request.url?.startsWith("/api/v1/admin/metrics/series")) {
+    if (forcedFailure && request.url?.startsWith(forcedFailure.pathPrefix)) {
       response.statusCode = 503;
       response.setHeader("Content-Type", "application/json");
       response.end(
@@ -30,9 +30,9 @@ before(async () => {
           data: null,
           error: {
             status: 503,
-            code: "ADMIN-METRICS-SERIES-UNAVAILABLE",
-            message: "시계열 집계 원천을 사용할 수 없습니다.",
-            requestId: "req-series-503",
+            code: forcedFailure.code,
+            message: "API 원천을 사용할 수 없습니다.",
+            requestId: forcedFailure.requestId,
             timestamp: "2026-08-31T00:00:00Z",
           },
         }),
@@ -261,7 +261,11 @@ test("metrics HTTP adapter converts backend latency groups into the locked scree
 });
 
 test("metrics HTTP adapter rejects when the required series endpoint fails", async () => {
-  failMetricsSeries = true;
+  forcedFailure = {
+    pathPrefix: "/api/v1/admin/metrics/series",
+    code: "ADMIN-METRICS-SERIES-UNAVAILABLE",
+    requestId: "req-series-503",
+  };
   try {
     await assert.rejects(
       () => createHttpAdminApi(baseUrl).getMetrics("1m"),
@@ -271,7 +275,7 @@ test("metrics HTTP adapter rejects when the required series endpoint fails", asy
         error?.requestId === "req-series-503",
     );
   } finally {
-    failMetricsSeries = false;
+    forcedFailure = null;
   }
 });
 
@@ -282,6 +286,25 @@ test("admin API entry point always sends overview requests to HTTP", async () =>
   const overview = await api.getOverview();
   assert.equal(requestedUrl, "/api/v1/admin/overview");
   assert.equal(overview.snapshotAt, "2026-08-28T00:00:00Z");
+});
+
+test("admin API entry point propagates overview HTTP failures without fallback data", async () => {
+  forcedFailure = {
+    pathPrefix: "/api/v1/admin/overview",
+    code: "ADMIN-OVERVIEW-UNAVAILABLE",
+    requestId: "req-overview-503",
+  };
+  try {
+    await assert.rejects(
+      () => createAdminApi(baseUrl).getOverview(),
+      (error) =>
+        error?.status === 503 &&
+        error?.code === "ADMIN-OVERVIEW-UNAVAILABLE" &&
+        error?.requestId === "req-overview-503",
+    );
+  } finally {
+    forcedFailure = null;
+  }
 });
 
 test("live overview does not send unsupported coupon and filter query parameters", async () => {
@@ -322,6 +345,25 @@ test("coupon round list uses the public page and returns its content", async () 
   assert.equal(Object.hasOwn(rounds[0], "dataGrantMb"), false);
   assert.equal(Object.hasOwn(rounds[0], "minOrderAmount"), false);
   assert.equal(Object.hasOwn(rounds[0], "queueActive"), false);
+});
+
+test("coupon API propagates public round HTTP failures without fallback data", async () => {
+  forcedFailure = {
+    pathPrefix: "/api/v1/coupon-rounds/public",
+    code: "COUPON-ROUND-LIST-UNAVAILABLE",
+    requestId: "req-rounds-503",
+  };
+  try {
+    await assert.rejects(
+      () => createHttpApi(baseUrl).listRounds(),
+      (error) =>
+        error?.status === 503 &&
+        error?.code === "COUPON-ROUND-LIST-UNAVAILABLE" &&
+        error?.requestId === "req-rounds-503",
+    );
+  } finally {
+    forcedFailure = null;
+  }
 });
 
 test("analytics sends a concrete date range and normalizes the observed backend response", async () => {

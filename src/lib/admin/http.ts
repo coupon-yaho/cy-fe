@@ -209,12 +209,8 @@ function normalizeAnalytics(response: BackendAnalyticsResponse) {
   };
 }
 
-function seriesPoints(
-  response: BackendMetricsSeriesResponse | undefined,
-  key: string,
-  valueKey: string,
-) {
-  return (response?.series ?? [])
+function seriesPoints(response: BackendMetricsSeriesResponse, key: string, valueKey: string) {
+  return response.series
     .filter((entry) => entry.key === key)
     .flatMap((entry) =>
       entry.points
@@ -234,7 +230,7 @@ function percentile(source: SourceValue<Percentiles>, key: keyof Percentiles): S
 
 function normalizeMetrics(
   response: BackendMetricsResponse,
-  seriesResponse?: BackendMetricsSeriesResponse,
+  seriesResponse: BackendMetricsSeriesResponse,
 ): AdminMetricsResponse {
   const { groups, ...latency } = response.latency;
   const throughput = seriesPoints(seriesResponse, "THROUGHPUT", "issueAttemptRps");
@@ -260,7 +256,7 @@ function normalizeMetrics(
     traffic: {
       ...response.traffic,
       series: throughput,
-      ...(seriesResponse?.markers
+      ...(seriesResponse.markers
         ? {
             markers: seriesResponse.markers.map((marker) => ({
               t: Date.parse(marker.at),

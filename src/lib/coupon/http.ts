@@ -1,8 +1,9 @@
 /**
  * 실서버 어댑터.
  *
- * VITE_API_BASE_URL 이 있으면 이 어댑터가 붙습니다. 모든 응답은
- * ResponseEnvelope<T> 로 감싸져 오므로 여기서 한 번만 벗깁니다.
+ * 운영 진입점은 항상 이 어댑터를 사용합니다. VITE_API_BASE_URL 이 비어 있으면 같은
+ * 출처의 상대 경로로 요청합니다. 모든 응답은 ResponseEnvelope<T> 로 감싸져 오므로
+ * 여기서 한 번만 벗깁니다.
  *
  * 헤더 규약 (api/.../MemberRequestHeaders · CouponRequestHeaders · AdminRequestHeaders)
  *   X-Member-Id        회원 식별자 (Long, 양수)

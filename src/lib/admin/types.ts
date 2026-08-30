@@ -509,7 +509,7 @@ export interface TrafficPanel {
   queueAcceptedRps: SourceValue<number>;
   policyRejectRps: SourceValue<number>;
   systemFailureRps: SourceValue<number>;
-  /** 시계열은 서버가 주지 않습니다 — 화면이 폴링으로 누적합니다. 목에서만 채워집니다 */
+  /** 시계열은 HTTP 어댑터가 별도 metrics/series 응답을 합쳐 채웁니다. */
   series?: Point[];
   markers?: { t: number; label: string }[];
 }
@@ -524,7 +524,7 @@ export interface ErrorPanel {
     excludedFromNumerator: boolean;
     rate: SourceValue<number>;
   }[];
-  /** 시계열은 서버가 주지 않습니다 — 화면 누적. 목에서만 채워집니다 */
+  /** 현재 HTTP 계약에 실패율 시계열이 없으므로 값이 없을 수 있습니다. */
   series?: Point[];
   /** 18 실패 원인 Top N — 저카디널리티 화이트리스트만 */
   topReasons: { httpStatus: number | string; reasonCode: string; count: number }[];
@@ -623,7 +623,7 @@ export interface AdminAnalyticsResponse {
   };
   /** 28 상태 전이 퍼널 — 유효기간 정책 근거 */
   funnel: { stage: string; label: string; count: number; ratio: number }[];
-  /** 실제 백엔드 집계 원천 상태. 목 응답에는 없을 수 있습니다. */
+  /** 실제 백엔드 집계 원천 상태. 집계 응답이 상태를 제공하지 않으면 생략됩니다. */
   sourceStates?: {
     brandTrend: SourceState;
     heatmap: SourceState;
