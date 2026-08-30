@@ -297,17 +297,37 @@ export type BatchSource = { root: BatchRoot; report: VerifyReport };
  * 띄우는 사람이 정하고, 화면은 그것을 모른다. 최신 실행을 물어 서버가 말한 {@code dataset}
  * 을 그대로 이름표로 쓴다. 안 뜬 엔드포인트는 조용히 빠진다.
  */
+/**
+ * 연달아 실패한 엔드포인트의 실패 횟수. <b>안 띄운 배치를 계속 두드리지 않으려는 것이다.</b>
+ *
+ * <p>개발 서버가 어떤 프록시를 열었는지 화면은 모른다. 안 열린 경로를 5초마다 부르면
+ * 콘솔이 빨간 줄로 도배되는데, 시연 중 개발자 도구를 열어 두면 그게 그대로 보인다.
+ *
+ * <p><b>한 번 실패로 끊지 않는다.</b> 배치가 재기동하는 동안에는 멀쩡한 엔드포인트도
+ * 잠깐 죽는다(실측으로 겪었다). 연속 세 번이면 "안 띄운 것" 으로 보고 접는다 — 나중에
+ * 띄우면 새로고침으로 돌아온다.
+ */
+const deadRoots = new Map<string, number>();
+const DEAD_AFTER = 3;
+
 export async function discoverSources(signal?: AbortSignal): Promise<BatchSource[]> {
+  const probe = BATCH_ROOTS.filter((root) => (deadRoots.get(root) ?? 0) < DEAD_AFTER);
   const settled = await Promise.allSettled(
-    BATCH_ROOTS.map(async (root) => ({ root, report: await getLatestReport(root, signal) })),
+    probe.map(async (root) => ({ root, report: await getLatestReport(root, signal) })),
   );
   const found: BatchSource[] = [];
-  for (const r of settled) {
-    if (r.status !== "fulfilled" || !r.value.report) continue;
+  settled.forEach((r, i) => {
+    const root = probe[i]!;
+    if (r.status !== "fulfilled" || !r.value.report) {
+      // 중단(화면이 떠난 것)은 실패로 세지 않는다 — 그것으로 끊으면 탭 전환에 죽는다.
+      if (!signal?.aborted) deadRoots.set(root, (deadRoots.get(root) ?? 0) + 1);
+      return;
+    }
+    deadRoots.delete(root);
     // 두 배치가 같은 DB 를 보고 있으면 같은 셋이 두 번 뜬다. 먼저 온 쪽만 남긴다.
-    if (found.some((f) => f.report.run.dataset === r.value.report!.run.dataset)) continue;
-    found.push({ root: r.value.root, report: r.value.report });
-  }
+    if (found.some((f) => f.report.run.dataset === r.value.report!.run.dataset)) return;
+    found.push({ root, report: r.value.report });
+  });
   return found;
 }
 
