@@ -324,8 +324,14 @@ export async function discoverSources(signal?: AbortSignal): Promise<BatchSource
       return;
     }
     deadRoots.delete(root);
-    // 두 배치가 같은 DB 를 보고 있으면 같은 셋이 두 번 뜬다. 먼저 온 쪽만 남긴다.
-    if (found.some((f) => f.report.run.dataset === r.value.report!.run.dataset)) return;
+    /*
+     * 중복은 <b>데이터 지문</b>으로 거른다. 처음엔 dataset 으로 걸렀는데, 그건 "같은 종류"
+     * 지 "같은 데이터" 가 아니다 — 시험용 정상셋(coupon_clean)과 운영 DB(app)가 둘 다
+     * CLEAN 이라, 지문이 다른데도 뒤에 온 쪽이 통째로 버려졌다(실측: cdddc4356ccf 와
+     * 4e33f09d24e5). 두 배치가 진짜로 같은 DB 를 보면 지문이 같으므로 그때는 여전히 걸린다.
+     */
+    const fp = r.value.report.run.datasetFingerprint;
+    if (fp && found.some((f) => f.report.run.datasetFingerprint === fp)) return;
     found.push({ root, report: r.value.report });
   });
   return found;

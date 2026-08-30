@@ -427,6 +427,10 @@ export function BatchVerification() {
             <SourceCard
               key={s.root}
               source={s}
+              /* 같은 종류가 둘 이상이면 이름표만으로 못 가른다 — 그때만 지문을 덧붙인다. */
+              ambiguous={
+                sources.filter((x) => x.report.run.dataset === s.report.run.dataset).length > 1
+              }
               selected={s.root === root}
               onSelect={() => setActiveRoot(s.root)}
             />
@@ -886,10 +890,13 @@ function FindingDonut({
 function SourceCard({
   source,
   selected,
+  ambiguous,
   onSelect,
 }: {
   source: BatchSource;
   selected: boolean;
+  /** 같은 종류의 셋이 둘 이상이라 이름표만으로는 못 가르는 상태. */
+  ambiguous: boolean;
   onSelect: () => void;
 }) {
   const { run, manifest } = source.report;
@@ -916,8 +923,16 @@ function SourceCard({
       }`}
     >
       <span className="min-w-0 flex-1">
+        {/*
+         * 서버가 주는 이름표는 dataset(CORRUPT·CLEAN) 뿐이라, 시험용 정상셋과 운영 DB 를
+         * 못 가른다 — 둘 다 CLEAN 이다. 그때만 데이터 지문 앞자리를 덧붙인다. 예쁘지는
+         * 않지만 <b>같은 이름 두 장</b>보다는 낫다. 서버가 이름을 주면 이 갈래는 사라진다.
+         */}
         <span className="t-caption block text-hig-muted">
           {corrupt ? "오염셋 · 정답을 심어 둔 시험" : "정상셋 · 평상시 도는 것"}
+          {ambiguous && run.datasetFingerprint && (
+            <span className="num ml-1.5">· {run.datasetFingerprint.slice(0, 6)}</span>
+          )}
         </span>
         {/*
          * <b>"심은 800건" 이 아니다.</b> 심은 오염은 700건이고, 그중 한 종류가 두 규칙에
