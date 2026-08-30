@@ -41,6 +41,10 @@ const LIVE_POLL_MS = 1000;
  */
 const IDLE_POLL_MS = 5000;
 
+/** 화면 말로 옮긴 {@code asOf} 의 뜻. 표와 패널이 같은 문장을 쓴다. */
+const AS_OF_NOTE =
+  "이 시각까지의 이력만 접어서 판정한다. 같은 값으로 다시 돌리면 같은 답이 나온다.";
+
 type RerunState =
   | { phase: "idle" }
   | { phase: "requesting" }
@@ -511,9 +515,12 @@ export function BatchVerification() {
                 )}
               </p>
               <dl className="t-body-sm mt-4 grid grid-cols-[5.5rem_1fr] gap-y-1.5 text-hig-secondary">
-                {/* "asOf" 는 화면 밖 사람에게 아무 뜻이 없다. 서버 파라미터 이름이지
-                    화면 말이 아니라, 이력을 여기까지만 자른다는 뜻으로 적는다. */}
-                <dt>기준 시각</dt>
+                {/* "asOf" 는 서버 파라미터 이름이지 화면 말이 아니다. 뜻을 옮겨 적고,
+                    그것만으로 안 통하는 사람을 위해 한 줄 설명을 마우스에 물려 둔다.
+                    본문으로 내면 카드마다 회색 문장이 다시 생긴다. */}
+                <dt className="cursor-help" title={AS_OF_NOTE}>
+                  기준 시각
+                </dt>
                 <dd className="num text-hig-fg">{report.run.asOf.replace("T", " ")}</dd>
                 <dt>소요</dt>
                 <dd className="num text-hig-fg">
@@ -559,7 +566,9 @@ export function BatchVerification() {
                   <th>run</th>
                   <th>판정</th>
                   <th>셋</th>
-                  <th>기준 시각</th>
+                  <th className="cursor-help" title={AS_OF_NOTE}>
+                    기준 시각
+                  </th>
                   <th className="text-right">검출</th>
                   <th className="text-right">소요</th>
                   <th>체크섬</th>
