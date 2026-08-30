@@ -897,6 +897,14 @@ function SourceCard({
   const expected = manifest?.present ? (manifest.expectedCount ?? 0) : 0;
   const hit = expected - (manifest?.missingCount ?? 0);
   const pass = run.verdict === "PASS";
+  /**
+   * 오염 수를 서버가 주면 문장 앞에 세우고, 없으면 "심은 오염이" 로만 적는다.
+   * 화면이 그 수를 추정하지 않는 것이 요점이다 — 틀린 숫자보다 없는 숫자가 낫다.
+   */
+  const injected =
+    manifest?.corruptionCount != null
+      ? `오염 ${manifest.corruptionCount.toLocaleString("ko-KR")}건이 `
+      : "심은 오염이 ";
 
   return (
     <button
@@ -924,7 +932,7 @@ function SourceCard({
           {!corrupt
             ? `검출 ${(run.findingCount ?? 0).toLocaleString("ko-KR")}건`
             : hit === expected
-              ? `심은 오염이 낳는 위반 ${expected.toLocaleString("ko-KR")}건을 전부 잡음`
+              ? `${injected}낳는 위반 ${expected.toLocaleString("ko-KR")}건을 전부 잡음`
               : `위반 ${expected.toLocaleString("ko-KR")}건 중 ${hit.toLocaleString("ko-KR")}건을 잡음`}
         </span>
         <span className="t-caption mt-1 block text-hig-secondary">

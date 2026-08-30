@@ -103,6 +103,15 @@ export type Manifest = {
   present: boolean;
   seedRunId: number;
   expectedCount: number | null;
+  /**
+   * 심은 <b>오염</b> 수. {@link expectedCount}(기대 <b>위반</b> 수)와 다르다 —
+   * 오염 하나가 규칙 둘에 걸리면 위반이 둘 생긴다(실측: 오염 700 · 위반 800).
+   *
+   * <p><b>서버가 아직 안 줄 수 있다.</b> 리포트 스키마에 나중에 들어오는 값이라
+   * 없으면 화면이 그 문구만 빼고 그린다 — 화면이 종류당 건수를 가정해 나눠 세면
+   * 시드가 한 종류만 더 심는 날 조용히 틀린다.
+   */
+  corruptionCount?: number | null;
   expectedDigest: string | null;
   missingCount: number | null;
   unexpectedCount: number | null;
