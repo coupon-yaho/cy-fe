@@ -35,19 +35,23 @@ export const FINDING_LABEL: Record<FindingType, string> = {
 };
 
 /**
- * 규칙별 색. <b>순번으로 계산하지 않고 손으로 박는다.</b>
+ * 규칙별 색. <b>한 색조의 계단이다.</b>
  *
- * <p>인덱스로 `viz-(i+1)` 을 만들면 유형이 하나 늘거나 순서가 바뀌는 날 색이 통째로
- * 밀린다 — 색은 자리가 아니라 <b>규칙 그 자체</b>를 가리켜야 어제 화면과 오늘 화면을
- * 겹쳐 볼 수 있다. 팔레트는 저장소 시각화 램프(라이트·다크 양쪽 검증됨)를 그대로 쓴다.
+ * <p>여섯 규칙에 여섯 색조를 주면 작은 링이 무지개가 되어, 옆의 무채색 패널들 사이에서
+ * 혼자 시끄럽다. <b>정체는 색이 아니라 범례의 글자가 나른다</b> — V1·재고 불일치가 바로
+ * 옆에 적혀 있으므로 색은 순서만 나르면 된다. 그래서 진한 쪽부터 연한 쪽으로 세운다.
+ *
+ * <p>순번으로 계산하지 않고 손으로 박는다. 인덱스로 만들면 유형이 늘거나 순서가 바뀌는
+ * 날 색이 통째로 밀리는데, 색은 자리가 아니라 <b>규칙 그 자체</b>를 가리켜야 어제 화면과
+ * 오늘 화면을 겹쳐 볼 수 있다. 바탕색과 섞으므로 패널 배경이 바뀌어도 같이 따라간다.
  */
 export const FINDING_TONE: Record<FindingType, string> = {
   STOCK_MISMATCH: "var(--viz-1)",
-  DUP_PER_MEMBER: "var(--viz-2)",
-  REPLAY_MISMATCH: "var(--viz-3)",
-  ILLEGAL_TRANSITION: "var(--viz-4)",
-  USAGE_MISMATCH: "var(--viz-5)",
-  GRADE_VIOLATION: "var(--viz-6)",
+  DUP_PER_MEMBER: "color-mix(in oklab, var(--viz-1) 82%, var(--hig-surface))",
+  REPLAY_MISMATCH: "color-mix(in oklab, var(--viz-1) 66%, var(--hig-surface))",
+  ILLEGAL_TRANSITION: "color-mix(in oklab, var(--viz-1) 50%, var(--hig-surface))",
+  USAGE_MISMATCH: "color-mix(in oklab, var(--viz-1) 36%, var(--hig-surface))",
+  GRADE_VIOLATION: "color-mix(in oklab, var(--viz-1) 24%, var(--hig-surface))",
 };
 
 export const FINDING_RULE: Record<FindingType, string> = {

@@ -324,6 +324,11 @@ export function BatchVerification() {
         <div>
           <p className="t-caption text-hig-muted">배치 검증 · 확정 판정</p>
           <h2 className="t-title mt-1">이력을 다시 접어 낸 답</h2>
+          {/* 패널마다 붙어 있던 설명을 여기 한 줄로 모았다 — 카드마다 회색 문장이
+              달려 있으면 화면이 값보다 말로 읽힌다. */}
+          <p className="t-body-sm mt-1.5 text-hig-secondary">
+            같은 기준 시각으로 다시 돌리면 체크섬이 같아야 한다.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {report && (
@@ -395,13 +400,7 @@ export function BatchVerification() {
             <Panel
               className={running ? "opacity-60 transition-opacity" : "transition-opacity"}
               title={manifest?.present ? "적중률" : "검출"}
-              hint={
-                running
-                  ? "이전 판정 · 새 검증이 도는 중"
-                  : manifest?.present
-                    ? "심은 것을 그대로 잡았나"
-                    : "정상셋은 0이 정답"
-              }
+              {...(running ? { hint: "이전 판정" } : manifest?.present ? {} : { hint: "0이 정답" })}
             >
               {manifest?.present ? (
                 <>
@@ -415,7 +414,7 @@ export function BatchVerification() {
                       tone={matched ? "var(--viz-good)" : "var(--viz-critical)"}
                     />
                   </div>
-                  <dl className="t-body-sm mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-hig-secondary">
+                  <dl className="t-body-sm mt-4 grid grid-cols-[5.5rem_1fr] gap-y-1.5 text-hig-secondary">
                     <dt>맞춘 것</dt>
                     <dd className="num text-hig-fg">
                       {(
@@ -435,9 +434,6 @@ export function BatchVerification() {
                       {(manifest.unexpectedCount ?? 0).toLocaleString("ko-KR")}
                     </dd>
                   </dl>
-                  <p className="t-caption mt-3 text-hig-muted">
-                    개수만 같고 서로 다른 것을 잡았을 수 있어, 집합을 양방향으로 뺀 값이다.
-                  </p>
                 </>
               ) : (
                 <>
@@ -461,18 +457,12 @@ export function BatchVerification() {
             <Panel
               className={running ? "opacity-60 transition-opacity" : "transition-opacity"}
               title="검출 대조"
-              hint={
-                running
-                  ? "이전 판정"
-                  : manifest?.present
-                    ? "규칙별 비중"
-                    : "여섯 규칙 전부 0이어야 한다"
-              }
+              {...(running ? { hint: "이전 판정" } : {})}
             >
               <FindingDonut byType={report.byType} total={total} />
             </Panel>
 
-            <Panel title="훑은 양" hint={running ? "지금 훑는 중" : "이 판정이 본 범위"}>
+            <Panel title="훑은 양" {...(running ? { hint: "진행 중" } : {})}>
               <p className={`t-hero num ${running ? "text-hig-fg" : ""}`}>
                 {scanRows === null ? (
                   <span className="text-hig-muted">—</span>
@@ -483,12 +473,10 @@ export function BatchVerification() {
                   </>
                 )}
               </p>
-              <dl className="t-body-sm mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-hig-secondary">
+              <dl className="t-body-sm mt-4 grid grid-cols-[5.5rem_1fr] gap-y-1.5 text-hig-secondary">
                 {/* "asOf" 는 화면 밖 사람에게 아무 뜻이 없다. 무엇인지 먼저 적고
                     서버 파라미터 이름을 작게 곁들인다. */}
-                <dt>
-                  기준 시각 <span className="num t-caption text-hig-muted">asOf</span>
-                </dt>
+                <dt>기준 시각</dt>
                 <dd className="num text-hig-fg">{report.run.asOf.replace("T", " ")}</dd>
                 <dt>소요</dt>
                 <dd className="num text-hig-fg">
@@ -515,11 +503,6 @@ export function BatchVerification() {
                   </p>
                 </div>
               )}
-              <p className="t-caption mt-3 text-hig-muted">
-                {running
-                  ? "이 시각까지의 이력만 접는다. 그래서 몇 번을 돌려도 답이 같다."
-                  : "같은 기준 시각으로 다시 돌리면 이 체크섬이 같아야 한다."}
-              </p>
             </Panel>
           </div>
 
@@ -675,15 +658,16 @@ export function BatchVerification() {
 const RULES = Object.keys(FINDING_LABEL) as FindingType[];
 
 /**
- * 검출 대조 — 규칙별 비중을 원형(도넛)으로.
+ * 검출 대조 — 규칙별 비중을 도넛으로.
+ *
+ * <p><b>떠 있는 말풍선을 안 쓴다.</b> 처음엔 조각 위에 카드를 띄웠는데 가운데 합계와
+ * 겹쳐 글자가 뭉개졌다. 링 안쪽은 이미 숫자가 있는 자리라 그 위에 무엇을 띄우든 겹친다.
+ * 그래서 <b>읽을 곳을 하나로 모은다</b> — 조각을 짚으면 가운데 숫자가 그 규칙의 값으로
+ * 바뀌고 범례의 해당 줄이 살아난다. 반대로 범례를 짚어도 조각이 살아난다.
  *
  * <p><b>0건인 규칙은 조각이 안 생긴다.</b> 원형이 못 그리는 값이라 그렇다. 그런데
- * "등급 위반은 한 건도 없었다" 는 이 패널이 말하려는 <b>"정확히 그것들만 잡았다" 의
- * 일부</b>라 화면에서 사라지면 안 된다. 그래서 아래 목록은 조각이 없는 규칙까지
- * 여섯 줄을 <b>전부</b> 세운다 — 원형은 비중을 말하고, 목록이 사실을 말한다.
- *
- * <p>같은 크기 조각(200·200·200)은 각도로 안 갈리므로 정체는 색이 아니라 목록의
- * 글자가 가른다. 조각 위에 마우스를 올리면 건수와 전체 대비 비율이 뜬다.
+ * "등급 위반은 한 건도 없었다" 는 이 패널이 말하려는 것의 일부라, 범례는 조각이 없는
+ * 규칙까지 여섯 줄을 전부 세운다 — 링은 비중을 말하고 범례가 사실을 말한다.
  */
 function FindingDonut({
   byType,
@@ -700,84 +684,85 @@ function FindingDonut({
     value: byType[type] ?? 0,
   }));
   const drawn = slices.filter((s) => s.value > 0);
-  const shownTotal = useCountUp(total);
+  const [active, setActive] = useState<FindingType | null>(null);
+  const focused = slices.find((s) => s.type === active) ?? null;
+
+  // 가운데가 읽어 주는 값. 짚은 것이 없으면 합계다.
+  const centerValue = focused ? focused.value : total;
+  const shownCenter = useCountUp(centerValue, focused?.type ?? "total");
 
   return (
-    <div className="flex flex-col">
-      {/* 링과 목록을 나란히 둔다 — 위아래로 쌓으면 링 좌우가 비고 두 덩어리로 읽힌다. */}
-      <div className="flex items-center gap-5">
-        <div className="relative size-[164px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={drawn.length > 0 ? drawn : [{ type: "EMPTY", value: 1 }]}
-                dataKey="value"
-                nameKey="label"
-                /* 얇은 링. 두꺼우면 색 면적이 커져 값보다 색이 먼저 읽힌다. */
-                innerRadius={60}
-                outerRadius={78}
-                /* 조각 사이를 띄운다 — 붙여 두면 같은 크기 조각의 경계가 안 보인다. */
-                paddingAngle={drawn.length > 1 ? 2 : 0}
-                stroke="none"
-                isAnimationActive={false}
-              >
-                {(drawn.length > 0 ? drawn : [{ type: "EMPTY", color: "var(--x-fill)" }]).map(
-                  (s) => (
-                    <Cell key={s.type} fill={s.color} />
-                  ),
-                )}
-              </Pie>
-              {drawn.length > 0 && <Tooltip content={<DonutTip total={total} />} cursor={false} />}
-            </PieChart>
-          </ResponsiveContainer>
-          {/* 가운데는 합계다. 조각을 다 더하면 얼마인지가 원형에서 안 읽힌다. */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="t-tile num font-semibold">
-              {Math.round(shownTotal).toLocaleString("ko-KR")}
-            </span>
-            <span className="t-caption -mt-0.5 text-hig-muted">건</span>
-          </div>
+    <div className="flex items-center gap-5">
+      <div className="relative size-[164px] shrink-0" onMouseLeave={() => setActive(null)}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={drawn.length > 0 ? drawn : [{ type: "EMPTY", value: 1 }]}
+              dataKey="value"
+              nameKey="label"
+              /* 얇은 링. 두꺼우면 색 면적이 커져 값보다 색이 먼저 읽힌다. */
+              innerRadius={60}
+              outerRadius={78}
+              /* 조각 사이를 띄운다 — 붙여 두면 같은 크기 조각의 경계가 안 보인다. */
+              paddingAngle={drawn.length > 1 ? 2 : 0}
+              stroke="none"
+              isAnimationActive={false}
+              onMouseEnter={(_, index) => setActive(drawn[index]?.type ?? null)}
+            >
+              {(drawn.length > 0 ? drawn : [{ type: "EMPTY", color: "var(--x-fill)" }]).map((s) => (
+                <Cell
+                  key={s.type}
+                  fill={s.color}
+                  /* 짚은 것만 남기고 나머지를 물린다. 강조를 색으로 더하는 것보다
+                     빼는 편이 조용하다. */
+                  fillOpacity={active && active !== s.type ? 0.28 : 1}
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="t-tile num font-semibold">
+            {Math.round(shownCenter).toLocaleString("ko-KR")}
+          </span>
+          <span className="t-caption -mt-0.5 text-hig-muted">{focused ? focused.label : "건"}</span>
         </div>
+      </div>
 
-        <ul className="flex min-w-0 flex-1 flex-col gap-2.5">
-          {slices.map((s) => (
-            <li key={s.type} className="t-body-sm flex items-baseline gap-2">
+      <ul className="flex min-w-0 flex-1 flex-col gap-2.5">
+        {slices.map((s) => {
+          const dim = active !== null && active !== s.type;
+          return (
+            <li
+              key={s.type}
+              className={`t-body-sm flex items-baseline gap-2 transition-opacity ${
+                dim ? "opacity-40" : ""
+              }`}
+              onMouseEnter={() => setActive(s.value > 0 ? s.type : null)}
+              onMouseLeave={() => setActive(null)}
+            >
               <span
-                className="size-2 shrink-0 translate-y-[-1px] rounded-full"
+                className="size-2 shrink-0 -translate-y-px rounded-full"
                 style={{ background: s.value === 0 ? "var(--x-fill)" : s.color }}
                 aria-hidden
               />
               <span className="num t-caption shrink-0 text-hig-muted">{s.rule}</span>
-              <span
-                className={`truncate ${s.value === 0 ? "text-hig-muted" : "text-hig-secondary"}`}
-              >
-                {s.label}
-              </span>
+              <span className={`truncate ${s.value === 0 ? "text-hig-muted" : ""}`}>{s.label}</span>
               <span
                 className={`num ml-auto shrink-0 font-semibold ${
                   s.value === 0 ? "text-hig-muted" : ""
                 }`}
               >
-                {s.value.toLocaleString("ko-KR")}
+                {/* 짚은 줄만 비율로 바뀐다. 여섯 줄에 전부 적으면 숫자가 두 배가 되고,
+                    정작 비교해야 할 건수가 안 읽힌다. */}
+                {active === s.type && total > 0
+                  ? `${((s.value / total) * 100).toFixed(1)}%`
+                  : s.value.toLocaleString("ko-KR")}
               </span>
             </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* 조각이 없는 규칙을 이름으로 적어 준다 — 원형에서 0 은 안 보이는데,
-          "그 규칙은 한 건도 없었다" 가 이 패널이 말하려는 것의 일부다.
-          여섯 규칙이 전부 잡혔으면 적을 것이 없으므로 줄 자체를 안 낸다. */}
-      {(drawn.length === 0 || drawn.length < slices.length) && (
-        <p className="t-caption mt-4 text-hig-muted">
-          {drawn.length === 0
-            ? "검출이 없어 조각이 없다 — 그것이 통과다."
-            : `조각이 없는 규칙 · ${slices
-                .filter((s) => s.value === 0)
-                .map((s) => s.label)
-                .join(" · ")}`}
-        </p>
-      )}
+          );
+        })}
+      </ul>
     </div>
   );
 }
