@@ -245,7 +245,12 @@ function RoundDetail() {
     } catch (error) {
       setPhase({ kind: "error", error });
     }
-  }, [roundId, runIssue, session, stopPolling]);
+    /* watchQueue 가 빠져 있었습니다. 그것도 useCallback 이라 재생성되는데, 이 콜백이
+       옛 것을 붙들면 대기열 폴링이 낡은 상태를 봅니다 — 증상이 "가끔 대기열이 안
+       움직인다" 로 나와 재현이 어렵습니다. 지금은 QUEUE_API_ENABLED 가 false 라
+       그 줄에 도달하지 않지만, 켜는 날 조용히 터질 자리입니다.
+       stopPolling 은 반대로 본문에서 안 쓰는데 목록에 있었습니다. */
+  }, [roundId, runIssue, session, watchQueue]);
 
   /* 입장 토큰의 남은 시간. 1초마다 셉니다 — 서버가 이 시간을 넘기면 슬롯을 반납하므로
      화면도 같은 시점에 손을 떼야 사용자가 헛되이 누르지 않습니다. */
