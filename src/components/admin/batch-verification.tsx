@@ -942,8 +942,12 @@ function SourceCard({
          */}
         <span className="t-caption block text-hig-muted">
           {corrupt ? "오염셋 · 주입 오염 대조" : "정상셋 · 무오염 데이터"}
-          {ambiguous && run.datasetFingerprint && (
-            <span className="num ml-1.5">· {run.datasetFingerprint.slice(0, 6)}</span>
+          {/* 종류가 겹칠 때만 붙인다. 서버가 스키마 이름을 주면 그것을 쓰고, 아직
+              안 주면 데이터 지문 앞자리로 버틴다 — 이름이 아니라 구분자일 뿐이다. */}
+          {ambiguous && (source.report.schema ?? run.datasetFingerprint) && (
+            <span className="num ml-1.5">
+              · {source.report.schema ?? run.datasetFingerprint!.slice(0, 6)}
+            </span>
           )}
         </span>
         {/*

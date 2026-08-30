@@ -121,7 +121,23 @@ export type Manifest = {
 export type VerifyReport = {
   run: VerifyRun;
   byType: Partial<Record<FindingType, number>>;
-  manifest: Manifest;
+  /**
+   * 정답 묶음 대조. <b>정상셋에서는 {@code null} 이다</b>(실측) — 예전 타입은 항상 있다고
+   * 적어 두어서, 화면이 {@code manifest.present} 를 그냥 읽었으면 정상셋에서 죽었다.
+   * 지금 코드가 안 죽은 것은 전부 옵셔널 체이닝을 쓰고 있어서지 타입이 지켜 준 게 아니다.
+   */
+  manifest: Manifest | null;
+  /**
+   * 이 배치가 붙은 DB 이름. <b>{@code dataset} 과 다른 축이다</b> —
+   * 그쪽은 "어떤 종류를 검증하나"(CORRUPT·CLEAN)이고 이쪽은 "어느 DB 를 보나"다.
+   * 시험용 정상셋과 운영 DB 가 둘 다 CLEAN 이라 종류만으로는 못 가른다.
+   *
+   * <p><b>매니페스트가 아니라 최상위에 있다.</b> 정상셋은 매니페스트가 없어서,
+   * 그 안에 두면 정작 가려야 할 두 장을 못 가른다.
+   *
+   * <p>서버가 아직 안 줄 수 있다(선택 필드). 없으면 화면이 종류 이름만 쓴다.
+   */
+  schema?: string;
 };
 
 export type BatchRun = {
