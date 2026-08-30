@@ -18,6 +18,7 @@ let OverviewUnavailable;
 let EventScopeNotice;
 let defaultAnalyticsRange;
 let AnalyticsUnavailable;
+let runtimeConfigExports;
 
 before(async () => {
   viteServer = await createViteServer({
@@ -51,6 +52,13 @@ before(async () => {
   ({ defaultAnalyticsRange, AnalyticsUnavailable } = await viteServer.ssrLoadModule(
     "/src/routes/admin.campaigns.index.tsx",
   ));
+  runtimeConfigExports = Object.keys(
+    await viteServer.ssrLoadModule("/src/lib/runtime-config.ts"),
+  ).sort();
+});
+
+test("runtime config exposes only the live API labels at runtime", () => {
+  assert.deepEqual(runtimeConfigExports, ["QUEUE_MODE_LABEL", "QUEUE_MODE_NOTE"]);
 });
 
 test("event polling advances the cursor and retains only the newest rows", () => {
