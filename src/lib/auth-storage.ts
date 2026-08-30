@@ -40,12 +40,30 @@ export function writeSession(s: Session | null) {
   else window.localStorage.removeItem(KEY);
 }
 
-/** 회원 번호는 닉네임에서 결정론적으로 만듭니다 — 새로고침해도 쿠폰함이 유지되도록. */
+/**
+ * 시드가 넣어 둔 회원 수. <b>이 범위를 벗어나면 발급이 404 로 죽습니다.</b>
+ *
+ * <p>서버는 발급할 때 회원을 실제로 찾습니다({@code COUPON-309 회원을 찾을 수 없습니다}).
+ * 예전에는 여기서 100,000~899,999 를 만들었는데 시드 회원은 1~10,000 이라 <b>겹칠 수가
+ * 없었고, 그래서 발급이 한 번도 성공한 적이 없습니다</b> — 로그인·목록·상세는 다 되는데
+ * 발급 버튼만 "회원 정보를 찾을 수 없습니다" 로 끝났습니다.
+ *
+ * <p>시드가 이 수를 바꾸면 여기도 같이 바뀌어야 합니다. 서버가 "쓸 수 있는 회원" 을
+ * 알려 주는 경로가 생기면 이 상수는 지웁니다.
+ */
+const SEEDED_MEMBER_COUNT = 10000;
+
+/**
+ * 회원 번호는 닉네임에서 결정론적으로 만듭니다 — 새로고침해도 쿠폰함이 유지되도록.
+ *
+ * <p>범위는 <b>시드가 실제로 넣은 회원</b>에 맞춥니다. 목 로그인이라 아무 번호나 만들어도
+ * 화면은 그려지지만, 발급은 서버가 회원을 찾으므로 없는 번호면 그 자리에서 404 입니다.
+ */
 export function memberIdFor(nickname: string): number {
   let h = 2166136261;
   for (let i = 0; i < nickname.length; i += 1) {
     h ^= nickname.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  return 100000 + (Math.abs(h) % 800000);
+  return 1 + (Math.abs(h) % SEEDED_MEMBER_COUNT);
 }
