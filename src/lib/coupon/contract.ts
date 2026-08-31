@@ -141,8 +141,37 @@ export interface CouponApi {
   ): Promise<CouponTemplateDetail>;
 }
 
-/** Idempotency-Key 헤더 값 — 사용·취소 요청마다 새로 만듭니다. */
+/**
+ * Idempotency-Key 헤더 값 — 상태 변경 요청마다 새로 만듭니다.
+ *
+ * <b>반드시 UUID v4 여야 합니다.</b> 서버가 형식을 강제하고, 아니면 발급 경로를
+ * 타기도 전에 400(COUPON-300)으로 거절합니다 — 그 검사는 취향이 아니라 내부 마커를
+ * 헤더로 밀어 넣는 것을 막는 방어입니다.
+ *
+ * 예전 폴백은 `idem-<시각>-<난수>` 였습니다. 그 값이 나가는 순간 요청이 통째로
+ * 죽는데, 하필 그 폴백은 **`crypto.randomUUID` 가 없을 때만** 쓰입니다 — 그것은
+ * 보안 컨텍스트(HTTPS 나 localhost)에서만 제공되므로, 사내 IP 로 HTTP 접속하는
+ * 시연 같은 자리에서만 조용히 터집니다. 개발자 기계에서는 재현되지 않습니다.
+ */
 export function newIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  // getRandomValues 는 보안 컨텍스트가 아니어도 있습니다. 그것마저 없으면
+  // Math.random 으로 떨어지는데, 멱등키는 예측 불가일 필요가 없습니다 —
+  // 같은 시도에 같은 값이면 되고 서로 다른 시도끼리만 안 겹치면 됩니다.
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  // `?? 0` 은 인덱스 접근을 undefined 가능으로 보는 검사기 때문입니다. 길이 16 을
+  // 방금 잡았으므로 실제로 빌 수 없습니다.
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40; // 버전 4
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // 변형 비트 — 서버가 [89ab] 를 요구합니다
+
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
