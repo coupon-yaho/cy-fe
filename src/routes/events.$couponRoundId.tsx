@@ -117,10 +117,21 @@ function RoundDetail() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const issueKeyRef = useRef(newIdempotencyKey());
 
+  /* 줄 서 있는 동안이 이 숫자가 **제일 궁금한** 때입니다 — 내 차례가 오기 전에
+     동날지가 그 숫자에 달려 있습니다. 그런데 예전에는 대기열에 들어가는 순간
+     갱신을 멈춰서, 기다리는 내내 얼어붙은 수량을 봤습니다.
+
+     그래서 기다리는 동안에는 순번 조회와 같은 1초로 맞춥니다. 평상시 5초는
+     그대로 둡니다 — 안 몰릴 때까지 촘촘히 물을 이유가 없습니다.
+
+     ⚠️ 이 경로(`/api/v1/coupon-rounds/{id}`)는 지금 게이트웨이가 안 태우고
+     cy-be 로 직행합니다. 20,000명이 동시에 줄을 서면 여기가 초당 20,000 요청이
+     되므로, 켜기 전에 게이트웨이의 조회 합치기(coalescing) 대상에 넣어야 합니다. */
+  const waiting = phase.kind === "queued" || phase.kind === "admitted";
   const { data: round, isLoading } = useQuery({
     queryKey: ["round", roundId],
     queryFn: () => couponApi.getRound(roundId),
-    refetchInterval: phase.kind === "idle" ? 5_000 : false,
+    refetchInterval: phase.kind === "idle" ? 5_000 : waiting ? 1_000 : false,
   });
 
   const stopPolling = useCallback(() => {
