@@ -159,8 +159,24 @@ export function BatchVerification() {
       if (v.status === "fulfilled") setRuns(v.value.items);
       const standings = b.status === "fulfilled" ? b.value : null;
       if (standings) setJobs(standings);
+      /*
+       * 셋이 다 거절돼야 "못 붙었다" 로 본다. 하나라도 성공했으면 배치는 살아 있고,
+       * 404(아직 안 돌린 셋) 같은 것은 화면이 따로 그린다.
+       *
+       * **이유를 그대로 올린다.** 원인마다 할 일이 다른데 — 주소가 틀렸는가, 상대가
+       * 답을 안 하는가, 토큰이 없는가 — 한 문구로 뭉개면 받는 사람이 셋을 다 뒤진다.
+       */
       const dead = [r, v, b].every((x) => x.status === "rejected");
-      setError(dead ? "배치 관리 API 에 연결하지 못했습니다." : undefined);
+      const why = [r, v, b].find(
+        (x): x is PromiseRejectedResult =>
+          x.status === "rejected" && x.reason instanceof BatchApiError,
+      );
+      setError(
+        dead
+          ? ((why?.reason as BatchApiError | undefined)?.message ??
+              "배치 관리 API 에 연결하지 못했습니다.")
+          : undefined,
+      );
       setLoading(false);
       return standings;
     },

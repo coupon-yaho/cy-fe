@@ -26,6 +26,24 @@ export type BatchRoot = (typeof BATCH_ROOTS)[number];
 
 const API_PATH = "/api/v1/admin";
 
+/**
+ * 한 요청을 기다리는 상한.
+ *
+ * <p><b>없으면 화면이 영영 돕니다.</b> 조회는 네 요청을 {@code Promise.allSettled} 로
+ * 묶는데 그것은 전부 결말이 나야 풀립니다. 그래서 하나가 매달리면 로딩이 안 끝나고,
+ * "연결하지 못했습니다" 문구도 <b>셋이 다 거절됐을 때</b>만 뜨므로 매달림은 그 조건에도
+ * 안 걸립니다 — 사용자에게는 원인 없는 무한 로딩으로 보입니다.
+ *
+ * <p>연결이 거부되면 즉시 실패하므로 이 값이 필요한 경우는 따로 있습니다. 상대가
+ * <b>연결은 받고 답을 안 줄 때</b>입니다 — 주소가 방화벽 뒤이거나, 컨테이너 밖인데
+ * {@code host.docker.internal} 을 적었거나, 배치가 떠 있는 채로 먹통일 때. 그때 OS
+ * 연결 시한은 분 단위라 사실상 무한입니다.
+ *
+ * <p>검증 트리거는 접수만 하고 바로 답하므로 이 상한 안에 듭니다 — 오래 걸리는 것은
+ * 배치의 실행이지 이 요청이 아닙니다.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
+
 export type Verdict = "PASS" | "FAIL";
 export type Dataset = "CLEAN" | "CORRUPT";
 export type Scope = "FULL" | "INCREMENTAL";
@@ -189,12 +207,35 @@ async function request<T>(
   method: "GET" | "POST",
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(`${root}${API_PATH}${path}`, {
-    method,
-    // signal 을 undefined 로 넘기면 오버로드가 안 맞는다 — 있을 때만 싣는다.
-    ...(signal ? { signal } : {}),
-    headers: { Accept: "application/json" },
-  });
+  // 호출부의 취소(화면을 떠남)와 시한을 **합친다.** 시한만 걸면 떠난 뒤에도 요청이
+  // 남고, 취소만 걸면 매달림을 못 끊는다.
+  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const merged = signal ? AbortSignal.any([signal, deadline]) : deadline;
+
+  let res: Response;
+  try {
+    res = await fetch(`${root}${API_PATH}${path}`, {
+      method,
+      signal: merged,
+      headers: { Accept: "application/json" },
+    });
+  } catch (e) {
+    // 화면을 떠나서 끊은 것은 그대로 올린다 — 호출부가 signal.aborted 로 가려낸다.
+    if (signal?.aborted) throw e;
+    // 시한이 끊은 것. **거절로 바꿔야 화면이 말을 한다** — 매달린 채로 두면
+    // 로딩만 돌고 아무 문구도 안 뜬다.
+    if (deadline.aborted) {
+      throw new BatchApiError(
+        `배치 관리 API 가 ${REQUEST_TIMEOUT_MS / 1000}초 안에 답하지 않았습니다. ` +
+          "주소는 맞는데 상대가 응답하지 않는 상태입니다 — BATCH_ORIGIN 이 가리키는 곳과 " +
+          "배치 컨테이너가 실제로 뜬 주소가 같은지 보십시오.",
+        0,
+        "TIMEOUT",
+      );
+    }
+    // 연결 거부·DNS 실패 등. 이쪽은 원래도 빨리 실패했다.
+    throw new BatchApiError("배치 관리 API 에 연결하지 못했습니다.", 0, "UNREACHABLE");
+  }
   const text = await res.text();
   let envelope: Envelope<T> | undefined;
   try {
