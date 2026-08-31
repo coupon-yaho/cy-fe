@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { LiveOverview } from "@/components/admin/live-overview";
 import { Panel } from "@/components/admin/panel";
@@ -128,17 +128,16 @@ function QueueControl() {
     queryKey: ["admin", "queue-settings"],
     queryFn: () => adminApi.getQueueSettings(),
   });
-  const [threshold, setThreshold] = useState("");
-
-  // 서버 값이 바뀌면 입력칸도 따라갑니다.
-  useEffect(() => {
-    if (settings.data) setThreshold(String(settings.data.adaptiveThresholdPerMinute));
-  }, [settings.data]);
-
+  /*
+   * **전체 교체라 나머지 값을 같이 실어 보냅니다.** 대기열 모드만 담으면 서버가
+   * 엔진 버전과 릴리스 단계를 못 받아 400 을 냅니다.
+   */
   const save = useMutation({
-    mutationFn: (input: { mode: QueueMode; adaptiveThresholdPerMinute: number }) =>
+    mutationFn: (mode: QueueMode) =>
       adminApi.updateQueueSettings({
-        ...input,
+        mode,
+        engineVersion: settings.data!.engineVersion,
+        releaseStage: settings.data!.releaseStage,
         expectedRevision: settings.data!.revision,
       }),
     onSuccess: (next) => {
@@ -151,8 +150,6 @@ function QueueControl() {
   });
 
   const current = settings.data;
-  const thresholdChanged =
-    !!current && Number(threshold) !== current.adaptiveThresholdPerMinute && Number(threshold) > 0;
 
   return (
     <Panel
@@ -173,12 +170,7 @@ function QueueControl() {
                   key={m.value}
                   type="button"
                   disabled={save.isPending}
-                  onClick={() =>
-                    save.mutate({
-                      mode: m.value,
-                      adaptiveThresholdPerMinute: current.adaptiveThresholdPerMinute,
-                    })
-                  }
+                  onClick={() => save.mutate(m.value)}
                   aria-pressed={current.mode === m.value}
                   className={`t-body-sm rounded-full px-3.5 py-1.5 transition-colors ${
                     current.mode === m.value
@@ -191,36 +183,11 @@ function QueueControl() {
               ))}
             </div>
             <p className="t-caption mt-2 text-hig-muted">{QUEUE_MODE_NOTE[current.mode]}</p>
-
-            {current.mode === "ADAPTIVE" && (
-              <div className="mt-4 flex items-end gap-2">
-                <label className="block">
-                  <span className="eyebrow">혼잡 기준</span>
-                  <span className="mt-1.5 flex items-center gap-2">
-                    <input
-                      value={threshold}
-                      onChange={(e) => setThreshold(e.target.value.replace(/\D/g, ""))}
-                      inputMode="numeric"
-                      className="num t-body-sm w-24 rounded-lg border border-hairline bg-hig-surface px-3 py-1.5 focus:border-hig-primary focus:outline-none"
-                    />
-                    <span className="t-caption text-hig-muted">건/분 이상</span>
-                  </span>
-                </label>
-                <button
-                  type="button"
-                  disabled={!thresholdChanged || save.isPending}
-                  onClick={() =>
-                    save.mutate({
-                      mode: current.mode,
-                      adaptiveThresholdPerMinute: Number(threshold),
-                    })
-                  }
-                  className="btn-compact"
-                >
-                  저장
-                </button>
-              </div>
-            )}
+            {/*
+              혼잡 기준 입력칸이 여기 있었습니다. 서버 계약에 그 필드가 없어
+              값을 보내도 버려지고, 화면에는 늘 저장된 것처럼 보였습니다.
+              기준값은 게이트웨이가 정하므로 관리자가 고칠 자리가 아닙니다.
+            */}
           </div>
 
           <div className="min-w-0">

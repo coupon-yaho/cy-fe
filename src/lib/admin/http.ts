@@ -149,6 +149,31 @@ type BackendAnalyticsResponse = {
   }>;
 };
 
+/**
+ * GET·PUT /api/v1/admin/runtime-config 의 실제 응답입니다.
+ *
+ * <b>대기열 모드의 이름이 화면 쪽과 다릅니다.</b> 서버는 {@code queueMode},
+ * 화면은 {@code mode} 입니다. 그대로 받으면 값이 통째로 {@code undefined} 라
+ * 모드 표시가 비고 토글이 아무 데도 눌린 것으로 안 보입니다.
+ */
+type BackendRuntimeConfig = {
+  revision: number;
+  engineVersion: string;
+  releaseStage: string;
+  queueMode: QueueSettings["mode"];
+  updatedAt: string;
+};
+
+function normalizeQueueSettings(response: BackendRuntimeConfig): QueueSettings {
+  return {
+    mode: response.queueMode,
+    engineVersion: response.engineVersion,
+    releaseStage: response.releaseStage,
+    revision: response.revision,
+    updatedAt: response.updatedAt,
+  };
+}
+
 const STATUS_LABEL: Record<string, string> = {
   ISSUED: "발급",
   USED: "사용",
@@ -414,12 +439,15 @@ export function createHttpAdminApi(baseUrl: string): AdminApi {
     inquireMember: (memberId) =>
       call(`/api/v1/admin/members/issuance-inquiries${qs({ memberId })}`),
 
-    getQueueSettings: () => call<QueueSettings>("/api/v1/admin/runtime-config"),
+    getQueueSettings: async () =>
+      normalizeQueueSettings(await call<BackendRuntimeConfig>("/api/v1/admin/runtime-config")),
 
-    updateQueueSettings: (input) =>
-      call<QueueSettings>("/api/v1/admin/runtime-config", {
-        method: "PUT",
-        body: JSON.stringify(input),
-      }),
+    updateQueueSettings: async ({ mode, engineVersion, releaseStage, expectedRevision }) =>
+      normalizeQueueSettings(
+        await call<BackendRuntimeConfig>("/api/v1/admin/runtime-config", {
+          method: "PUT",
+          body: JSON.stringify({ queueMode: mode, engineVersion, releaseStage, expectedRevision }),
+        }),
+      ),
   };
 }

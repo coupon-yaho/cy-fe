@@ -15,9 +15,16 @@ export const QUEUE_MODE_NOTE: Record<QueueMode, string> = {
 };
 
 export interface QueueSettings {
+  /** 서버는 이 값을 {@code queueMode} 로 부릅니다. 이름은 어댑터에서 맞춥니다. */
   mode: QueueMode;
-  /** 혼잡 판단 기준. 분당 발급 건수가 이 값을 넘으면 대기열을 켭니다. */
-  adaptiveThresholdPerMinute: number;
+  /**
+   * 엔진 버전과 릴리스 단계.
+   *
+   * <b>화면에 안 쓰지만 들고 있어야 합니다.</b> PUT 이 전체 교체라, 대기열 모드만
+   * 바꿔도 나머지 두 값을 그대로 되돌려보내지 않으면 서버가 400 을 냅니다.
+   */
+  engineVersion: string;
+  releaseStage: string;
   /** 동시 수정을 막는 리비전. 값을 바꿀 때 이 번호를 함께 보냅니다. */
   revision: number;
   updatedAt: string;

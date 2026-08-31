@@ -68,10 +68,16 @@ export interface AdminApi {
 
   /** GET /api/v1/admin/runtime-config — 대기열 운영 설정 */
   getQueueSettings(): Promise<QueueSettings>;
-  /** PUT /api/v1/admin/runtime-config — 리비전이 어긋나면 409 */
+  /**
+   * PUT /api/v1/admin/runtime-config — 리비전이 어긋나면 409
+   *
+   * <b>전체 교체입니다.</b> 대기열 모드만 바꿔도 엔진 버전과 릴리스 단계를 같이
+   * 보내야 합니다. 빠뜨리면 서버가 {@code 400 must not be null} 을 냅니다.
+   */
   updateQueueSettings(input: {
     mode: QueueSettings["mode"];
-    adaptiveThresholdPerMinute: number;
+    engineVersion: string;
+    releaseStage: string;
     expectedRevision: number;
   }): Promise<QueueSettings>;
 }
