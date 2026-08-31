@@ -14,6 +14,7 @@ import {
   ROUND_STATUS_LABEL,
   brandOf,
   couponApi,
+  CouponApiError,
   discountDetail,
   discountHeadline,
   errorCopy,
@@ -50,20 +51,35 @@ type Phase =
 /** PRD — entryToken TTL 180초. 서버가 expiresIn 을 주면 그 값이 우선입니다. */
 const ENTRY_TTL_SECONDS = 180;
 
-/* 대기열 API는 v2/v3 담당 범위입니다. 현재 백엔드는 발급 API를 직접 제공합니다. */
-const QUEUE_API_ENABLED = false;
+/* 폴링 중 매진을 만나면 이 오류로 바꿔 화면에 넘깁니다. 순번 조회는 매진을 오류가
+   아니라 정상 응답(SOLD_OUT)으로 알려 주는데, 화면에는 이미 품절 문구가 COUPON-306
+   으로 붙어 있습니다. 새 문구를 만드는 대신 그 자리로 보냅니다. */
+const SOLD_OUT_ERROR = {
+  status: 409,
+  code: "COUPON-306",
+  message: "수량이 모두 소진됐습니다.",
+  requestId: null,
+  timestamp: "",
+} as const;
 
-/* 대기 중 새로고침해도 순번이 유지되게 토큰을 남깁니다.
-   PRD 설계 규칙 5 — "/entry 중복 호출은 기존 queueToken 반환(멱등).
-   새로고침으로 순번이 밀리지 않도록." 순번은 서버에 살아 있는데 프론트가 토큰을
-   메모리에만 들고 있어서 잃어버리고 있었습니다. */
+/* 대기열을 켜고 끄는 플래그가 없습니다. 켜는 주체가 **게이트웨이**이기 때문입니다 —
+   앞에 cy-waiting 이 서 있으면 발급이 202 로 줄을 세우고, 없으면 cy-be 가 201 만
+   돌려줍니다. 프론트는 두 경우에 같은 코드를 태우고 응답으로만 갈립니다.
+   플래그를 두면 "서버는 줄을 세웠는데 화면은 안 켜진" 상태를 만들 수 있습니다. */
+
+/* 대기 중 새로고침해도 순번이 유지되게 토큰을 남깁니다. 순번은 서버에 살아 있는데
+   프론트가 토큰을 메모리에만 들고 있으면 잃어버립니다 — 줄에는 그대로 서 있으면서
+   화면만 처음으로 돌아갑니다. */
 const QUEUE_KEY = "coupon-yaho.queue.v1";
 
-/* 토큰을 들고 있을 필요가 없습니다. 어느 회차에서 줄을 섰는지만 남기고,
-   돌아오면 /entry 를 다시 부릅니다 — 서버가 기존 순번을 그대로 돌려줍니다. */
+/* 토큰을 남깁니다. 예전에는 안 남기고 돌아올 때 `/entry` 를 다시 불러 받아 왔는데,
+   게이트웨이에 그 경로가 없습니다. 그렇다고 발급을 다시 두드려 받아 올 수도 없습니다 —
+   기다리는 사이에 자리가 났으면 그 요청이 **곧바로 쿠폰을 뽑아 버립니다.** 누르지도
+   않았는데 발급되는 것이라, 순번 조회만으로 돌아오려면 토큰이 있어야 합니다. */
 interface SavedQueue {
   roundId: number;
   memberId: number;
+  queueToken: string;
 }
 
 function saveQueue(v: SavedQueue) {
@@ -116,11 +132,75 @@ function RoundDetail() {
 
   useEffect(() => stopPolling, [stopPolling]);
 
+  /* 순번을 1초마다 봅니다. PRD 가 SSE 를 쓰지 않기로 했습니다 —
+     20,000 VU 부하 테스트에서 클라이언트가 먼저 죽기 때문입니다. */
+  const watchQueue = useCallback(
+    (member: MemberContext, queueToken: string) => {
+      stopPolling();
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await couponApi.pollQueue(roundId, member, queueToken);
+
+          if (status.status === "ADMITTED") {
+            stopPolling();
+            clearQueue();
+            /* 여기서 바로 발급하지 않습니다. 입장은 발급을 보장하지 않고,
+               누르는 시점이 곧 선착순이라는 것이 PRD 의 정의입니다. */
+            setPhase({
+              kind: "admitted",
+              entryToken: status.entryToken,
+              expiresAt: Date.now() + (status.expiresIn || ENTRY_TTL_SECONDS) * 1000,
+            });
+            return;
+          }
+
+          /* 줄이 사라졌습니다. 이 둘을 안 다루면 화면이 영영 폴링합니다 —
+             서버는 이미 답을 줬는데 프론트만 "대기 중" 으로 남습니다.
+             다시 설 수 있는 CLOSED 는 처음 화면으로, 재고가 끝난 SOLD_OUT 은
+             매진으로 보냅니다. */
+          if (status.status === "CLOSED" || status.status === "SOLD_OUT") {
+            stopPolling();
+            clearQueue();
+            setPhase(
+              status.status === "SOLD_OUT"
+                ? { kind: "error", error: new CouponApiError(SOLD_OUT_ERROR) }
+                : { kind: "idle" },
+            );
+            return;
+          }
+
+          setPhase((prev) =>
+            prev.kind === "queued"
+              ? { ...prev, place: { position: status.position, etaSeconds: status.etaSeconds } }
+              : prev,
+          );
+        } catch (error) {
+          stopPolling();
+          clearQueue();
+          setPhase({ kind: "error", error });
+        }
+      }, 1000);
+    },
+    [roundId, stopPolling],
+  );
+
   const runIssue = useCallback(
     async (member: MemberContext, entryToken: string | null, fromQueue = false) => {
       setPhase({ kind: "issuing", fromQueue });
       try {
-        const issuance = await couponApi.issue(roundId, member, issueKeyRef.current, entryToken);
+        const result = await couponApi.issue(roundId, member, issueKeyRef.current, entryToken);
+
+        /* 자리가 없어 줄에 섰습니다. 게이트웨이가 앞에 있을 때만 오는 갈래입니다. */
+        if (result.kind === "queued") {
+          const { queueToken, position, etaSeconds } = result.queued;
+          const place: QueuePlace = { position, etaSeconds };
+          saveQueue({ roundId, memberId: member.memberId, queueToken });
+          setPhase({ kind: "queued", queueToken, place, startPosition: position });
+          watchQueue(member, queueToken);
+          return;
+        }
+
+        const issuance = result.issuance;
         clearQueue();
         setPhase({ kind: "done", issuance });
         notify(
@@ -136,84 +216,46 @@ function RoundDetail() {
         setPhase({ kind: "error", error });
       }
     },
-    [notify, queryClient, round?.name, roundId],
+    [notify, queryClient, round?.name, roundId, watchQueue],
   );
 
-  /* 순번을 1초마다 봅니다. PRD 가 SSE 를 쓰지 않기로 했습니다 —
-     20,000 VU 부하 테스트에서 클라이언트가 먼저 죽기 때문입니다. */
-  const watchQueue = useCallback(
-    (member: MemberContext, queueToken: string) => {
-      stopPolling();
-      pollRef.current = setInterval(async () => {
-        try {
-          const status = await couponApi.pollQueue(roundId, member, queueToken);
-          if (status.status === "ADMITTED" && status.entryToken) {
-            stopPolling();
-            clearQueue();
-            /* 여기서 바로 발급하지 않습니다. 입장은 발급을 보장하지 않고,
-               누르는 시점이 곧 선착순이라는 것이 PRD 의 정의입니다. */
-            setPhase({
-              kind: "admitted",
-              entryToken: status.entryToken,
-              expiresAt: Date.now() + ENTRY_TTL_SECONDS * 1000,
-            });
-            return;
-          }
-          if (status.place) {
-            setPhase((prev) => (prev.kind === "queued" ? { ...prev, place: status.place! } : prev));
-          }
-        } catch (error) {
-          stopPolling();
-          clearQueue();
-          setPhase({ kind: "error", error });
-        }
-      }, 1000);
-    },
-    [roundId, stopPolling],
-  );
-
-  /* 새로고침 복귀. 이 회차에서 줄을 섰던 기록이 있으면 /entry 를 다시 부릅니다.
-     PRD 설계 규칙 5 — 중복 호출은 기존 queueToken 과 순번을 그대로 돌려줍니다.
-     토큰을 프론트가 보관했다가 그대로 쓰는 것보다 낫습니다: 서버가 토큰을 갈아도
-     따라가고, 그 사이 순서가 왔으면 admitted 로 바로 들어갑니다. */
+  /* 새로고침 복귀. 저장해 둔 토큰으로 **순번만 조회합니다.**
+     발급을 다시 두드려서 복귀하면 안 됩니다 — 자리가 났으면 그 요청이 그대로
+     쿠폰을 뽑아 버립니다. 조회는 아무것도 소비하지 않습니다. */
   const resumedRef = useRef(false);
   useEffect(() => {
-    if (!QUEUE_API_ENABLED) {
-      clearQueue();
-      return;
-    }
     if (resumedRef.current || !session) return;
     const saved = loadQueue();
     if (!saved || saved.roundId !== roundId || saved.memberId !== session.memberId) return;
     resumedRef.current = true;
 
     const member: MemberContext = { memberId: session.memberId, grade: session.grade };
+    const { queueToken } = saved;
     void (async () => {
       try {
-        const entry = await couponApi.enterRound(roundId, member);
-        if (entry.admitted && entry.entryToken) {
+        const status = await couponApi.pollQueue(roundId, member, queueToken);
+
+        if (status.status === "ADMITTED") {
           clearQueue();
           setPhase({
             kind: "admitted",
-            entryToken: entry.entryToken,
-            expiresAt: Date.now() + (entry.expiresIn ?? ENTRY_TTL_SECONDS) * 1000,
+            entryToken: status.entryToken,
+            expiresAt: Date.now() + (status.expiresIn || ENTRY_TTL_SECONDS) * 1000,
           });
           return;
         }
-        const place = entry.place;
-        if (!entry.queueToken || !place) {
+
+        // 줄이 사라졌으면 기록만 지우고 처음 화면으로 둡니다.
+        if (status.status !== "WAITING") {
           clearQueue();
           return;
         }
-        setPhase({
-          kind: "queued",
-          queueToken: entry.queueToken,
-          place,
-          startPosition: place.position,
-        });
-        watchQueue(member, entry.queueToken);
+
+        const place: QueuePlace = { position: status.position, etaSeconds: status.etaSeconds };
+        setPhase({ kind: "queued", queueToken, place, startPosition: status.position });
+        watchQueue(member, queueToken);
       } catch {
-        // 줄이 이미 사라졌거나 발급이 끝난 경우입니다. 조용히 기록만 지웁니다.
+        // 토큰이 만료됐거나 발급이 끝난 경우입니다. 조용히 기록만 지웁니다.
         clearQueue();
       }
     })();
@@ -224,33 +266,10 @@ function RoundDetail() {
     const member: MemberContext = { memberId: session.memberId, grade: session.grade };
     setPhase({ kind: "entering" });
 
-    if (!QUEUE_API_ENABLED) {
-      await runIssue(member, null);
-      return;
-    }
-
-    try {
-      const entry = await couponApi.enterRound(roundId, member);
-
-      if (entry.admitted) {
-        await runIssue(member, entry.entryToken);
-        return;
-      }
-
-      const queueToken = entry.queueToken!;
-      const place = entry.place!;
-      saveQueue({ roundId, memberId: member.memberId });
-      setPhase({ kind: "queued", queueToken, place, startPosition: place.position });
-      watchQueue(member, queueToken);
-    } catch (error) {
-      setPhase({ kind: "error", error });
-    }
-    /* watchQueue 가 빠져 있었습니다. 그것도 useCallback 이라 재생성되는데, 이 콜백이
-       옛 것을 붙들면 대기열 폴링이 낡은 상태를 봅니다 — 증상이 "가끔 대기열이 안
-       움직인다" 로 나와 재현이 어렵습니다. 지금은 QUEUE_API_ENABLED 가 false 라
-       그 줄에 도달하지 않지만, 켜는 날 조용히 터질 자리입니다.
-       stopPolling 은 반대로 본문에서 안 쓰는데 목록에 있었습니다. */
-  }, [roundId, runIssue, session, watchQueue]);
+    /* 문이 하나입니다. 자리가 있으면 쿠폰이 오고 없으면 번호표가 오는데, 그 갈림은
+       runIssue 안에서 응답을 보고 정합니다. */
+    await runIssue(member, null);
+  }, [runIssue, session]);
 
   /* 입장 토큰의 남은 시간. 1초마다 셉니다 — 서버가 이 시간을 넘기면 슬롯을 반납하므로
      화면도 같은 시점에 손을 떼야 사용자가 헛되이 누르지 않습니다. */
@@ -272,17 +291,15 @@ function RoundDetail() {
     void runIssue({ memberId: session.memberId, grade: session.grade }, phase.entryToken, true);
   }, [phase, runIssue, session]);
 
+  /* 화면에서만 손을 뗍니다. **서버에 이탈 연산이 없습니다** — 게이트웨이의 QueuePort
+     는 등록(enqueue)과 조회(status) 둘뿐이고, `DELETE .../queue` 는 경로만 맞아
+     순번 조회 응답을 200 으로 돌려줍니다. 지웠다고 믿게 만드는 요청이라 안 보냅니다.
+     자리는 토큰이 만료되면서 자연히 빠집니다. */
   const cancelQueue = useCallback(() => {
     stopPolling();
     clearQueue();
     setPhase({ kind: "idle" });
-    if (session) {
-      void couponApi.leaveQueue(roundId, {
-        memberId: session.memberId,
-        grade: session.grade,
-      });
-    }
-  }, [roundId, session, stopPolling]);
+  }, [stopPolling]);
 
   if (isLoading || !round) {
     return (

@@ -27,7 +27,8 @@ import type {
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
   CouponUseResponse,
-  EntryResponse,
+  IssueOutcome,
+  QueuedResponse,
   IssuanceStatus,
   MemberCoupon,
   Page,
@@ -73,10 +74,12 @@ function memberHeaders(member: MemberContext): Record<string, string> {
 export function createHttpApi(baseUrl: string): CouponApi {
   const root = baseUrl.replace(/\/$/, "");
 
-  async function call<T>(
+  /* 상태 코드까지 돌려주는 판. 발급만 이것이 필요합니다 — 201 과 202 가 둘 다
+     성공인데 뜻이 정반대라, 코드를 안 보면 구분할 방법이 없습니다. */
+  async function callWithStatus<T>(
     path: string,
     init: RequestInit & { headers?: Record<string, string> } = {},
-  ): Promise<T> {
+  ): Promise<{ status: number; data: T }> {
     let res: Response;
     try {
       res = await fetch(`${root}${path}`, {
@@ -125,7 +128,14 @@ export function createHttpApi(baseUrl: string): CouponApi {
       );
     }
 
-    return envelope.data as T;
+    return { status: res.status, data: envelope.data as T };
+  }
+
+  async function call<T>(
+    path: string,
+    init: RequestInit & { headers?: Record<string, string> } = {},
+  ): Promise<T> {
+    return (await callWithStatus<T>(path, init)).data;
   }
 
   const admin = { [USER_ROLE]: "ADMIN" };
@@ -164,33 +174,33 @@ export function createHttpApi(baseUrl: string): CouponApi {
     getRound: async (id) =>
       toCouponRound(await call<CouponRoundResponse>(`/api/v1/coupon-rounds/${id}`)),
 
-    enterRound: (id, member) =>
-      call<EntryResponse>(`/api/v1/coupons/${id}/entry`, {
-        method: "POST",
-        headers: memberHeaders(member),
-      }),
-
     pollQueue: (id, member, queueToken) =>
       call<QueueResponse>(
         `/api/v1/coupons/${id}/queue?queueToken=${encodeURIComponent(queueToken)}`,
         { headers: memberHeaders(member) },
       ),
 
-    leaveQueue: (id, member) =>
-      call<void>(`/api/v1/coupons/${id}/queue`, {
-        method: "DELETE",
-        headers: memberHeaders(member),
-      }),
-
-    issue: (couponRoundId, member, idempotencyKey, entryToken) =>
-      call<CouponIssueResponse>(`/api/v1/coupons/${couponRoundId}/issue`, {
-        method: "POST",
-        headers: {
-          ...memberHeaders(member),
-          [IDEMPOTENCY_KEY]: idempotencyKey,
-          ...(entryToken ? { "Entry-Token": entryToken } : {}),
+    /* 201 과 202 를 갈라야 해서 call() 을 안 씁니다. call() 은 2xx 를 전부 성공으로
+       보고 봉투만 벗겨 주는데, 그러면 "쿠폰을 받았다" 와 "줄에 섰다" 가 같은 모양으로
+       돌아옵니다 — 대기 응답을 쿠폰으로 읽고 발급 완료 화면을 띄우게 됩니다. */
+    issue: async (couponRoundId, member, idempotencyKey, entryToken) => {
+      const { status, data } = await callWithStatus<CouponIssueResponse | QueuedResponse>(
+        `/api/v1/coupons/${couponRoundId}/issue`,
+        {
+          method: "POST",
+          headers: {
+            ...memberHeaders(member),
+            [IDEMPOTENCY_KEY]: idempotencyKey,
+            ...(entryToken ? { "Entry-Token": entryToken } : {}),
+          },
         },
-      }),
+      );
+
+      /* 202 는 게이트웨이가 세워 준 줄입니다. 게이트웨이가 앞에 없으면 cy-be 가
+         201 만 주므로 이 갈래는 아예 안 탑니다. */
+      if (status === 202) return { kind: "queued", queued: data as QueuedResponse };
+      return { kind: "issued", issuance: data as CouponIssueResponse };
+    },
 
     listMyCoupons: (member, params = {}) => {
       const q = new URLSearchParams();

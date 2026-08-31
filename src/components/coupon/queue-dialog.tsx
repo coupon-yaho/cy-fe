@@ -97,7 +97,10 @@ export function QueueDialog({
         ) : (
           <>
             <div className="pt-8 pb-3 text-center">
-              <p className="yh-label">내 순번</p>
+              {/* 서버가 주는 값은 순번이 아니라 **내 앞의 인원**입니다
+                  (cy-waiting `QueueEntry.rank`). 차례가 오면 0 이 됩니다 —
+                  "내 순번" 이라고 적으면 1등이 0 으로 보입니다. */}
+              <p className="yh-label">앞에 남은 사람</p>
               <p className="yh-figure yh-num mt-2">{position.toLocaleString("ko-KR")}</p>
             </div>
 
@@ -115,21 +118,16 @@ export function QueueDialog({
               />
             </div>
 
-            <dl className="mt-7 grid grid-cols-3 border-t border-yh-rule text-center">
-              <Stat
-                label="내 뒤"
-                value={place ? `${place.behind.toLocaleString("ko-KR")}명` : "집계 중"}
-              />
-              <Stat
-                label="전체 대기"
-                value={place ? `${place.totalWaiting.toLocaleString("ko-KR")}명` : "집계 중"}
-              />
+            {/* "내 뒤 N명" 과 "전체 대기 N명" 이 있었는데 들어냈습니다. 게이트웨이가
+                주는 것은 내 앞의 인원과 예상 시간 둘뿐이라, 그 두 칸은 영영 "집계 중"
+                으로 남습니다. 안 채워지는 칸은 기다리는 사람에게 고장으로 보입니다. */}
+            <dl className="mt-7 grid grid-cols-1 border-t border-yh-rule text-center">
               <Stat label="예상 대기" value={eta(place?.etaSeconds ?? null)} />
             </dl>
 
             {/* 앞서 "새로고침하면 순번이 사라집니다" 라고 적어 두었는데 사실이 아닙니다.
-                서버는 같은 토큰에 같은 순번을 돌려줍니다(PRD 설계 규칙 5).
-                이제 프론트도 토큰을 남겨 두므로 새로고침해도 이어서 기다립니다. */}
+                자리는 서버가 토큰으로 들고 있고, 프론트도 그 토큰을 남겨 두므로
+                돌아와서 순번만 다시 물어보면 이어서 기다립니다. */}
             <p className="yh-small mt-7 text-center text-yh-ink-2">
               차례가 오면 이 창에 뜹니다. 새로고침해도 순번은 그대로입니다.
             </p>

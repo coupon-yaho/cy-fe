@@ -21,7 +21,8 @@ export class CouponApiError extends Error {
   readonly serverMessage: string;
   /**
    * 503 일 때 서버가 헤더로 알려 주는 재시도 간격(초).
-   * 게이트(서킷브레이커)가 닫히면 /entry 가 503 + Retry-After 를 줍니다 — PRD 적응형 대기열.
+   * cy-waiting 게이트웨이가 붙입니다. 429(QUEUE_FULL·RATE_LIMITED·RETRY_TOKEN)와
+   * 503(TEMPORARILY_UNAVAILABLE) 에 실려 옵니다 — PRD 적응형 대기열.
    * 응답 **본문**에는 없는 값이라 어댑터가 헤더에서 읽어 넣습니다.
    */
   readonly retryAfterSeconds: number | null;
@@ -118,6 +119,28 @@ const COPY: Record<string, Copy> = {
     title: "지금은 입장할 수 없습니다",
     next: "발급 처리가 잠시 멈췄습니다. 곧 다시 열립니다.",
   },
+
+  /* ── cy-waiting 게이트웨이가 직접 만드는 코드 (ApiError.Code) ──
+     뒷단 코드가 아니라 게이트웨이가 자기 이름으로 내는 것이라, 여기 없으면
+     전부 "일시적인 오류" 한 줄로 뭉개집니다. 넷 다 뜻이 다릅니다. */
+  QUEUE_FULL: {
+    title: "대기열이 가득 찼습니다",
+    next: "잠시 후 다시 눌러 주세요.",
+  },
+  RATE_LIMITED: {
+    title: "요청이 너무 잦습니다",
+    next: "잠시 기다렸다가 다시 눌러 주세요.",
+  },
+  /* 줄에 서 있는 사람이 예산보다 자주 두드린 경우입니다. 사용자가 뭘 잘못한 게
+     아니라 폴링 간격 문제라, 나무라는 문구를 쓰지 않습니다. */
+  RETRY_TOKEN: {
+    title: "순번을 다시 확인하는 중입니다",
+    next: "잠시 후 자동으로 이어집니다.",
+  },
+  TEMPORARILY_UNAVAILABLE: {
+    title: "지금은 발급을 받을 수 없습니다",
+    next: "잠시 후 다시 시도해 주세요.",
+  },
 };
 
 const NETWORK: Copy = {
@@ -156,6 +179,10 @@ export function errorCopy(e: unknown): Copy {
 export function isRetryable(e: unknown): boolean {
   if (!isCouponApiError(e)) return true; // 네트워크 문제
   if (e.status >= 500) return true;
+  /* 429 는 전부 "지금 말고 이따가" 입니다 — 게이트웨이가 Retry-After 까지 함께
+     줍니다. 다시 시도 버튼을 안 열면 서버가 재시도하라고 한 요청을 화면이
+     막다른 오류로 만듭니다. */
+  if (e.status === 429) return true;
   return e.code === "COUPON-405" || e.code === "COMMON-004";
 }
 

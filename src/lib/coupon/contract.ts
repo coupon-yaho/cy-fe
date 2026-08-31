@@ -14,13 +14,12 @@ import type {
   CalendarEntry,
   CouponCancelResponse,
   CouponCancelUseResponse,
-  CouponIssueResponse,
   CouponRoundView,
   CouponRoundStatus,
   CouponTemplateDetail,
   CouponTemplateWriteRequest,
   CouponUseResponse,
-  EntryResponse,
+  IssueOutcome,
   IssuanceStatus,
   MemberCoupon,
   MembershipGrade,
@@ -59,27 +58,30 @@ export interface CouponApi {
    */
   listCalendar(from: string, to: string): Promise<CalendarEntry[]>;
 
-  /* 대기열 3종 — PRD 에는 있으나 어느 브랜치에도 구현이 없습니다.
-     프론트가 지어낸 계약이 아니라 백엔드 일감이 남은 것입니다. */
-
-  /** 미구현: POST /api/v1/coupons/{couponRoundId}/entry */
-  enterRound(couponRoundId: number, member: MemberContext): Promise<EntryResponse>;
-  /** 미구현: GET /api/v1/coupons/{couponRoundId}/queue */
+  /**
+   * GET /api/v1/coupons/{couponRoundId}/queue — 내 순번.
+   *
+   * <b>cy-waiting 게이트웨이가 직접 답합니다.</b> cy-be 에는 이 경로가 없어서,
+   * 게이트웨이를 앞에 세우지 않으면 404 입니다.
+   */
   pollQueue(
     couponRoundId: number,
     member: MemberContext,
     queueToken: string,
   ): Promise<QueueResponse>;
-  /** 미구현: DELETE /api/v1/coupons/{couponRoundId}/queue — 대기를 취소하고 자리를 반납합니다 */
-  leaveQueue(couponRoundId: number, member: MemberContext): Promise<void>;
 
-  /** POST /api/v1/coupons/{couponRoundId}/issue → 201 */
+  /**
+   * POST /api/v1/coupons/{couponRoundId}/issue → 201 발급 · 202 대기.
+   *
+   * 게이트웨이 없이 cy-be 만 두면 201 만 옵니다 — 그때는 `kind: "issued"` 한 갈래로만
+   * 흐르므로, 대기열을 안 켠 상태에서도 이 함수를 그대로 씁니다.
+   */
   issue(
     couponRoundId: number,
     member: MemberContext,
     idempotencyKey: string,
     entryToken?: string | null,
-  ): Promise<CouponIssueResponse>;
+  ): Promise<IssueOutcome>;
 
   /** GET /api/v1/coupons?status=&page=&size= — MemberCouponController */
   listMyCoupons(

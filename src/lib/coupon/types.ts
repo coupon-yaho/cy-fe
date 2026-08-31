@@ -229,33 +229,50 @@ export interface CouponRoundView {
   activeCount: number;
 }
 
-/** 대기열에서 보여 줄 값 한 벌 */
+/* ── 대기열 ────────────────────────────────────────────
+   대기열은 cy-be 가 아니라 **cy-waiting 게이트웨이**가 답합니다. 게이트웨이는 cy-be
+   앞에 서는 프록시라, 프론트가 부르는 주소는 그대로고 답하는 쪽만 달라집니다.
+
+   그래서 "줄에 서는 문" 이 따로 없습니다 — `POST .../issue` 한 곳을 두드리고,
+   자리가 있으면 201 로 쿠폰이 오고 없으면 202 로 번호표가 옵니다. 예전에는 여기
+   `/entry` 가 있었는데 게이트웨이에 그런 경로가 없어 들어냈습니다. */
+
+/** 대기 화면이 그리는 값. 게이트웨이가 주는 두 개가 전부입니다. */
 export interface QueuePlace {
-  /** 내 순번. 앞에 남은 사람 수와 같습니다. */
+  /** 내 앞의 인원. 차례가 오면 0 입니다 (cy-waiting `QueueEntry.rank`). */
   position: number;
-  /** 내 뒤에서 기다리는 사람 수 */
-  behind: number;
-  /** 이 회차에서 대기 중인 전체 인원 */
-  totalWaiting: number;
   /** 입장까지 남은 시간(초). 입장 처리가 멈추면 null 입니다. */
   etaSeconds: number | null;
 }
 
-/** POST /api/v1/coupons/{couponRoundId}/entry — 200 입장 / 202 대기 */
-export interface EntryResponse {
-  admitted: boolean;
-  entryToken: string | null;
-  expiresIn: number | null;
-  queueToken: string | null;
-  place: QueuePlace | null;
+/** POST .../issue 가 202 로 답한 것 — 자리가 없어 줄에 섰다는 뜻입니다 */
+export interface QueuedResponse {
+  admitted: false;
+  queueToken: string;
+  position: number;
+  etaSeconds: number;
+  queueMode: string;
+  /** 자리를 비웠다가 다시 선 사람인가. 등록 응답에만 실립니다. */
+  rejoined: boolean;
 }
 
-/** GET /api/v1/coupons/{couponRoundId}/queue */
-export interface QueueResponse {
-  status: "WAITING" | "ADMITTED";
-  place: QueuePlace | null;
-  entryToken: string | null;
-}
+/** 발급 요청의 두 갈래. 상태 코드로만 갈리므로 호출부가 반드시 확인해야 합니다. */
+export type IssueOutcome =
+  { kind: "issued"; issuance: CouponIssueResponse } | { kind: "queued"; queued: QueuedResponse };
+
+/**
+ * GET /api/v1/coupons/{couponRoundId}/queue
+ *
+ * 게이트웨이가 네 가지로 답합니다. `CLOSED` 와 `SOLD_OUT` 을 안 다루면 줄이
+ * 사라졌는데도 화면이 영영 폴링합니다.
+ */
+export type QueueResponse =
+  | { status: "WAITING"; position: number; etaSeconds: number }
+  | { status: "ADMITTED"; entryToken: string; expiresIn: number }
+  /** 줄에서 빠졌습니다(이탈·만료). 다시 설 수 있습니다. */
+  | { status: "CLOSED"; reason: string }
+  /** 재고가 떨어졌습니다. 다시 서도 소용없습니다. */
+  | { status: "SOLD_OUT"; reason: string };
 
 /* ── 캘린더 ────────────────────────────────────────────
    GET /api/v1/calendar?from&to — 사양서 U2 가 새로 요구한 엔드포인트입니다.
