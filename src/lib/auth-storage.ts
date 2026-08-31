@@ -2,7 +2,7 @@
  * 목 인증.
  *
  * 실제 로그인은 과제 범위 밖이라 클레임만 localStorage 에 보관합니다.
- * 백엔드는 JWT 대신 X-Member-Id · X-Membership-Grade · X-User-Role 헤더로
+ * 백엔드는 JWT 대신 X-Member-Id · X-Member-Grade · X-User-Role 헤더로
  * 사용자를 구분하므로(docs/CY-14), 세션이 담아야 할 값도 그 셋입니다.
  */
 import type { MembershipGrade } from "./coupon/types";
@@ -13,7 +13,7 @@ export interface Session {
   /** X-Member-Id 로 나가는 값 */
   memberId: number;
   nickname: string;
-  /** X-Membership-Grade */
+  /** X-Member-Grade */
   grade: MembershipGrade;
   /** X-User-Role — ADMIN 이면 /api/v1/admin/** 통과 */
   role: Role;

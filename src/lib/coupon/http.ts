@@ -7,7 +7,7 @@
  *
  * 헤더 규약 (api/.../MemberRequestHeaders · CouponRequestHeaders · AdminRequestHeaders)
  *   X-Member-Id        회원 식별자 (Long, 양수)
- *   X-Membership-Grade WELCOME | SILVER | GOLD | VIP
+ *   X-Member-Grade     WELCOME | SILVER | GOLD | VIP
  *   X-User-Role        ADMIN — /api/v1/admin/** 전체에 AdminRoleInterceptor 가 검사
  *   Idempotency-Key    사용 · 사용취소 · 발급취소
  */
@@ -37,12 +37,10 @@ import type {
 } from "./types";
 
 const MEMBER_ID = "X-Member-Id";
-const MEMBERSHIP_GRADE = "X-Membership-Grade";
-/* 게이트웨이는 등급을 **다른 이름으로** 받습니다 (cy-waiting MemberIdentityFilter).
-   둘을 다 보냅니다 — 앞에 게이트웨이가 있으면 게이트웨이가 이 이름을 보고, 없으면
-   cy-be 가 위 이름을 봅니다. 서로 상대의 이름은 그냥 무시합니다.
-   두 저장소가 이름을 하나로 합치면 이 줄은 지웁니다. */
-const GATEWAY_GRADE = "X-Member-Grade";
+/* 한동안 `X-Membership-Grade` 와 둘 다 보냈습니다. 게이트웨이와 cy-be 가 등급
+   헤더를 서로 다른 이름으로 받고 있었고, 어느 쪽이 앞에 서든 통하게 하려면 그래야
+   했습니다. CY-806 으로 이 이름 하나로 합쳐져서 옛 이름을 걷어냈습니다. */
+const MEMBER_GRADE = "X-Member-Grade";
 const USER_ROLE = "X-User-Role";
 const IDEMPOTENCY_KEY = "Idempotency-Key";
 
@@ -72,8 +70,7 @@ function toCouponTemplate(response: CouponTemplateResponse): CouponTemplateDetai
 function memberHeaders(member: MemberContext): Record<string, string> {
   return {
     [MEMBER_ID]: String(member.memberId),
-    [MEMBERSHIP_GRADE]: member.grade,
-    [GATEWAY_GRADE]: member.grade,
+    [MEMBER_GRADE]: member.grade,
   };
 }
 

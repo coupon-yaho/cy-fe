@@ -27,7 +27,7 @@ import type {
   QueueResponse,
 } from "./types";
 
-/** X-Member-Id · X-Membership-Grade 헤더로 나가는 값 */
+/** X-Member-Id · X-Member-Grade 헤더로 나가는 값 */
 export interface MemberContext {
   memberId: number;
   grade: MembershipGrade;

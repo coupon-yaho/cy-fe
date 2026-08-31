@@ -55,7 +55,7 @@ export function useAuth() {
   return ctx;
 }
 
-/** X-Member-Id · X-Membership-Grade 로 나갈 값 */
+/** X-Member-Id · X-Member-Grade 로 나갈 값 */
 export function useMember() {
   const { session } = useAuth();
   return session ? { memberId: session.memberId, grade: session.grade } : null;
