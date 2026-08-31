@@ -36,6 +36,14 @@ const batchAltOrigin = process.env["BATCH_ALT_ORIGIN"] || localEnv("BATCH_ALT_OR
 const batchAppOrigin = process.env["BATCH_APP_ORIGIN"] || localEnv("BATCH_APP_ORIGIN");
 const batchToken = process.env["BATCH_ADMIN_TOKEN"] || localEnv("BATCH_ADMIN_TOKEN");
 
+// 대기열 게이트웨이(cy-waiting). **모든 /api 를 여기로 보내면 안 된다** — 게이트웨이가
+// 아는 경로는 쿠폰 셋뿐이고 나머지(회차·달력·브랜드·관리자)는 전부 404 다. 실제로
+// API_ORIGIN 을 통째로 돌렸다가 화면이 통으로 죽는 것을 봤다.
+//
+// 그래서 발급과 순번 조회 **두 경로만** 게이트웨이로 보낸다. 안 띄웠으면 비워 두면
+// 되고, 그때는 지금까지처럼 발급이 cy-be 로 직행한다(201만 오므로 대기열이 안 뜬다).
+const gatewayOrigin = process.env["GATEWAY_ORIGIN"] || localEnv("GATEWAY_ORIGIN");
+
 type ProxyLike = {
   on: (event: "proxyReq", cb: (req: { setHeader: (k: string, v: string) => void }) => void) => void;
 };
@@ -44,6 +52,15 @@ export default defineConfig({
   vite: {
     server: {
       proxy: {
+        // **/api 보다 먼저 둔다.** 앞의 규칙이 이기므로 순서가 곧 동작이다.
+        ...(gatewayOrigin
+          ? {
+              "^/api/v1/coupons/\\d+/(issue|queue)(\\?.*)?$": {
+                target: gatewayOrigin,
+                changeOrigin: true,
+              },
+            }
+          : {}),
         "/api": {
           target: apiOrigin,
           changeOrigin: true,

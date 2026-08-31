@@ -38,6 +38,11 @@ import type {
 
 const MEMBER_ID = "X-Member-Id";
 const MEMBERSHIP_GRADE = "X-Membership-Grade";
+/* 게이트웨이는 등급을 **다른 이름으로** 받습니다 (cy-waiting MemberIdentityFilter).
+   둘을 다 보냅니다 — 앞에 게이트웨이가 있으면 게이트웨이가 이 이름을 보고, 없으면
+   cy-be 가 위 이름을 봅니다. 서로 상대의 이름은 그냥 무시합니다.
+   두 저장소가 이름을 하나로 합치면 이 줄은 지웁니다. */
+const GATEWAY_GRADE = "X-Member-Grade";
 const USER_ROLE = "X-User-Role";
 const IDEMPOTENCY_KEY = "Idempotency-Key";
 
@@ -68,6 +73,7 @@ function memberHeaders(member: MemberContext): Record<string, string> {
   return {
     [MEMBER_ID]: String(member.memberId),
     [MEMBERSHIP_GRADE]: member.grade,
+    [GATEWAY_GRADE]: member.grade,
   };
 }
 
